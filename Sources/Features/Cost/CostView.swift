@@ -17,9 +17,12 @@ struct CostView: View {
                 periodFilter
                 ReportFilters(model: model, includesCost: true)
                 pricingAssumptions
+                DetailSheet("Published model price history") { CostRateHistoryView(selectedModel: model.modelFilter) }
                 CostSummary(report: report, basis: model.costBasis, refreshing: model.busy || model.filtering,
                             sourceDate: model.lastSuccessfulUsageRead, sourceError: model.snapshot.error, sourceAvailable: model.costSourceAvailable)
                 if report.calculatedAt != nil && model.costSourceAvailable {
+                    CostUsageContext(model: model, monitor: model.live)
+                    CostOutputComparison(report: report, basis: model.costBasis)
                     VStack(alignment: .leading, spacing: 14) {
                         ChoiceRow(title: "Compare", selection: $breakdown, choices: [(0, "Models"), (1, "Reasoning levels")], segmented: true)
                         ForEach(Array((showAll ? rows : Array(rows.prefix(8))))) { row in costRow(row) }
@@ -128,6 +131,8 @@ struct CostView: View {
             ProgressView(value: NSDecimalNumber(decimal: row.amounts.total).doubleValue,
                          total: max(0.000001, NSDecimalNumber(decimal: rows.first?.amounts.total ?? 0).doubleValue))
                 .progressViewStyle(ReportMagnitudeStyle())
+            Text(row.output.usdPerMillionOutput.map { CostPricing.dollars($0) + " / 1M output tokens · same priced records" } ?? "Cost per output unavailable")
+                .font(.callout).monospacedDigit()
             Text("\(compact(row.pricedTokens)) tokens priced · \(compact(row.unpricedTokens)) unpriced · \(row.records.formatted()) records")
                 .font(.caption).foregroundStyle(.secondary)
         }

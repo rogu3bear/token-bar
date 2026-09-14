@@ -23,6 +23,12 @@ Historical base rates (USD per million input / cached input / output tokens):
 | 5.6 Luna | July 9–29; July 30 onward | 1 / 0.1 / 6; 0.2 / 0.02 / 1.2 | Same launch and reduction |
 | 6 Astra | September 3 onward | 10 / 1 / 50 | [Changelog](https://developers.openai.com/api/docs/changelog) |
 
+The [launch post](https://openai.com/index/gpt-5-6/), rechecked September 13,
+2026 for this qualification, describes the August 21 Sol API/credit reduction
+as lasting three months. The shipped open interval retains the last verified
+rate; it does not establish a permanent tariff. An exact expiration instant or
+replacement rate is not established here and is not invented.
+
 Verification date is September 9, 2026. Price-change days are entirely unpriced because the exact UTC cutover is unknown. Historical Fast pricing is supported only from July 31; historical long-context surcharges only from September 9. Complete older GPT-5.5 and GPT-5.3-Codex schedules are not established here; their historical rules start at the September 9 observation. The last verified version continues forward until explicitly updated; it can become stale. CSV schema 2 preserves the original column prefix and appends each applied version, source, verification date, interval, selected service and applied service. Legacy reference columns are blank for historical rows; generic rate-card and price-basis columns identify the historical schedule. Unsupported intervals stay unpriced even when reference pricing is available.
 
 The model/provider match is exact. Current verified rules cover OpenAI GPT-6 Astra, GPT-5.6 Sol/Terra/Luna, the documented GPT-5.6 alias, GPT-5.5, and GPT-5.3-Codex. Other models, providers, and unsupported service scenarios remain unpriced. Extending the rate card does not add another usage connector. There are no network pricing calls or uploads.
@@ -66,13 +72,80 @@ The selected reasoning effort comes from each turn context; a missing setting re
 
 Coverage uses processed tokens in priced records divided by all processed tokens matching the filters. A zero denominator is unavailable (an em dash), not 0%. Empty selections have no estimate; supported zero-token records can have a measured zero-dollar estimate, including in model and effort rows. Nonzero usage with no supported prices has 0% coverage and an unavailable estimate. Unpriced records remain visible by model/effort and reason. A partial dollar amount is labeled partial. CSV carries full-precision decimal amounts, reference card/service, unknown reasons, observed request context band, effective pricing context band/scope and granularity; blank dollar cells mean unpriced, never zero. Formula-leading source labels are escaped for spreadsheet use.
 
+## Cost relative to output
+
+Cost shows the full estimated request cost in USD per million output tokens,
+by selected period, local day, model and reasoning level. The numerator includes
+all priced input, cache and output contributions. The denominator uses output
+from exactly those priced records, including reasoning. Input-only priced
+records still contribute cost. Zero output, an empty selection or wholly
+unpriced usage has no ratio. This is neither an output-only tariff nor a measure
+of answer quality, task success or productivity.
+
+The companion input-per-output ratio uses that same priced cohort. Output
+coverage is priced output divided by all recorded output in the selection;
+missing output counters are excluded and their record count is shown separately.
+This differs from the existing processed-token pricing coverage. Daily detail
+shows its own output denominator and coverage; absent or unpriceable days do not
+become zero-cost bars. Ratios are computed from summed costs and counters, not
+an average of request ratios. The same History/Cost filters apply throughout.
+
+Historical rates show both dated rate changes and usage changes. Reference rates
+hold the shipped card fixed across days; model mix, caching, input volume and
+context bands can still change the ratio. Filter to a model/task to narrow that
+comparison. Existing CSV retains the full cost and output counters needed to
+reconstruct this calculation; blank estimates remain unpriced.
+
 ## Separate completeness and provider comparison
 
-The evidence panel reports model, reasoning level, cache reads, cache writes, request size, usage-reported tier, requested tier and price availability separately. Each field has a token-weighted denominator (all selected input + output tokens), and recorded-field rows also show record counts. These measure available local evidence, not the unknowable share of logs that never reached this machine. A usage record can contain multiple requests, so record counts must not be called request counts.
+The report details panel reports model, reasoning level, cache reads, cache writes, request size, usage-reported tier, requested tier and price availability separately. Each field has a token-weighted denominator (all selected input + output tokens), and recorded-field rows also show record counts. These measure available local evidence, not the unknowable share of logs that never reached this machine. A usage record can contain multiple requests, so record counts must not be called request counts.
+
+**What this usage covers** explains that reports use records available on this
+Mac; origin-host identity is not retained. Copied logs do not establish where
+work ran, and absent remote/cloud records remain unseen. The directly accessible
+**Compare with Codex account totals** sheet provides account context without a
+transfer or sync feature. Account-minus-local differences cannot distinguish
+other hosts from attribution gaps, unavailable logs or reporting differences.
 
 **Refresh account usage** reads `account/usage/read` through the installed app-server, bracketed by account-bound quota/identity reads on the serialized provider queue. Account changes reject the read. Private per-account snapshots persist alongside existing quota observations, with source and observation time. The panel reports lifetime tokens and available daily buckets, then compares only complete UTC days returned by the provider inside the selected local-time period. Missing days stay unknown. Tool, model, effort, task or different-account filters disable the comparison; provider daily totals have no such breakdown. Local inferred-account tokens and unattributed tokens remain separate. Unknown UTC dates are excluded and counted. A difference is arithmetic, not a finding of missing usage or a billing error: the provider's counter rules and delay are not established by this endpoint. Today may have no complete eligible day.
 
 The app's Usage & billing screen also displays quota percentages and turn-count analytics; these are different denominators. An advertised monthly plan price is not payment evidence. Subscription charges and paid amounts are not estimated from token statistics. No invoice export is required to use this comparison, and no API-equivalent amount is relabeled as an actual charge.
+
+## Published rates and allowance observations
+
+**Published model price history** shows the shipped standard API input,
+cache-read and output rates by effective interval, including the change from
+the preceding version, source link and verification date. It does not flatten
+history into today's reference card. Change-day ambiguity, unsupported older
+intervals and the last verification date remain visible. These public prices
+are separate from subscription metering.
+
+**Allowance changes and observed tokens** compares one active Codex account and
+one retained allowance window across the selected Cost dates. Each interval
+uses consecutive observations at most ten minutes apart, with unchanged reset,
+window duration and name. Resets, decreases, invalid percentages and larger gaps
+are excluded. Input/output/cache-read counters are summed only for exact
+single-request observations inside the same interval, inferred to that account;
+cache reads remain within input. Known foreign providers/tools are excluded.
+Unattributed or unidentified Codex work remains an explicit coverage gap.
+
+The diagnostic local-token-per-percentage-point ratio is unavailable for zero
+allowance change, zero local tokens, ambiguous attribution/counters, or unresolved
+daily timing that could overlap that interval. Unresolved older days do not
+invalidate precise later intervals. Matched request archive details recover
+timing only when the existing totals, counts and account/group identity reconcile;
+no source-log replay or proportional split is performed. Model mix remains visible,
+but even one observed model cannot prove a subscription multiplier: provider
+reporting lag and unseen activity can change the relationship. Retained Codex
+quota observations cover up to 90 days; Claude/Grok historic metering remains
+unavailable. Account/model/tool/task filter restrictions prevent comparing unlike
+scopes. This is evidence for investigating divergence, not a billing-error claim.
+
+`UsageComparisonStore` prepares process-owned results on a serial utility queue.
+Source, retained quota, account, query, day and archive-count changes invalidate
+results. Navigation reuses them; queued updates retain completed results for the
+same account/query and reject results for obsolete scopes. Reconciled archive
+details are cached by source revision and archive count.
 
 ## Retained details
 

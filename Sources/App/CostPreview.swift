@@ -52,6 +52,23 @@ enum CostPreview {
         model.live.currentID = "synthetic-account"
         model.live.state.usage = ["synthetic-account": ProviderUsage(accountID: "synthetic-account", observed: now, lifetimeTokens: 9_000_000,
             days: Dictionary(uniqueKeysWithValues: (0..<6).map { day in (UsageMetadata.day(now.addingTimeInterval(Double(-day) * 86400)), 400_000) }))]
+        if CommandLine.arguments.contains("--sample-metering") {
+            var samples: [QuotaReading] = []
+            for index in 0..<7 {
+                let date = now.addingTimeInterval(Double(index - 6) * 300)
+                samples.append(QuotaReading(accountID: sampleAccount.id, bucket: "codex", name: "Codex", window: "primary", minutes: 300,
+                    used: Double(20 + index * (index + 1) / 2), reset: now.addingTimeInterval(3600), date: date))
+                if index > 0 {
+                    var entry = entries[index % 3]
+                    entry.date = date.addingTimeInterval(-150); entry.firstObserved = entry.date
+                    entry.pricingDay = UsageMetadata.day(entry.date); entry.account = sampleAccount
+                    entry.session = "sample-metering-\(index)"; entry.recordID = entry.session
+                    entries.append(entry)
+                }
+            }
+            model.live.state.accounts[sampleAccount.id] = LiveAccount(id: sampleAccount.id, email: "sample@example.com", plan: "pro", observed: now, quotas: [samples.last!])
+            model.live.state.quotaHistory = samples
+        }
         model.snapshot = Snapshot(entries: entries, updated: now)
         model.snapshot.historyImportedAt = now
         model.availableModels = Array(Set(entries.map(\.model))).sorted()

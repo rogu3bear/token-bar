@@ -36,6 +36,32 @@ let rows = [entry(yesterday, effort: "low"), entry(effort: "high"), entry(effort
 let report = CostReport.build(source: rows, query: UsageQuery(period: 1), catalog: [:], now: now)
 check(report.pricedTokens == 3_300_000 && report.unpricedTokens == 1_100_000 && report.coverage == 0.75, "Coverage includes unpriced usage")
 check(report.efforts.contains { $0.id == "Unknown" }, "Missing effort has a visible bin")
+check(report.output.output == 300_000 && report.output.unpricedOutput == 100_000 && report.output.outputCoverage == 0.75,
+      "Output coverage keeps priced and unpriced output in separate cohorts")
+check(report.output.usdPerMillionOutput == Decimal(string: "98.5")! && report.output.inputPerOutput == 10,
+      "Full input/cache/output cost is normalized against the same priced output, never unpriced output")
+check(report.models.reduce(0) { $0 + $1.output.output } == report.output.output
+      && report.days.reduce(Decimal.zero) { $0 + $1.output.cost } == report.amounts.total,
+      "Model and daily output comparisons reconcile with the selected priced cohort")
+let inputOnly = entry(tokens: usage(input: 100, cached: 0, writes: 0, output: 0, reasoning: 0))
+let inputOnlyReport = CostReport.build(source: [inputOnly], query: UsageQuery(period: 1), catalog: [:], now: now)
+check(inputOnlyReport.output.cost > 0 && inputOnlyReport.output.usdPerMillionOutput == nil,
+      "Input-only work has cost but no cost-per-output denominator")
+let mixedOutput = CostReport.build(source: [entry(), inputOnly], query: UsageQuery(period: 1), catalog: [:], now: now)
+check(mixedOutput.output.usdPerMillionOutput == Decimal(string: "98.51")!,
+      "Input-only requests remain in the full cost numerator when priced output exists")
+var absentOutput = entry(); absentOutput.tokenFields?.removeAll { $0 == "output_tokens" }
+let missingOutputReport = CostReport.build(source: [entry(), absentOutput], query: UsageQuery(period: 1), catalog: [:], now: now)
+check(missingOutputReport.output.missingOutputRecords == 1 && missingOutputReport.output.unpricedOutput == 0
+      && missingOutputReport.output.usdPerMillionOutput == Decimal(string: "98.5")!,
+      "Missing output fields never become a measured zero or dilute the priced ratio")
+var otherAccount = entry(); otherAccount.account = Account(id: "other", label: "Synthetic", plan: "pro")
+let outputScoped = CostReport.build(source: [entry(), otherAccount, unknown], query: UsageQuery(period: 1, account: "other"), catalog: [:], now: now)
+check(outputScoped.output.output == 100_000 && outputScoped.output.unpricedOutput == 0,
+      "Output comparisons follow the same account selection as cost")
+check(CostReport.build(source: [entry()], query: UsageQuery(period: 1, model: "absent"), catalog: [:], now: now).output.usdPerMillionOutput == nil,
+      "An empty filtered selection has no output comparison")
+print("PASS: matched cost/output cohorts, daily and model reconciliation, input-only cost, absent output and account/model filters")
 let high = CostReport.build(source: rows, query: UsageQuery(period: 0), catalog: [:], effort: "high", now: now)
 check(high.lines.count == 2 && high.unpricedTokens > 0, "Combined date and effort filtering preserves unknown prices")
 check(CostReport.build(source: rows, query: UsageQuery(period: 4, start: now, end: yesterday), catalog: [:]).lines.isEmpty, "Reversed date range has no usage")
@@ -286,3 +312,110 @@ do {
     check(corrupt.indexBuilds == 1, "A damaged derived index rebuilds from saved usage")
 }
 print("PASS: durable report index restart, incremental append, late events, mismatched baseline and corrupt-cache recovery")
+
+// Same observed account/window interval: no cross-window sums or model tariff inference.
+let meterNow = Calendar.current.startOfDay(for: now).addingTimeInterval(3600)
+let meterAccount = Account(id: "meter-account", label: "Synthetic", plan: "pro")
+func allowance(_ seconds: Double, _ used: Double, reset: Date? = nil) -> QuotaReading {
+    QuotaReading(accountID: meterAccount.id, bucket: "standard", name: "Codex", window: "primary", minutes: 300,
+                 used: used, reset: reset ?? meterNow.addingTimeInterval(3600), date: meterNow.addingTimeInterval(seconds))
+}
+func metered(_ seconds: Double, model: String = "gpt-6-astra") -> Entry {
+    var value = entry(meterNow.addingTimeInterval(seconds), model: model, tokens: usage(input: 1000, cached: 200, writes: 0, output: 100, reasoning: 20))
+    value.account = meterAccount; value.harness = "codex-cli"; value.requestInputTokens = 1000
+    return value
+}
+let meterHistory = [allowance(-600, 10), allowance(-300, 11), allowance(0, 13)]
+let meterSource = [metered(-450), metered(-150, model: "gpt-5.6-sol")]
+let windowID = meterHistory[0].id
+let meterReport = MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource, query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
+check(meterReport.intervals.map(\.usedPoints) == [1, 2] && meterReport.intervals.map(\.tokensPerPoint) == [1100, 550],
+      "Matched intervals expose observed allowance divergence for identical local token mix")
+check(meterReport.intervals[0].cached == 200 && meterReport.intervals[0].input == 1000,
+      "Cache reads remain a subset of input")
+let mixedMeter = MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource + [metered(-350, model: "gpt-5.6-sol")], query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
+check(mixedMeter.intervals[0].models.count == 2, "Mixed-model usage remains explicitly mixed at the account level")
+let resetHistory = [allowance(-1800, 5), allowance(-600, 10), allowance(-300, 1, reset: meterNow.addingTimeInterval(7200)), allowance(0, 0)]
+check(MeteringComparison.build(history: resetHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource, query: UsageQuery(period: 1), effort: "All levels", now: meterNow).intervals.isEmpty,
+    "Long gaps, resets and decreases cannot become comparable depletion intervals")
+var unbound = metered(-400); unbound.account = nil
+let incompleteMeter = MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource + [unbound], query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
+check(incompleteMeter.intervals[0].tokensPerPoint == nil && incompleteMeter.intervals[0].unattributed == 1100,
+      "Unattributed usage prevents a seemingly complete local ratio")
+var coarseMeter = metered(-400); coarseMeter.bucket = "day"
+check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource + [coarseMeter], query: UsageQuery(period: 1), effort: "All levels", now: meterNow).intervals.allSatisfy { $0.tokensPerPoint == nil },
+    "Unreconciled daily records prevent precise metering ratios")
+check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource, query: UsageQuery(period: 1, model: "gpt-6-astra"), effort: "All levels", now: meterNow).intervals.isEmpty,
+    "A model-filtered denominator cannot explain whole-account allowance")
+let comparisonStore = UsageComparisonStore()
+var comparisonState = LiveState()
+comparisonState.accounts[meterAccount.id] = LiveAccount(id: meterAccount.id, email: "sample@example.com", plan: "pro", observed: meterNow, quotas: [meterHistory.last!])
+comparisonState.quotaHistory = meterHistory
+let comparisonQuery = UsageQuery(period: 1)
+func refreshComparison(_ revision: UInt64 = 1, quota: UInt64 = 1, query: UsageQuery? = nil) {
+    comparisonStore.refresh(source: meterSource, revision: revision, quotaRevision: quota, state: comparisonState,
+                            currentID: meterAccount.id, query: query ?? comparisonQuery, effort: "All levels", now: meterNow)
+}
+func settleComparison() {
+    let deadline = Date().addingTimeInterval(10)
+    while comparisonStore.busy && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    check(!comparisonStore.busy, "Background comparison completes")
+}
+refreshComparison(); settleComparison()
+check(comparisonStore.metering[windowID]?.intervals.count == 2, "Background owner publishes interval evidence")
+refreshComparison(); settleComparison()
+check(comparisonStore.builds == 1, "Navigation/re-entry reuses unchanged comparison results")
+refreshComparison(2); settleComparison()
+check(comparisonStore.builds == 2, "Usage revision invalidates comparison")
+refreshComparison(2, quota: 2); settleComparison()
+check(comparisonStore.builds == 3, "Retained quota revision invalidates comparison")
+refreshComparison(2, quota: 2, query: UsageQuery(period: 1, model: "gpt-6-astra")); settleComparison()
+check(comparisonStore.metering[windowID]?.intervals.isEmpty == true, "Query changes replace incompatible comparisons")
+print("PASS: matched allowance/token intervals, divergence, mixed models, resets/gaps, attribution/timing gaps and process-owned reuse/invalidation")
+
+var previousDayBucket = coarseMeter; previousDayBucket.date = meterNow.addingTimeInterval(-86400)
+let preciseDay = MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource + [previousDayBucket], query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
+check(preciseDay.coarseRecords == 1 && preciseDay.intervals.allSatisfy { $0.tokensPerPoint != nil },
+      "A coarse bucket on another day cannot invalidate precise intervals")
+var foreign = unbound; foreign.provider = "anthropic"; foreign.harness = "Claude Code"
+check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
+    source: meterSource + [foreign], query: UsageQuery(period: 1), effort: "All levels", now: meterNow).intervals[0].tokensPerPoint == 1100,
+    "Known foreign usage is outside the unknown Codex attribution denominator")
+refreshComparison(3, quota: 3); settleComparison()
+let completeBeforeQueue = comparisonStore.calculatedAt
+refreshComparison(4, quota: 4); refreshComparison(5, quota: 5)
+check(comparisonStore.calculatedAt == completeBeforeQueue && comparisonStore.metering[windowID]?.intervals.count == 2,
+      "Source/quota changes preserve the last completed result in the same scope")
+settleComparison()
+check(comparisonStore.metering[windowID]?.intervals.count == 2 && comparisonStore.calculatedAt != nil,
+      "Coalesced background updates publish without starving the view")
+print("PASS: coarse timing is interval-local, foreign-tool scope is separate, queued updates preserve completed comparison")
+
+let timingArchiveURL = root.appendingPathComponent("meter-timing.sqlite")
+let timingArchive = try RequestArchive(url: timingArchiveURL)
+var detailOne = metered(-450); detailOne.recordID = "meter-detail-one"
+var detailTwo = metered(-150); detailTwo.recordID = "meter-detail-two"
+try timingArchive.record(detailOne, admitted: true); try timingArchive.record(detailTwo, admitted: true)
+var dailyMeter = detailOne; dailyMeter.date = Calendar.current.startOfDay(for: meterNow)
+dailyMeter.tokens = detailOne.tokens + detailTwo.tokens; dailyMeter.bucket = "day"; dailyMeter.sampleCount = 2
+dailyMeter.recordID = nil; dailyMeter.requestInputTokens = nil
+let archivedComparison = UsageComparisonStore()
+archivedComparison.refresh(source: [dailyMeter], revision: 1, quotaRevision: 1, state: comparisonState,
+    currentID: meterAccount.id, query: comparisonQuery, effort: "All levels", now: meterNow,
+    archiveURL: timingArchiveURL, archiveCount: 2)
+let archiveDeadline = Date().addingTimeInterval(10)
+while archivedComparison.busy && Date() < archiveDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+check(archivedComparison.metering[windowID]?.coarseRecords == 0 && archivedComparison.metering[windowID]?.intervals.map(\.tokensPerPoint) == [1100, 550],
+      "Background comparison recovers exact matching archived timing after daily compaction")
+var since = comparisonQuery; since.period = 5; since.start = meterNow.addingTimeInterval(-600)
+check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id, source: [dailyMeter],
+    query: since, effort: "All levels", now: meterNow).coarseRecords == 2,
+    "A bucket starting before a partial-day selection still makes overlapping intervals uncertain")
+print("PASS: reconciled request archive supplies exact metering timing; partial-day coarse overlap stays unavailable")

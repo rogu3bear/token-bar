@@ -4,6 +4,28 @@ struct CostLine {
     var entry: Entry
     var estimate: CostEstimate
 }
+/// Numerator and denominator always describe the same fully priced records.
+/// Input-only requests contribute cost; a zero output denominator is unavailable.
+struct CostOutput {
+    var cost: Decimal = 0
+    var input = 0
+    var output = 0
+    var unpricedOutput = 0
+    var missingOutputRecords = 0
+    var usdPerMillionOutput: Decimal? { output > 0 ? cost * 1_000_000 / Decimal(output) : nil }
+    var inputPerOutput: Decimal? { output > 0 ? Decimal(input) / Decimal(output) : nil }
+    var outputCoverage: Double? {
+        let total = output + unpricedOutput
+        return total > 0 ? Double(output) / Double(total) : nil
+    }
+    mutating func add(_ entry: Entry, estimate: CostEstimate) {
+        if let amounts = estimate.amounts {
+            cost += amounts.total; input += entry.tokens.input; output += entry.tokens.output
+        } else if entry.hasField("output_tokens") {
+            unpricedOutput += entry.tokens.output
+        } else { missingOutputRecords += entry.eventCount }
+    }
+}
 struct CostRow: Identifiable {
     var id: String
     var title: String
@@ -12,11 +34,13 @@ struct CostRow: Identifiable {
     var unpricedTokens = 0
     var records = 0
     var hasPricedRecords = false
+    var output = CostOutput()
 }
 struct CostDay: Identifiable {
     var date: Date
     var amounts = CostAmounts()
     var unpricedTokens = 0
+    var output = CostOutput()
     var id: Date { date }
 }
 struct CostContextIndex: Codable {
@@ -39,6 +63,7 @@ struct CostReport {
     var lines: [CostLine] = []
     var completeness = CostCoverage()
     var amounts = CostAmounts()
+    var output = CostOutput()
     var pricedTokens = 0
     var unpricedTokens = 0
     var unknownEffortTokens = 0
@@ -74,6 +99,7 @@ struct CostReport {
             var row = rows[key] ?? CostRow(id: key, title: title)
             if let value = estimate.amounts { row.amounts = row.amounts + value; row.pricedTokens += entry.tokens.total; row.hasPricedRecords = true }
             else { row.unpricedTokens += entry.tokens.total }
+            row.output.add(entry, estimate: estimate)
             row.records += entry.eventCount; rows[key] = row
         }
         let bounds = query.timeBounds(now: now)
@@ -84,8 +110,10 @@ struct CostReport {
             if estimate.priceBasis == nil { estimate.priceBasis = basis.rawValue }
             result.completeness.add(entry)
             result.lines.append(CostLine(entry: entry, estimate: estimate))
+            result.output.add(entry, estimate: estimate)
             let date = Calendar.current.startOfDay(for: entry.date)
             var day = days[date] ?? CostDay(date: date)
+            day.output.add(entry, estimate: estimate)
             if let value = estimate.amounts {
                 result.amounts = result.amounts + value; result.pricedTokens += entry.tokens.total
                 day.amounts = day.amounts + value

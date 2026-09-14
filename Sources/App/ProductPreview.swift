@@ -89,6 +89,9 @@ enum ProductPreview {
             model.tachometer.unit = .minute
             model.claudeMeter.unit = .hour
         }
+        if CommandLine.arguments.contains("--sample-two-tools") {
+            model.grokMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now); model.grokMeter.tick(now: now)
+        }
         if CommandLine.arguments.contains("--sample-single-tool") {
             model.claudeMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now); model.claudeMeter.tick(now: now)
             model.grokMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now); model.grokMeter.tick(now: now)
@@ -105,15 +108,18 @@ enum ProductPreview {
                 error: "Synthetic transcript read failed", referenceDate: now)
             model.claudeMeter.tick(now: now)
         }
+        let previewWidth: CGFloat = CommandLine.arguments.firstIndex(of: "--sample-width").flatMap {
+            CommandLine.arguments.indices.contains($0 + 1) ? Double(CommandLine.arguments[$0 + 1]) : nil
+        }.map { CGFloat(min(1800, max(900, $0))) } ?? 1064
         let view = AppearanceHost(preferences: model.appearance) {
             Group {
                 if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
                 else { DetailRoot(model: model) }
-            }.frame(width: compact ? 440 : 1064, height: compact ? nil : 900)
+            }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : 900)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } }
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : 1064, height: compact ? host.fittingSize.height : 900)
+        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : previewWidth, height: compact ? host.fittingSize.height : 900)
         if compact { print("Compact native fitting size: \(host.frame.size)") }
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

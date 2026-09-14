@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 — In development
+
+- Restore equal active-provider columns and aligned separators, quota rows and large gauges on Now, with complete rate digits and explicit units.
+- Compare full request cost per output token, with daily/model coverage, and inspect sourced model API rate changes by effective date.
+- Compare account-bound Codex allowance changes with the locally observed input/output/cache mix over matching retained intervals. Resets, gaps and ambiguous evidence remain explicit; no model-specific subscription tariff or host identity is inferred.
+- Reuse background comparison results across navigation and matching archived timing when available. Explain these boundaries on the website without advertising an unreleased installer.
+
 ## 0.1.1 — Patch candidate
 
 - Keep History and Cost reports warm across navigation; publish completed results while new usage is queued.

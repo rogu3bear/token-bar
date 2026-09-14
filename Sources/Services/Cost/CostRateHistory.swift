@@ -10,6 +10,8 @@ struct CostRateVersion {
     var rule: CostRateRule
     var transitionDays: Set<String> = []
     var fastFrom: String?
+    var qualification: String?
+    var qualificationSource: URL?
     // Historical base prices are documented; do not backdate today's context surcharge without evidence.
     var longContextVerifiedFrom = "2026-09-09"
     func includes(_ day: String) -> Bool { day >= effectiveFrom && (effectiveUntil.map { day < $0 } ?? true) }
@@ -24,6 +26,10 @@ enum CostRateHistory {
             let rule = CostRateRule.modern(model, input: input, cached: cached, output: output)
             values.append(CostRateVersion(id: "\(model)-\(from)", effectiveFrom: from, effectiveUntil: until, source: source, rule: rule,
                                           transitionDays: [from], fastFrom: "2026-07-31"))
+            if ["gpt-5.6-sol", "gpt-5.6"].contains(model), from == "2026-08-21" {
+                values[values.count - 1].qualification = "The August 21 announcement describes a three-month API/credit price reduction. The exact expiry instant and replacement tariff are not established here. This is the last verified rate, not a permanent price. Duration checked September 13, 2026."
+                values[values.count - 1].qualificationSource = launch
+            }
         }
         for model in ["gpt-5.6-sol", "gpt-5.6"] {
             add(model, from: "2026-07-09", until: "2026-08-21", input: "5", cached: "0.5", output: "30", source: launch)

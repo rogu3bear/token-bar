@@ -91,8 +91,17 @@ struct Runway {
     }
 }
 @Observable final class LiveMonitor {
-    var state = LiveState()
-    var currentID: String?
+    var state = LiveState() {
+        didSet {
+            // Current 30-second samples do not invalidate a retained-history comparison.
+            let historyChanged = (state.quotaHistory ?? state.samples) != (oldValue.quotaHistory ?? oldValue.samples)
+            let usageChanged = state.usage?.mapValues(\.observed) != oldValue.usage?.mapValues(\.observed)
+            if historyChanged || usageChanged { comparisonRevision &+= 1; comparisonChanged?() }
+        }
+    }
+    var currentID: String? { didSet { if currentID != oldValue { comparisonChanged?() } } }
+    @ObservationIgnored private(set) var comparisonRevision: UInt64 = 0
+    @ObservationIgnored var comparisonChanged: (() -> Void)?
     var error: String?
     var busy = false
     var usageBusy = false

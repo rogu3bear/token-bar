@@ -61,7 +61,7 @@ struct ToolQuotaSummary: View {
             Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text(text).font(.system(size: 29, weight: .semibold, design: .rounded))
-                .monospacedDigit().lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.55)
                 .contentTransition(.numericText())
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: text)
         }.accessibilityElement(children: .combine)

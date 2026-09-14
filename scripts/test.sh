@@ -13,7 +13,7 @@ RAN=0
 # never edits this file, and a missing or ambiguous name fails the run.
 
 # The ledger, cost and provider surfaces that every logic group links.
-CORE="ProviderUsage.swift CostRateHistory.swift CostCoverage.swift RequestExport.swift
+CORE="ProviderUsage.swift UsageComparison.swift CostRateHistory.swift CostCoverage.swift RequestExport.swift
       CoverageAudit.swift UsageMetadata.swift RequestArchive.swift LiveStateStore.swift CostPricing.swift
       CostReport.swift CostRecovery.swift UsageInsights.swift Appearance.swift PageStyle.swift
       Usage.swift UsageStore.swift ImportProgress.swift GrokUsage.swift Activity.swift LiveTool.swift ClaudeActivityReader.swift ActivityFeed.swift EventIndex.swift

@@ -624,3 +624,12 @@ sample receipt, not proof of native animation frame pixels. Native raster captur
 continues using SwiftUI/AppKit animation and wall-clock pacing. The repeat verifier
 compares diagnostic PNG bytes and sample receipts, and reports motion raster
 differences separately when `--motion-raster` is requested.
+
+### Now provider alignment
+
+Now uses equal-width active-provider columns with shared row heights for rate,
+separator, quota, gauge and model detail. Connection/unavailable text can grow its
+row without misaligning gauges. The center dividers span the columns. Inactive
+tools reserve no area. Rate digits retain their own complete height and actual
+units. Single-provider views use the available width; the same geometry owner
+supports minimum/default/wide dashboard sizes.

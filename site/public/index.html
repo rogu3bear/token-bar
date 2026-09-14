@@ -115,6 +115,27 @@
           </div></article>
         </div>
       </section>
+      <section class="details wrap" id="comparison" aria-labelledby="comparison-heading">
+        <div class="section-heading">
+          <span class="eyebrow">IN DEVELOPMENT</span>
+          <h2 id="comparison-heading">Put cost in context.<br />Compare what produced it.</h2>
+          <p class="flow-note">In development for 0.1.2; not included in the installer linked above. Output includes reasoning and does not measure answer quality. API estimates, local tokens, account totals and allowance changes remain separate measurements.</p>
+        </div>
+        <div class="feature-list">
+          <article><span class="index mono">01</span><div>
+            <h3>Compare cost with output.</h3>
+            <p>The next Cost view compares full estimated request cost per million output tokens, by day and model. Input and cache costs stay included. Only records with a supported price enter both sides of the calculation, with output coverage shown alongside it.</p>
+          </div></article>
+          <article><span class="index mono">02</span><div>
+            <h3>Separate rate changes from usage changes.</h3>
+            <p>Inspect each model’s shipped API price history: effective dates, input/cache/output prices, changes and published sources. Historical estimates use those dated rules; reference estimates hold the card fixed. The last verification date stays visible, and unknown intervals remain unpriced.</p>
+          </div></article>
+          <article><span class="index mono">03</span><div>
+            <h3>Observe allowance alongside tokens.</h3>
+            <p>Compare observed Codex allowance changes with local input, output and cache use over the same account/window intervals. Resets, gaps and ambiguous attribution stay visible. Model mix provides context, but does not reveal a model-specific subscription multiplier or identify another host.</p>
+          </div></article>
+        </div>
+      </section>
       <section class="data-flow wrap" aria-labelledby="flow-heading">
         <span class="eyebrow">READY WHEN YOU COME BACK</span>
         <h2 id="flow-heading">Your history stays. New records join it.</h2>
@@ -177,6 +198,10 @@
             dated API rates; OpenCode token history is separate from its provider-reported billing. Claude Code and
             Grok usage remain unpriced. Missing readings stay unavailable.
           </p>
+        </article>
+        <article>
+          <h3>Does it see work on my other computers?</h3>
+          <p>Token Bar reads the usage records available on this Mac. It does not automatically collect logs from other hosts or cloud tasks, and saved records do not identify the originating host. Supported Codex account totals can provide account-wide context, but cannot locate that usage. Missing remote records stay unknown.</p>
         </article>
         <article>
           <h3>Can I customize what appears?</h3>

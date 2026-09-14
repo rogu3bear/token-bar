@@ -83,7 +83,11 @@ categories. Repeated snapshots and inherited fork counters are deduplicated.
 
 Account allowance is separate from token totals. API-equivalent cost compares
 supported usage against dated OpenAI API prices; it is not your subscription
-bill. Other providers remain unpriced. See [cost semantics](docs/COST.md).
+bill. Other providers remain unpriced. Cost also compares full request cost per
+million output tokens over time and by model, with matched priced records and
+explicit output coverage. Output volume includes reasoning and does not establish
+answer quality. The account comparison provides context beyond available local
+records without claiming to identify another host. See [cost semantics](docs/COST.md).
 
 ## Your data
 

@@ -6,6 +6,7 @@ import ServiceManagement
 @Observable final class UsageModel {
     let usageStore: UsageStore
     let reporting = ReportState()
+    let comparisons = UsageComparisonStore()
     let clock = PresentationClock()
     private var sourceRevision: UInt64 { usageStore.revision }
     private var catalogRevision: UInt64 { reporting.catalogRevision }
@@ -168,6 +169,7 @@ import ServiceManagement
             guard let self else { return }
             self.queryGeneration &+= 1; self.rebuild()
         }
+        live.comparisonChanged = { [weak self] in self?.refreshComparisons() }
         publish(snapshot)
     }
     func quota(for tool: LiveTool) -> ToolQuotaState {
@@ -191,6 +193,7 @@ import ServiceManagement
     @ObservationIgnored private var reportValidity: ReportValidity?
     func rebuild() {
         // Keep the process-owned report warm; navigation only consumes it.
+        refreshComparisons()
         let now = referenceDate ?? Date()
         let inputs = ReportRevisionInputs(entries: sourceRevision, catalog: catalogRevision, query: costQuery, effort: costEffort, service: costService, basis: costBasis)
         if !filtering, inputs == reportInputs, reportValidity?.contains(now) == true { return }
@@ -228,6 +231,11 @@ import ServiceManagement
                 if self.reportPending || self.generation != version { self.rebuild() }
             }
         }
+    }
+    func refreshComparisons() {
+        comparisons.refresh(source: snapshot.entries, revision: sourceRevision, quotaRevision: live.comparisonRevision,
+                            state: live.state, currentID: live.currentID, query: costQuery, effort: costEffort,
+                            now: referenceDate ?? Date(), archiveURL: scanner.requestArchiveURL, archiveCount: retainedRequests)
     }
     @ObservationIgnored private var publishedRevision: UInt64?
     private func publish(_ result: Snapshot) {

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the v0.1.1 source. Known limitations are listed separately;
+> Describes the v0.1.2 source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
@@ -26,7 +26,7 @@ not application state or UI code.
 | `GrokQuotaMonitor` | JSON-RPC to `grok agent --no-leader stdio`, `_x.ai/billing` | In-memory quota samples only |
 | `LiveMonitor`, `LiveStateStore`, `ProviderUsage`, `CodexInstallation` | JSON-RPC to `codex app-server --stdio` for quota, plan, account usage | `live-accounts.sqlite`; legacy JSON retained for migration/rollback |
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
-| `Cost*`, `CoverageAudit` | dated API-equivalent estimates, coverage, recovery, audit | shipped rate data |
+| `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
 | `*View.swift`, `MenuBarSettings`, `Appearance`, `DashboardNavigation` | seven dashboard sections, popover, settings | `UserDefaults` preferences |
 | `site/lib/*.mjs`, `site/worker.js`, `site/functions/` | feedback and config handlers; advanced-mode and Functions routing | nothing |
 
