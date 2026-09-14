@@ -14,6 +14,9 @@ struct PromptInsightsSection: View {
                 Text(state.message).foregroundStyle(.secondary)
             }
             if let result = state.result {
+                if let warning = result.cacheWarning {
+                    StatusNotice(message: warning, severity: .warning, dismissible: false)
+                }
                 HStack(alignment: .top, spacing: PageStyle.related) {
                     stat("PROMPTS", result.prompts.formatted())
                     stat("TYPICAL LENGTH", result.prompts == 0 ? "—" : "\(result.medianWords) words")

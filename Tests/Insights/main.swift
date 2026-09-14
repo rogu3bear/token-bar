@@ -235,3 +235,45 @@ assert(withNewChat.prompts == direct.prompts + 1)
 let expired = try InsightReader.read(home: folder, now: now.addingTimeInterval(31 * 86400), index: newChatIndex)
 assert(expired.prompts == 0 && newChatIndex.bytesRead == 0)
 print("PASS: new-chat discovery processes only the unseen chat and the rolling sample expires without transcript replay")
+
+// Derived storage failures must not turn readable transcripts into failed sources.
+let readable = try InsightReader.read(home: folder, now: now)
+func matchesReadable(_ result: PromptInsights) -> Bool {
+    result.prompts == readable.prompts && result.words == readable.words && result.tasks == readable.tasks && result.skipped == 0
+}
+let damagedURL = indexDirectory.appendingPathComponent(PromptIndex.digest(Data(growingPath.path.utf8)) + ".json")
+try Data("broken checkpoint".utf8).write(to: damagedURL)
+let damagedIndex = PromptIndex(directory: indexDirectory)
+let recovered = try InsightReader.read(home: folder, now: now, index: damagedIndex)
+assert(matchesReadable(recovered) && recovered.cacheWarning != nil)
+assert(damagedIndex.bytesRead == old.utf8.count && damagedIndex.filesReused == 3)
+var incompatible = try JSONSerialization.jsonObject(with: Data(contentsOf: damagedURL)) as! [String: Any]
+incompatible["version"] = 999
+try JSONSerialization.data(withJSONObject: incompatible).write(to: damagedURL)
+let migrated = try InsightReader.read(home: folder, now: now, index: PromptIndex(directory: indexDirectory))
+assert(matchesReadable(migrated) && migrated.cacheWarning != nil)
+let repairedIndex = PromptIndex(directory: indexDirectory)
+let repaired = try InsightReader.read(home: folder, now: now, index: repairedIndex)
+assert(matchesReadable(repaired) && repaired.cacheWarning == nil && repairedIndex.bytesRead == 0)
+
+let blockedCache = folder.appendingPathComponent("blocked-cache")
+try Data("synthetic obstruction".utf8).write(to: blockedCache)
+let unwritableIndex = PromptIndex(directory: blockedCache)
+let uncached = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(uncached) && uncached.cacheWarning != nil)
+let retained = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(retained) && unwritableIndex.bytesRead == 0 && retained.cacheWarning != nil)
+try FileManager.default.removeItem(at: blockedCache)
+let savedAgain = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(savedAgain) && savedAgain.cacheWarning == nil && unwritableIndex.bytesRead == 0)
+let afterRecovery = PromptIndex(directory: blockedCache)
+_ = try InsightReader.read(home: folder, now: now, index: afterRecovery)
+assert(afterRecovery.bytesRead == 0, "Write recovery persists retained facts without transcript replay")
+
+let summaryObstruction = blockedCache.appendingPathComponent("summary.json")
+try FileManager.default.createDirectory(at: summaryObstruction, withIntermediateDirectories: false)
+let summaryFailureModel = InsightsModel(clock: { now }, storageURL: blockedCache, home: folder)
+summaryFailureModel.refresh(home: folder, force: true); await awaitRead(summaryFailureModel)
+assert(!summaryFailureModel.state.failed && matchesReadable(summaryFailureModel.state.result!))
+assert(summaryFailureModel.state.result?.cacheWarning?.contains("summary could not be saved") == true)
+print("PASS: corrupt/incompatible checkpoints rebuild one chat; failed cache writes retain results and retry without replay; summary write failure stays separate from source availability")

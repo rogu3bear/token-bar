@@ -8,6 +8,7 @@ struct PromptFact: Identifiable, Codable {
     var id: String { label }
 }
 struct PromptInsights: Codable {
+    var cacheWarning: String?
     var prompts = 0
     var tasks = 0
     var files = 0

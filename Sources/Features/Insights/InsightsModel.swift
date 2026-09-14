@@ -30,18 +30,22 @@ import Combine
         queue.async {
             var lastPublication = Date.distantPast
             do {
-                let result = try InsightReader.read(home: home, now: self.clock(), clock: self.clock, index: self.index) { partial in
+                var result = try InsightReader.read(home: home, now: self.clock(), clock: self.clock, index: self.index) { partial in
                     let now = Date()
                     guard partial.filesChecked == 0 || partial.filesChecked == partial.filesTotal || now.timeIntervalSince(lastPublication) >= 0.5 else { return }
                     lastPublication = now
                     DispatchQueue.main.async { self.state.receivePartial(partial) }
                 }
                 if result.skipped == 0 || result.files > 0 {
-                    try self.index.saveSummary(result, home: home)
+                    do { try self.index.saveSummary(result, home: home) }
+                    catch {
+                        result.cacheWarning = [result.cacheWarning, "Prompt summary could not be saved. Current results remain available."].compactMap { $0 }.joined(separator: " ")
+                    }
                 }
+                let completed = result
                 DispatchQueue.main.async {
                     self.nextRead = self.clock().addingTimeInterval(300)
-                    self.state.succeed(result)
+                    self.state.succeed(completed)
                 }
             } catch {
                 DispatchQueue.main.async {

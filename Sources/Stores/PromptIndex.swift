@@ -45,6 +45,9 @@ final class PromptIndex {
     }
     let directory: URL?
     private var chats: [String: Chat] = [:]
+    private var pendingWrites = Set<String>()
+    private var cacheReadFailures = 0
+    private var cacheWriteFailures = 0
     private(set) var bytesRead = 0
     private(set) var promptsAnalyzed = 0
     private(set) var filesReused = 0
@@ -73,15 +76,29 @@ final class PromptIndex {
         try handle.seek(toOffset: offset - min(offset, 128))
         return Self.digest(try handle.read(upToCount: Int(min(offset, 128))) ?? Data())
     }
+    private func save(_ chat: Chat) {
+        guard let url = url(chat.path) else { return }
+        do {
+            try PrivateCache.write(chat, to: url)
+            pendingWrites.remove(chat.path)
+        } catch {
+            pendingWrites.insert(chat.path)
+            cacheWriteFailures += 1
+        }
+    }
     private func tail(path: String, task: String, since: Date) throws -> Chat {
         let stamp = try Stamp(path)
         var saved = chats[path]
         if saved == nil, let url = url(path), FileManager.default.fileExists(atPath: url.path) {
-            saved = try JSONDecoder().decode(Chat.self, from: Data(contentsOf: url))
-            guard saved?.version == 1, saved?.path == path else { throw CocoaError(.fileReadCorruptFile) }
+            do {
+                let decoded = try JSONDecoder().decode(Chat.self, from: Data(contentsOf: url))
+                guard decoded.version == 1, decoded.path == path else { throw CocoaError(.fileReadCorruptFile) }
+                saved = decoded
+            } catch { cacheReadFailures += 1 }
         }
         if let saved, saved.stamp == stamp, saved.offset == stamp.size {
             filesReused += 1
+            if pendingWrites.contains(path) { save(saved) }
             return saved
         }
         let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
@@ -131,7 +148,7 @@ final class PromptIndex {
         guard ferror(file) == 0 else { throw POSIXError(.EIO) }
         chat.boundary = try boundary(handle, offset: chat.offset)
         chat.facts.removeAll { $0.date < since }
-        if let url = url(path) { try PrivateCache.write(chat, to: url) }
+        save(chat)
         return chat
     }
     static func normalized(_ text: String) -> String {
@@ -152,6 +169,7 @@ final class PromptIndex {
     func read(selected: [(String, String)], since: Date, now: Date, clock: () -> Date,
               progress: ((PromptInsights) -> Void)?) throws -> PromptInsights {
         bytesRead = 0; promptsAnalyzed = 0; filesReused = 0
+        cacheReadFailures = 0; cacheWriteFailures = 0
         var analysis = InsightAnalysis.Accumulator(), seen = Set<String>()
         var repeatSources: [String: (String, Fact)] = [:]
         var files = 0, skipped = 0
@@ -201,6 +219,10 @@ final class PromptIndex {
         }.sorted { $0.count == $1.count ? $0.label < $1.label : $0.count > $1.count }
         result.repeats = Array(result.repeats.prefix(5))
         result.files = files; result.skipped = skipped; result.filesChecked = selected.count; result.filesTotal = selected.count
+        var warnings: [String] = []
+        if cacheReadFailures > 0 { warnings.append("Some saved prompt checkpoints were unusable. Readable chats were processed again.") }
+        if cacheWriteFailures > 0 { warnings.append("Prompt checkpoints could not be saved. Current results remain available; saving will retry on refresh.") }
+        result.cacheWarning = warnings.isEmpty ? nil : warnings.joined(separator: " ")
         return result
     }
 }
