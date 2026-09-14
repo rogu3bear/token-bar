@@ -1,9 +1,9 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.2",
   "available": true,
   "platform": "Apple silicon \u00b7 macOS 14+",
-  "url": "https://github.com/rogu3bear/token-bar/releases/download/v0.1/TokenBar-0.1.0-arm64.pkg",
-  "sha256": "0b8078057c6e4386c0908502921df82b8345d9c502f134a603b8b4dc2c74a863",
+  "url": "https://github.com/rogu3bear/token-bar/releases/download/v0.1.2/TokenBar-0.1.2-arm64.pkg",
+  "sha256": "6eb33dc195167f8947a6a0bb6bec753a329c850c544d4baaa597dca3e92a7603",
   "notarized": true,
   "status": "Signed and notarized for macOS. Open the .pkg to install; no build tools or reboot required."
 }

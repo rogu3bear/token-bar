@@ -1,7 +1,7 @@
 # macOS release
 
-The public release is **v0.1**, with application version **0.1.0** and build
-**30100**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1/TokenBar-0.1.0-arm64.pkg)
+The current public release is **v0.1.2**, with application version **0.1.2** and build
+**30102**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1.2/TokenBar-0.1.2-arm64.pkg)
 for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer,
 then open Token Bar from Applications. No build tools or reboot are required.
 The installer preserves existing usage history and preferences.
@@ -117,7 +117,8 @@ The existing bundle identifier is retained to preserve upgrades and saved menu-b
 ## GitHub Packages distribution
 
 The separate [Packages listing](https://github.com/users/rogu3bear/packages/container/package/token-bar)
-uses `ghcr.io/rogu3bear/token-bar:0.1.0`. It contains
+uses `ghcr.io/rogu3bear/token-bar:0.1.0`. It archives the initial 0.1.0 release,
+not the current 0.1.2 installer. It contains
 `TokenBar-0.1.0-arm64.pkg`, its basename-only `.sha256`, and `README.txt`.
 This is an OCI distribution artifact, not a runnable macOS container. The
 installer inside is byte-identical to the v0.1 Release asset.

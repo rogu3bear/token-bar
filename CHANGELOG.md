@@ -1,13 +1,15 @@
 # Changelog
 
-## 0.1.2 — In development
+## 0.1.2 — Released 2026-09-13
 
 - Restore equal active-provider columns and aligned separators, quota rows and large gauges on Now, with complete rate digits and explicit units.
 - Compare full request cost per output token, with daily/model coverage, and inspect sourced model API rate changes by effective date.
 - Compare account-bound Codex allowance changes with the locally observed input/output/cache mix over matching retained intervals. Resets, gaps and ambiguous evidence remain explicit; no model-specific subscription tariff or host identity is inferred.
-- Reuse background comparison results across navigation and matching archived timing when available. Explain these boundaries on the website without advertising an unreleased installer.
+- Reuse background comparison results across navigation and matching archived timing when available. Bound archived timing recovery to relevant groups, reuse unchanged history, and retry visible failures with backoff.
 
-## 0.1.1 — Patch candidate
+### 0.1.1 work included in 0.1.2
+
+These changes shipped in 0.1.2; there was no separate public 0.1.1 release.
 
 - Keep History and Cost reports warm across navigation; publish completed results while new usage is queued.
 - Persist the report index and extend it with appended usage instead of rebuilding settled entries.
@@ -28,6 +30,6 @@ The public version sequence starts at 0.1.0. A Developer ID signed and
 Apple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).
 An OCI archive with the identical installer is uploaded to GitHub Packages;
 its listing remains private as of September 13, 2026. The public website and
-README use the direct Release asset. Installation needs no build tools or reboot.
+README used the direct v0.1 Release asset at launch. Installation needs no build tools or reboot.
 Claude after-turn account allowance refresh remains unavailable; the
 account-matched local cache is used when fresh. OpenCode provides history only.
