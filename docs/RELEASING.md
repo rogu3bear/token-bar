@@ -101,8 +101,8 @@ Before upload, ensure the checksum names only the installer basename, not a
 private build path. From the release output directory:
 
 ```sh
-shasum -a 256 TokenBar-0.1.0-arm64.pkg > TokenBar-0.1.0-arm64.pkg.sha256
-shasum -a 256 -c TokenBar-0.1.0-arm64.pkg.sha256
+shasum -a 256 TokenBar-0.1.2-arm64.pkg > TokenBar-0.1.2-arm64.pkg.sha256
+shasum -a 256 -c TokenBar-0.1.2-arm64.pkg.sha256
 ```
 
 Use the actual `VERSION` for later releases. A public tag remains bound to its
