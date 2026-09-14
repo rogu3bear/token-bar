@@ -13,14 +13,16 @@ export function initFeedback({ document, location, history, storage, writeClipbo
   }
   function retain() {
     const draft = fields();
+    let retained = false;
     text.value = copyText(draft);
     try {
       storage().setItem(DRAFT_KEY, JSON.stringify(draft));
+      retained = true;
       saved.textContent = 'Draft saved in this browser. Nothing sent.';
     } catch {
       saved.textContent = 'Browser storage is unavailable. Keep this page open or copy your draft before leaving.';
     }
-    return draft;
+    return { draft, retained };
   }
   try {
     const restored = draftFields(JSON.parse(storage().getItem(DRAFT_KEY) || '{}'));
@@ -38,7 +40,13 @@ export function initFeedback({ document, location, history, storage, writeClipbo
   form.addEventListener('submit', event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
-    const url = issueURL(retain());
+    const { draft, retained } = retain();
+    if (!retained) {
+      fallback.open = true; text.focus(); text.select();
+      show('Your draft could not be saved in this browser. Copy or save the complete draft below before leaving, then use Open GitHub directly and paste it into the issue form.', true);
+      return;
+    }
+    const url = issueURL(draft);
     if (!url) {
       fallback.open = true; text.focus(); text.select();
       show('This draft is too long for a GitHub link. Copy it below, open GitHub directly, and paste it into the issue form. Your draft is retained.', true);
@@ -46,14 +54,14 @@ export function initFeedback({ document, location, history, storage, writeClipbo
     }
     try {
       openReview(url);
-      show('GitHub review requested in a new tab. Your draft stays here. If it does not open, copy the draft and use Open GitHub directly below.');
+      show('Opening GitHub in this tab. Your draft is saved; use Back to return. If GitHub does not open, copy the draft and use Open GitHub directly below.');
     } catch {
       fallback.open = true;
       show('GitHub could not be opened. Your draft is retained. Copy it and use Open GitHub directly below.', true);
     }
   });
   document.querySelector('#copy').addEventListener('click', async () => {
-    const value = copyText(retain());
+    const value = copyText(retain().draft);
     try { await writeClipboard(value); show('Draft copied. Review it before submitting on GitHub.'); }
     catch {
       // Use the current draft even if it changed while permission was pending.
@@ -71,5 +79,5 @@ export function initFeedback({ document, location, history, storage, writeClipbo
 if (typeof document !== 'undefined') initFeedback({
   document, location, history, storage: () => window.localStorage,
   writeClipboard: text => navigator.clipboard.writeText(text),
-  openReview: url => window.open(url, '_blank', 'noopener,noreferrer'),
+  openReview: url => location.assign(url),
 });

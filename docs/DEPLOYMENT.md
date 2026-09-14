@@ -36,11 +36,15 @@ on GitHub explicitly sends title, `behavior`, `version` and `macos` query fields
 with `template=bug_report.yml`. Custom IDs match `.github/ISSUE_TEMPLATE/bug_report.yml`;
 no labels, assignees or generic body parameter are injected. GitHub requires an
 account to submit; the user reviews before publishing a public issue. The report
-is transmitted in a URL at review time, not only at final submission.
+is transmitted in a URL at review time, not only at final submission. Review
+navigates in the current tab after saving the draft; browser Back restores it.
 
 An encoded URL over the local guard stays local and offers a copy fallback.
 Clipboard denial provides selectable text; storage or navigation failure must
-retain the visible draft. Direct GitHub and existing-issue links send no draft.
+retain the visible draft. If local saving fails, Review stays on the page and
+shows the complete copyable draft with instructions to copy before leaving.
+The direct GitHub fallback uses the current tab and sends no draft fields;
+existing-issue links also send no draft.
 No real issue is created during synthetic acceptance.
 
 Before claiming live, inspect deployment state, fetch all four pages, verify

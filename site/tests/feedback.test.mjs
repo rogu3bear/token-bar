@@ -71,12 +71,23 @@ test('copy succeeds without navigation and clipboard denial preserves selectable
   assert.equal(bad.node('#copy-fallback').open, true); assert.equal(bad.node('#copy-text').value, copyText(report));
   assert.equal(bad.node('#copy-text').selected, true); assert.match(bad.node('#form-status').textContent, /Clipboard access/);
 });
-test('storage/navigation failures retain visible draft and show direct/manual fallbacks', async () => {
-  const app = setup({ storageFails: true, navigationFails: true }); app.fill(report);
+test('storage failure prevents review navigation and exposes the complete copyable draft', async () => {
+  const app = setup({ storageFails: true }); app.fill(report);
   assert.match(app.node('#draft-status').textContent, /storage is unavailable/);
   await app.fire('#feedback-form:submit'); assert.match(app.node('#form-status').textContent, /Open GitHub directly/);
+  assert.equal(app.opened.length, 0); assert.equal(app.node('#copy-fallback').open, true);
+  assert.equal(app.node('#copy-text').value, copyText(report)); assert.equal(app.node('#copy-text').selected, true);
+  assert.match(app.node('#form-status').textContent, /before leaving/);
   assert.equal(app.form.elements.behavior.value, report.behavior);
   await app.fire('#clear-draft:click'); assert.equal(app.form.elements.behavior.value, report.behavior);
+});
+test('thrown review navigation preserves the saved and visible draft with a direct fallback', async () => {
+  const app = setup({ navigationFails: true }); app.fill(report);
+  await app.fire('#feedback-form:submit');
+  assert.deepEqual(JSON.parse(app.data.get(DRAFT_KEY)), report);
+  assert.equal(app.form.elements.behavior.value, report.behavior);
+  assert.equal(app.node('#copy-fallback').open, true);
+  assert.match(app.node('#form-status').textContent, /could not be opened/);
 });
 test('clear removes only this local draft; invalid submission never opens GitHub', async () => {
   const app = setup({ initial: report }); app.data.set('unrelated', 'keep');
@@ -88,4 +99,5 @@ test('page always offers existing issue search, direct no-draft fallback and pub
   assert.match(html, /issues\/new\/choose/); assert.match(html, /Search existing issues/);
   assert.match(html, /public and require a GitHub account/); assert.match(html, /before you submit/);
   assert.match(html, /<noscript>/); assert.doesNotMatch(html, /name="email"|turnstile|api\/feedback/i);
+  assert.doesNotMatch(html, /target="_blank"/); assert.match(html, /Copy your draft before leaving/);
 });
