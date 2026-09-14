@@ -1,23 +1,22 @@
-name: Bug report
-description: Report an observable problem without private data.
+name: Report or suggestion
+description: Report a problem or suggest an improvement without private data.
 title: ""
 body:
   - type: markdown
     attributes:
-      value: "Do not include email addresses, account IDs, credentials, private task names, or raw logs. For private contact email, use the app's Feedback button."
+      value: "This issue will be public. Do not include email addresses, account IDs, credentials, private task names, or raw logs."
   - type: textarea
     id: behavior
     attributes:
-      label: What happened?
-      description: Include expected behavior and steps to reproduce.
+      label: Report
+      description: Describe your suggestion, or include what happened, expected behavior and steps to reproduce.
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: App version and macOS version
+      label: App version (optional)
   - type: input
-    id: reference
+    id: macos
     attributes:
-      label: Private feedback reference (optional)
-      description: An opaque reference from the feedback form, never your email.
+      label: macOS version (optional)

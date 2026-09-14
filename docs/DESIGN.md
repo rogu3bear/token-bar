@@ -91,7 +91,10 @@ preferences. Controls are quiet secondary actions; sample disclosure stays visib
 Page gutters, related gaps, group spacing, section rhythm, and control height
 have shared CSS owners. FAQ placement is independent of question count.
 System fonts and small static assets avoid external font requests and hydration.
-Feedback keeps private contact information separate from public draft content.
+Feedback keeps report drafts in the browser until an explicit Review on GitHub
+action sends their fields in a URL. Submission is a separate public GitHub action.
+All site pages share source, release, issue, privacy, license and terms links,
+with a Made by JKCA credit.
 
 All four web pages expose Skip to content, a focusable main landmark, and named
 Main navigation and Footer landmarks. Page-specific links can differ while the

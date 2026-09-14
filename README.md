@@ -113,8 +113,9 @@ Installed provider tools may contact their services to read account allowance.
 Token Bar does not ask you for passwords or API keys.
 
 Feedback is voluntary. The [feedback form](https://token-bar-9v8.pages.dev/feedback/)
-sends your report and contact email to the maintainer and can prepare a separate
-public issue draft without your email. You choose whether to publish that draft.
+saves a draft in your browser. Review on GitHub sends its fields to GitHub in a
+URL; you separately choose whether to submit a public issue there. A GitHub
+account is required. The site collects no email and never posts automatically.
 Read the [privacy details](https://token-bar-9v8.pages.dev/privacy/).
 
 ## Build from source
@@ -140,13 +141,13 @@ python3 scripts/check-public-tree.py
 
 The native app uses Swift/SwiftUI without third-party Swift packages. The
 website lives under `site/` in this repository and uses static HTML, CSS and
-JavaScript with a small feedback endpoint. JavaScript tooling is Bun-managed;
+JavaScript with local GitHub report drafting. JavaScript tooling is Bun-managed;
 verification runs locally, without GitHub Actions.
 
 - `Sources/` and `Tests/`: app implementation and synthetic regression fixtures.
 - `Assets/`: native app resources.
 - `scripts/`: build, installer, preview and verification commands.
-- `site/`: product website and feedback service.
+- `site/`: product website and local report drafting.
 - `docs/` and [ARCHITECTURE.md](ARCHITECTURE.md): technical guides.
 
 Documentation: [Architecture](ARCHITECTURE.md), [Design](docs/DESIGN.md),

@@ -27,11 +27,16 @@ setting.
 
 Maintainers are responsible for clarifying and enforcing these standards and
 will take appropriate and fair corrective action in response to any behavior
-they deem inappropriate, threatening, offensive, or harmful. Instances of
-abusive, harassing, or otherwise unacceptable behavior may be reported through
-the project's private feedback channel named in `SECURITY.md`. All complaints
-will be reviewed and investigated promptly and fairly, and the privacy and
-security of the reporter will be respected. Consequences follow the
+they deem inappropriate, threatening, offensive, or harmful. For abusive or
+harassing content on GitHub, use the content menu's **Report content** option
+and **Report abuse to GitHub Support**, or GitHub's
+[abuse reporting form](https://support.github.com/contact/report-abuse). See
+[GitHub's reporting instructions](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).
+These reports go to GitHub; the project currently has no separate private
+conduct-reporting channel. Do not post private complaint details through the
+website's public issue draft or use security advisories for conduct reports.
+Maintainers will review conduct brought to their attention fairly and respect
+the privacy and security of those involved. Consequences follow the
 Contributor Covenant's community impact guidelines: correction, warning,
 temporary ban, then permanent ban.
 

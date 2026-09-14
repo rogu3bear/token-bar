@@ -19,16 +19,31 @@ test("function invocations are restricted to API paths", async () => {
   assert.deepEqual(JSON.parse(await read("_routes.json")).include, ["/api/*"]);
 });
 
-test('advanced-mode entry keeps feedback, config and static fallback', async () => {
+test('advanced-mode retires both APIs without reading bindings, bodies or contacting providers', async () => {
   const { default: worker } = await import('../worker.js');
   let assets = 0;
-  const env = { ASSETS: { fetch: async () => { assets++; return new Response('static'); } } };
-  const root = await worker.fetch(new Request('https://example.test/'), env);
-  assert.equal(await root.text(), 'static'); assert.equal(assets, 1);
-  const config = await worker.fetch(new Request('https://example.test/api/config'), env);
-  assert.equal((await config.json()).available, false);
-  const feedback = await worker.fetch(new Request('https://example.test/api/feedback'), env);
-  assert.equal(feedback.status, 405);
+  const env = new Proxy({ ASSETS: { fetch: async () => { assets++; return new Response('static'); } } }, {
+    get(target, key) { if (key !== 'ASSETS') throw new Error('Obsolete binding read'); return target[key]; }
+  });
+  for (const path of ['/api/config', '/api/feedback']) for (const method of ['GET', 'POST', 'OPTIONS', 'DELETE']) {
+    const request = new Request('https://example.test' + path, { method });
+    request.json = () => { throw new Error('Body must not be read'); };
+    const response = await worker.fetch(request, env);
+    assert.equal(response.status, 410); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.match((await response.json()).error, /retired/);
+  }
+  assert.equal(assets, 0);
   assert.equal((await worker.fetch(new Request('https://example.test/api/unknown'), env)).status, 404);
+  assert.equal(await (await worker.fetch(new Request('https://example.test/'), env)).text(), 'static');
   assert.equal(assets, 1);
+});
+test('all four pages share the complete accessible footer and obsolete CAPTCHA allowances are absent', async () => {
+  let expected;
+  for (const path of ['index.html', 'feedback/index.html', 'privacy/index.html', 'terms/index.html']) {
+    const html = await read(path); const footer = html.match(/<footer[\s\S]*?<\/footer>/)[0];
+    expected ??= footer; assert.equal(footer, expected);
+    for (const label of ['Source', 'Releases', 'Report an issue', 'Privacy', 'MIT License', 'Terms', 'JKCA', '© 2026 Token Bar contributors']) assert.ok(footer.includes(label));
+    assert.match(footer, /aria-label="Footer"/); assert.match(footer, /href="https:\/\/jkca.me"/);
+  }
+  assert.doesNotMatch(await read('_headers'), /challenges.cloudflare.com/);
 });

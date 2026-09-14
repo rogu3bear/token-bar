@@ -6,11 +6,11 @@
     <title>Feedback — Token Bar</title>
     <meta
       name="description"
-      content="Send Token Bar feedback privately to the maintainer, then review an email-free public GitHub issue draft."
+      content="Prepare a report locally, then review and submit it on GitHub."
     />
     <link rel="icon" href="/token-bar-icon.png" />
     <link rel="stylesheet" href="/style.css" />
-    <script src="/feedback.js" defer></script>
+    <script src="/feedback.js" type="module"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -23,106 +23,58 @@
       </nav>
     </header>
     <main class="wrap form-page" id="main" tabindex="-1">
-      <span class="eyebrow">A DIRECT LINE TO THE MAINTAINER</span>
+      <span class="eyebrow">OPEN SOURCE, OPEN CONVERSATION</span>
       <h1>Help make it better.</h1>
-      <p class="intro">
-        Tell us what happened or what you’d like to see. Your email goes
-        privately to the maintainer. You can then review and submit a public
-        GitHub issue.
-      </p>
-      <div class="notice">
-        <p>
-          <strong>Two separate steps.</strong> Sending this form emails your
-          report privately. It does not post an issue. The GitHub draft includes
-          the report fields and a reference ID, but never your contact-email
-          field. Keep private information out of the public report fields.
-        </p>
+      <p class="intro">Describe a problem or suggest an improvement. Prepare your draft here, then review it on GitHub.</p>
+      <div class="notice" id="public-notice">
+        <p><strong>GitHub reports are public and require a GitHub account.</strong>
+          Choosing Review on GitHub sends the fields below to GitHub in a URL, before you submit the issue.
+          Nothing is posted automatically. Leave out email addresses, credentials, account details, private task names and raw logs.</p>
       </div>
-      <form class="feedback-form" id="feedback-form">
-        <label class="field"
-          >Title <span aria-hidden="true">· public draft</span
-          ><input
-            name="title"
-            required
-            minlength="3"
-            maxlength="100"
-            placeholder="A short description of your idea or problem" /></label
-        ><label class="field"
-          >Report <span aria-hidden="true">· public draft</span
-          ><textarea
-            name="description"
-            required
-            minlength="10"
-            maxlength="2500"
-            placeholder="What happened? What did you expect? Include steps to reproduce if you can."
-          ></textarea
-          ><small
-            >Do not include email addresses, tokens, account details, private
-            task names, or raw usage logs here.</small
-          ></label
-        ><label class="field"
-          >App version <span aria-hidden="true">· public draft</span
-          ><input
-            name="version"
-            maxlength="40"
-            placeholder="For example, 2.0.0" /></label
-        ><label class="field"
-          >Your email <span aria-hidden="true">· private</span
-          ><input
-            name="email"
-            type="email"
-            autocomplete="email"
-            required
-            maxlength="254"
-            placeholder="you@example.com"
-          /><small
-            >Used for replies to this report. Sent via Resend to the maintainer;
-            excluded from the GitHub draft. Not added to a mailing list.</small
-          ></label
-        ><label class="consent"
-          ><input name="consent" type="checkbox" required /><span
-            >I agree to send this report and my contact email privately to the
-            maintainer as described in the
-            <a class="text-link" href="/privacy/">privacy details</a>. I
-            understand the report fields become public only if I submit the
-            GitHub draft.</span
-          ></label
-        >
-        <div id="verification" aria-label="Human verification"></div>
-        <p
-          class="form-status"
-          id="form-status"
-          role="status"
-          aria-live="polite"
-        >
-          Loading private feedback…
-        </p>
-        <button class="button primary" id="send" type="submit" disabled>
-          Send privately & prepare issue
-          <span aria-hidden="true">↗</span></button
-        ><a
-          class="button secondary hidden"
-          id="issue-link"
-          href="https://github.com/rogu3bear/token-bar/issues/new"
-          rel="noreferrer"
-          >Review draft on GitHub ↗</a
-        ><noscript
-          ><p>
-            JavaScript is needed for private email delivery and verification.
-            You can
-            <a href="https://github.com/rogu3bear/token-bar/issues/new"
-              >open a public GitHub issue directly</a
-            >; do not include your email there.
-          </p></noscript
-        >
+      <p><a class="text-link" href="https://github.com/rogu3bear/token-bar/issues">Search existing issues ↗</a></p>
+      <form class="feedback-form" id="feedback-form" aria-describedby="public-notice draft-status">
+        <label class="field">Title
+          <input name="title" required minlength="3" maxlength="100" placeholder="A short description of your idea or problem" />
+        </label>
+        <label class="field">Report
+          <textarea name="behavior" required minlength="10" maxlength="2500" placeholder="What happened? What did you expect? Include steps to reproduce if you can."></textarea>
+        </label>
+        <div class="draft-versions">
+          <label class="field">App version · optional
+            <input name="version" maxlength="40" placeholder="For example, 0.1.2" />
+          </label>
+          <label class="field">macOS version · optional
+            <input name="macos" maxlength="80" placeholder="For example, macOS 15.6" />
+          </label>
+        </div>
+        <p id="draft-status">With JavaScript, your draft is saved only in this browser. This site collects no email address and sends no feedback email.</p>
+        <div class="draft-actions">
+          <button class="button primary" id="review" type="submit" disabled>Review on GitHub ↗</button>
+          <button class="button secondary" id="copy" type="button">Copy draft</button>
+          <button class="button secondary" id="clear-draft" type="button">Clear local draft</button>
+        </div>
+        <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+        <details id="copy-fallback">
+          <summary>View copyable draft</summary>
+          <label class="field">Draft to copy<textarea id="copy-text" readonly></textarea></label>
+        </details>
+        <p><a class="text-link" href="https://github.com/rogu3bear/token-bar/issues/new/choose" target="_blank" rel="noopener noreferrer">Open GitHub directly ↗</a> if the draft link does not work. This link sends no draft fields.</p>
+        <noscript><p>JavaScript is unavailable, so local saving and prefill controls do not work. Copy your text manually and open GitHub directly to create a report.</p></noscript>
       </form>
     </main>
-    <footer class="wrap">
-      <a href="/">← Back to Token Bar</a>
-      <nav aria-label="Footer">
-        <a href="/privacy/">Privacy</a
-        ><a href="/terms/">Terms</a><a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
-      </nav>
+    <footer class="wrap site-footer">
+      <div class="footer-main">
+        <div><a class="brand" href="/">Token Bar</a><p>Open source. Built for your Mac.</p></div>
+        <nav aria-label="Footer">
+          <a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
+          <a href="https://github.com/rogu3bear/token-bar/releases">Releases ↗</a>
+          <a href="/feedback/">Report an issue</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="https://github.com/rogu3bear/token-bar/blob/main/LICENSE">MIT License ↗</a>
+          <a href="/terms/">Terms</a>
+        </nav>
+      </div>
+      <div class="footer-bottom"><span>Made by <a href="https://jkca.me">JKCA ↗</a></span><span>© 2026 Token Bar contributors</span></div>
     </footer>
   </body>
 </html>

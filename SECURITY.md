@@ -5,18 +5,19 @@ under `~/Library/Application Support/CodexTokenBar/`, and does not upload usage
 history or add telemetry. Installed provider tools
 may contact providers using existing sign-ins. Grok attribution reads identity
 fields from its local auth file; credential values must not be exported or
-logged. Voluntary feedback opens the website and sends the submitted report
-and contact email to the maintainer. Security issues include unintended data
-disclosure, credential exposure, world-readable private state, or an installer
+logged. Voluntary reports are drafted in the browser and sent to GitHub in a
+review URL only after an explicit action; they are intended for public issues.
+Security issues include unintended data disclosure, credential exposure,
+world-readable private state, or an installer
 differing from its declared source.
 
 ## Reporting
 
-- Preferred: GitHub private vulnerability reporting on this repository
-  (Security → Report a vulnerability).
-- Alternative: the app's Feedback button or the site's private feedback page,
-  which reaches only the maintainer. Keep any optional public issue draft
-  unpublished.
+Use [GitHub private vulnerability reporting](https://github.com/rogu3bear/token-bar/security/advisories/new)
+(Security → Report a vulnerability), which is enabled for this repository.
+The app's Feedback button and website prepare public issues; do not use them
+for security reports. If private reporting is unavailable, keep exploit details
+and private data out of public issues.
 
 Include the app version (`VERSION` or About), macOS version, a minimal
 synthetic reproduction, and the affected file or surface. Never include

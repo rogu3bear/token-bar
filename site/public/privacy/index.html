@@ -76,52 +76,16 @@
         archive. Repeated-prompt labels are read from their original source by
         byte position and stay in memory.
       </p>
-      <h2>Private feedback</h2>
-      <p>
-        Opening Feedback sends only the app version to this website. You type
-        the report and contact email yourself. Submitting the form sends that
-        information through Cloudflare Pages to Resend for email delivery to the
-        maintainer. The email field is used as the reply-to address. It is not
-        added to a mailing list.
-      </p>
-      <p>
-        The website does not keep a separate feedback database. Your message
-        exists in the maintainer’s mailbox and in the email provider’s delivery
-        records under their retention settings. Contact the maintainer by
-        using the private feedback form or replying to a feedback response if you need help accessing or deleting a submitted message. Do not post contact details in a public issue. There is no app-enforced automatic mailbox deletion schedule. Provider request metadata may be processed for operation and
-        abuse prevention.
-      </p>
-      <h2>The public GitHub issue is separate</h2>
-      <p>
-        After email acceptance, the site offers a GitHub issue draft. It
-        contains your title, report, app version, and a random reference ID. The
-        dedicated email field is excluded. You review the draft and choose
-        whether to publish it on GitHub. Avoid putting private information into
-        report fields; a public issue can be read and copied by anyone.
-      </p>
+      <h2>Preparing a report</h2>
+      <p>Opening Feedback sends only the app version to this website. The page removes that convenience parameter from the address bar. You enter the title, report and optional app/macOS versions yourself. There is no contact-email field, email delivery, CAPTCHA or feedback submission to a Token Bar server.</p>
+      <p>Draft fields are saved in this browser’s local storage so you can return to them. They remain until you choose Clear local draft or remove this site’s browser data. If storage is unavailable, the page warns you and keeps the draft in the open page. Copy your draft before leaving. Do not use these fields for private information, especially in a shared browser.</p>
+      <p>Reports emailed before this change may remain in the maintainer’s mailbox and the email provider’s delivery records under their retention settings. Retiring the form does not delete those earlier messages.</p>
+      <h2>Reviewing on GitHub</h2>
+      <p>Choosing Review on GitHub sends the draft fields to GitHub in a prefilled URL, before any issue is submitted. The URL may remain in your browser history. GitHub requires an account to submit an issue, and a submitted issue is public. You decide whether to submit there; the website never posts automatically.</p>
+      <p>Long drafts stay here with a copy fallback. Copy draft uses your browser’s clipboard permission; if it fails, a selectable text field is provided. Open GitHub directly and Search existing issues send no draft fields. Copying does not submit a report.</p>
       <h2>Website services</h2>
-      <p>
-        Cloudflare serves the site and verifies feedback submissions using
-        Turnstile. GitHub hosts the source and release downloads. Resend
-        delivers feedback email. Those providers receive the information
-        necessary to perform their roles, including ordinary network/request
-        metadata. The site adds no advertising trackers or analytics scripts.
-      </p>
-      <p>
-        <a href="https://www.cloudflare.com/policies/privacy/"
-          >Cloudflare privacy policy</a
-        >
-        · <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Turnstile privacy addendum</a>
-        ·
-        <a href="https://resend.com/legal/privacy-policy"
-          >Resend privacy policy</a
-        >
-        ·
-        <a
-          href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
-          >GitHub privacy statement</a
-        >
-      </p>
+      <p>Cloudflare serves the site. GitHub hosts the source, release downloads and issues. These services may receive ordinary network/request metadata. GitHub receives report fields only when you choose Review on GitHub or paste them there yourself. This site adds no advertising trackers or analytics scripts. Retired email API paths return an unavailable response without forwarding submissions.</p>
+      <p><a href="https://www.cloudflare.com/policies/privacy/">Cloudflare privacy policy</a> · <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub privacy statement</a></p>
       <h2>Your choices</h2>
       <p>
         You can use the local app without sending feedback. You can build it
@@ -131,12 +95,19 @@
       </p>
       <p>Last updated: September 13, 2026.</p>
     </main>
-    <footer class="wrap">
-      <a href="/">← Back to Token Bar</a>
-      <nav aria-label="Footer">
-        <a href="/feedback/">Feedback</a
-        ><a href="/terms/">Terms</a><a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
-      </nav>
+    <footer class="wrap site-footer">
+      <div class="footer-main">
+        <div><a class="brand" href="/">Token Bar</a><p>Open source. Built for your Mac.</p></div>
+        <nav aria-label="Footer">
+          <a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
+          <a href="https://github.com/rogu3bear/token-bar/releases">Releases ↗</a>
+          <a href="/feedback/">Report an issue</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="https://github.com/rogu3bear/token-bar/blob/main/LICENSE">MIT License ↗</a>
+          <a href="/terms/">Terms</a>
+        </nav>
+      </div>
+      <div class="footer-bottom"><span>Made by <a href="https://jkca.me">JKCA ↗</a></span><span>© 2026 Token Bar contributors</span></div>
     </footer>
   </body>
 </html>

@@ -9,7 +9,7 @@ Two independent surfaces. A single-module Swift/SwiftUI menu-bar app compiled
 with plain `swiftc` over sources discovered recursively (no Xcode project, no package
 manifest, no third-party Swift code) runs as an accessory process on Apple
 silicon, macOS 14+. A static Cloudflare Pages site under `site/` serves four
-HTML pages and one small feedback API. They share product language and
+HTML pages and local GitHub report drafting. They share product language and
 native-rendered synthetic stills and recordings,
 not application state or UI code.
 
@@ -28,7 +28,7 @@ not application state or UI code.
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
 | `*View.swift`, `MenuBarSettings`, `Appearance`, `DashboardNavigation` | seven dashboard sections, popover, settings | `UserDefaults` preferences |
-| `site/lib/*.mjs`, `site/worker.js`, `site/functions/` | feedback and config handlers; advanced-mode and Functions routing | nothing |
+| `site/public/feedback*.js`, `site/worker.js` | local report drafting; advanced-mode static fallback and retired API responses | browser local storage for the draft |
 
 ## Sources of truth
 
@@ -121,11 +121,13 @@ not application state or UI code.
 ### Feedback
 
 1. The app opens the site with only its version in the URL.
-2. The page loads config, then Turnstile; submit posts JSON to `/api/feedback`.
-3. The server checks exact Origin, body size, field bounds, Turnstile hostname
-   and action, and refuses an email inside public fields.
-4. Resend accepts the mail to the fixed recipient; only then a reference and an
-   email-free GitHub issue draft URL return.
+2. The page restores/saves a local browser draft with title, report and optional
+   app/macOS version fields. The convenience version query is removed locally.
+3. Explicit Review on GitHub opens a safely encoded URL matching the issue-form
+   IDs. It transmits fields to GitHub but never submits an issue automatically.
+4. Encoded-length and clipboard failures retain the draft with a selectable copy
+   fallback. Retired feedback/config API paths return 410/no-store without
+   reading bindings or contacting upstream providers.
 
 ## Boundaries
 
@@ -133,8 +135,8 @@ not application state or UI code.
 - Provider-reported cost never crosses into the estimate total.
 - Credential values are not exported or logged. Grok account binding reads
   identity fields from its local auth file; provider subprocesses use existing
-  sign-ins. Feedback secrets stay server-side; the public origin and Turnstile
-  site key are intentionally returned by the config endpoint.
+  sign-ins. Website report drafting requires no feedback secrets or provider
+  bindings. Drafts are public-intended user text, never copied agent logs.
 - Preview and audit modes never cross into the real support directory.
 - The site never becomes a control plane; deployment stays with the Cloudflare
   Authority.

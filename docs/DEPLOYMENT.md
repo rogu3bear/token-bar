@@ -1,51 +1,54 @@
 # Cloudflare Pages release contract
 
-Purpose: let users discover, download, and understand Token Bar, and submit feedback with a private contact address. The public source and installer downloads are hosted on GitHub. The production site URL is `https://token-bar-9v8.pages.dev`.
+Purpose: let users discover, download and understand Token Bar, prepare a local
+report, and explicitly review it on GitHub. Source, issues and installer downloads
+are hosted on GitHub. Production URL: `https://token-bar-9v8.pages.dev`.
 
-Use static Pages hosting and one small feedback API. Do not provision D1/R2, move binaries to Cloudflare, enable paid plans, enable GitHub Actions, or add broad middleware. `public/_routes.json` restricts Functions to `/api/*`; ordinary page requests remain static.
+Use static Pages hosting with the existing advanced-mode worker. Do not provision
+D1/R2, move binaries to Cloudflare, enable paid plans or GitHub Actions, or add
+broad middleware. `public/_routes.json` restricts worker invocation to `/api/*`;
+ordinary pages remain static.
 
 ## Application-owned artifacts
 
-- Static source: `site/public`
+- Static source: `site/public`.
 - Immutable upload directory: `build/site`, produced by `(cd site && bun install && bun run build)`. `build/site-artifact.json` binds every uploaded file by SHA-256.
-- Pages Functions directory: `site/functions`
-- Shared function modules: `site/lib/feedback.mjs` and `site/lib/config.mjs`
-- Advanced-mode entry: `site/worker.js`, bundled into `build/site/_worker.js` with the pinned esbuild dependency. It preserves API handlers and static `ASSETS.fetch` fallback. Upload this complete built directory through the maintainer's configured Pages release tooling; do not upload raw `functions/` or remove the feedback API.
-- Local acceptance: `./scripts/test.sh` and `(cd site && bun test)`
-- Local visual preview: `(cd site && bun run preview)`; this serves static content only, with byte-range responses for native video seeking. Private feedback fails closed without its server configuration.
+- Advanced-mode entry: `site/worker.js`, bundled into `build/site/_worker.js` with pinned esbuild. Preserve `ASSETS.fetch` fallback and clear 410/no-store responses for retired `/api/feedback` and `/api/config`, for every method. These paths read no body or provider binding and make no upstream call. Unknown API paths remain 404/no-store.
+- Upload the complete built directory through the registered Cloudflare Authority. The former mail/config modules and Pages Functions have been retired; no raw functions directory is needed.
+- Local acceptance: `(cd site && bun test)` for site changes; native checks apply only when native inputs change.
+- Local visual preview: `(cd site && bun run preview)`, static only, with byte-range video responses. Drafting requires no server configuration and works in this preview.
 
 ## Provider-owned configuration
 
-Production deployment is maintainer-operated. Contributors can build and preview
-the complete website locally without production credentials.
+Production deployment remains maintainer-operated through the registered
+Cloudflare Authority. Bind the exact source commit and artifact hashes; there is
+no automatic deploy on source pushes. Contributors need no production credentials
+to build or preview the site.
 
-The maintainer verifies the target account and project, records the exact source
-commit and artifact hashes, and publishes the complete built directory. No automatic deploy on source pushes.
+No Turnstile, Resend, contact address, sender or origin-validation binding is
+required by this source. Existing provider resources or secrets are the operator's
+custody; removing obsolete source does not authorize changing those resources.
 
-Required production bindings:
+## Report and verification boundary
 
-| Name | Purpose |
-| --- | --- |
-| `SITE_ORIGIN` | Exact production HTTPS origin for request and challenge validation |
-| `TURNSTILE_SITE_KEY` | Public site key restricted to the site's hostname |
-| `TURNSTILE_SECRET_KEY` | Server-only Turnstile secret |
-| `RESEND_API_KEY` | Server-only Resend key, preferably send-only and scoped to the verified sender domain |
-| `FEEDBACK_TO` | Fixed maintainer recipient; never supplied by the browser |
-| `FEEDBACK_FROM` | Verified Resend sender address |
+The draft is stored in the browser until cleared or site data is removed. Review
+on GitHub explicitly sends title, `behavior`, `version` and `macos` query fields
+with `template=bug_report.yml`. Custom IDs match `.github/ISSUE_TEMPLATE/bug_report.yml`;
+no labels, assignees or generic body parameter are injected. GitHub requires an
+account to submit; the user reviews before publishing a public issue. The report
+is transmitted in a URL at review time, not only at final submission.
 
-Use Turnstile action `feedback`. Test keys are for isolated local tests only, never production. Do not echo secret values into receipts, scripts, history, source, or tool output. Bind existing secrets through the authorized local secret source, without copying them into Git.
+An encoded URL over the local guard stays local and offers a copy fallback.
+Clipboard denial provides selectable text; storage or navigation failure must
+retain the visible draft. Direct GitHub and existing-issue links send no draft.
+No real issue is created during synthetic acceptance.
 
-Private feedback requires exact Origin validation, bounded fields/body, server-side Turnstile hostname/action checks, a fixed recipient, provider acceptance before offering the issue draft, and no request-body logging. The issue URL includes only title, report, version, and random reference ID. A public issue is not created automatically. A successful Resend response proves acceptance, not inbox delivery; a controlled mail test and private receipt are needed for delivery verification.
+Before claiming live, inspect deployment state, fetch all four pages, verify
+headers/footer links and any enabled installer by hash. Verify local draft
+retention, prefill encoding/template fields, length/copy fallbacks, and retired
+API 410/no-store behavior separately. No email delivery check applies.
 
-## Cost and verification
-
-Static hosting, Functions and email have separate usage and pricing rules. Confirm the user's current account plan and costs before provisioning. Keep the site static even if feedback is unavailable; never broaden the API routes just to simplify deployment.
-
-Before claiming live: read provider deployment state, fetch the pages.dev landing/feedback/privacy/terms pages, check security headers, verify the GitHub source link, verify any enabled download by hash, and record feedback verification separately. A real mail submission requires
-explicit authorization; without it, check non-sending API behavior and state
-that inbox delivery was not tested. The private contact address must not appear in public issue URLs, repository files, page source, or response logs.
-
-GitHub Packages is an additional installer archive, with its own visibility;
-it is not the website's download origin. Keep `release.json` bound to the
-notarized Release asset. Documentation-only changes outside `site/` require no
-site rebuild or Cloudflare deployment when the published inputs are unchanged.
+GitHub Packages remains an additional installer archive with independent
+visibility; it is not the website's download origin. Keep `release.json` bound
+to the notarized Release asset. Documentation-only changes outside `site/` need
+no site rebuild or deployment when published inputs are unchanged.
