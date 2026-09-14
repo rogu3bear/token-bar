@@ -66,8 +66,9 @@ app's real rendering and motion; a web reconstruction is not sufficient.
 `TokenBar --render-motion-preview <new-directory>` captures the shipping `DetailRoot` dashboard, including `LiveToolPanels`,
 `ToolSpeedCard`, and `RPMGauge`, plus the actual `MenuBarPresentation.combined`
 formatter, using isolated synthetic `RateMeasurement` inputs passed through
-`Tachometer.apply`. The shipping presentation animator owns exact-value number crossfades and
-dial interpolation; SwiftUI owns native view transitions. The capture
+`Tachometer.apply`. SwiftUI owns the dashboard dial interpolation and numeric
+transitions in `RPMGauge` and `RollingRate`. The separate `MenuBarAnimator`
+owns the menu-bar number crossfades and dial interpolation. The capture
 never starts monitoring or reads production history/preferences. Its
 `capture.json` records sample values and frame timestamps. Encode frames at
 those timestamps with FFmpeg; do not invent or smooth a different display.
