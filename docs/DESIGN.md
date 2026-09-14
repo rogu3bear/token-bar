@@ -6,40 +6,18 @@ Use a dark instrument-panel canvas, crisp system typography, thin structural
 borders, and a restrained yellow-green action accent. This is Token Bar's own
 design, not a copy of another product's branding or paid fonts.
 
-## Advisory design review through the next release
+## Design review and qualification
 
-User-requested contract, established 2026-09-12. The continuing reviewer is an
-external advisory design review whose transcript the maintainer retains
-privately. The repository owner retains design and implementation judgment;
-the reviewer supplies concrete visual advice.
+This guide describes the shipping native surfaces and synthetic website
+previews. Dated screenshots qualify only the revision they captured; publication
+does not turn untested interactions into proof.
 
-Keep this contract active through the next release, including if its version or
-release date changes. Before treating visual work as accepted, send separate
-shipping-view synthetic images of Now, History, Cost, Accounts & plans, Insights,
-Menu bar settings and Appearance, plus the compact popover, menu-bar readout and
-welcome surface. Include Light/Lime, Dark/Lime, custom accent, minimum window
-size and explicit integrity states. Include affected sheets, menus, focus and
-selection states when a change touches them; absent views remain unreviewed.
-
-Keep the exchange bidirectional: return the repository owner’s assessment and
-open questions, invite the reviewer’s response, and record the resulting
-disposition before treating a round as closed.
-
-After material visual changes, return changed faces and matching before/after
-images to the same conversation. Before release, request a final complete-face
-review against the exact candidate and retain its response. Record each tip as
-accepted, rejected with rationale, deferred with reason, or awaiting reproduction
-in the dated verification record. Previously tested behavior retains its proof
-unless its inputs change; advice alone does not demonstrate a source defect.
-
-Preserve one adaptive accent, canonical Dark/Lime, customization, native controls,
-measurement semantics, keyboard behavior, persistent integrity disclosure and
-reduced motion. Send synthetic images only. Stills do not prove animation,
-VoiceOver or offscreen interactions. This is an advisory working agreement, not
-a legal contract, autonomous background monitor, or permission to edit source,
-commit, sign, install, publish or release. Existing release authority and the
-user's VoiceOver deferral remain in force. The contract closes when the actual
-next release is recorded or the user explicitly ends it, not on a green build.
+For a visual change, inspect affected shipping views with synthetic data,
+including relevant light/dark/custom-accent, minimum-size, focus, selection,
+error and reduced-motion states. Review the exact candidate and state what was
+actually exercised. Stills establish appearance; motion, keyboard interaction,
+VoiceOver and installation require their own checks. Contributor-facing PRs
+include relevant sanitized evidence and remaining limitations.
 
 ## Native design system
 
@@ -88,7 +66,8 @@ app's real rendering and motion; a web reconstruction is not sufficient.
 `TokenBar --render-motion-preview <new-directory>` captures the shipping `DetailRoot` dashboard, including `LiveToolPanels`,
 `ToolSpeedCard`, and `RPMGauge`, plus the actual `MenuBarPresentation.combined`
 formatter, using isolated synthetic `RateMeasurement` inputs passed through
-`Tachometer.apply`. SwiftUI owns dial and number interpolation. The capture
+`Tachometer.apply`. The shipping presentation animator owns exact-value number crossfades and
+dial interpolation; SwiftUI owns native view transitions. The capture
 never starts monitoring or reads production history/preferences. Its
 `capture.json` records sample values and frame timestamps. Encode frames at
 those timestamps with FFmpeg; do not invent or smooth a different display.

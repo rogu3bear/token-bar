@@ -1,7 +1,7 @@
 # ARCHITECTURE.md
 
-> **Role budget:** 700 words. Describes the current system. Intended-but-unbuilt
-> structure is marked under Known divergence.
+> Describes the shipped v0.1 system. Known limitations are listed separately;
+> a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
 
@@ -9,8 +9,9 @@ Two independent surfaces. A single-module Swift/SwiftUI menu-bar app compiled
 with plain `swiftc` over sources discovered recursively (no Xcode project, no package
 manifest, no third-party Swift code) runs as an accessory process on Apple
 silicon, macOS 14+. A static Cloudflare Pages site under `site/` serves four
-HTML pages and one small feedback API. They share product language and a
-rendered preview image, not code.
+HTML pages and one small feedback API. They share product language and
+native-rendered synthetic stills and recordings,
+not application state or UI code.
 
 ## Components
 
@@ -40,7 +41,8 @@ rendered preview image, not code.
 | Pricing | `CostRateCard` and `CostRateHistory` in source | cost report, CSV | `Tests/Cost`, `docs/COST.md` |
 | Preferences | `UserDefaults` keys `appearance.*`, `menuBarConfiguration.v1`, `dashboard.rateUnit.<tool>` | tool units, menu bar title, theme | `Tests/Appearance`, `Tests/MenuBar` |
 | Version | `VERSION` | Info.plist, package name, `release.json` | `scripts/build.sh` |
-| Public download | `site/public/release.json` | landing page button | `site/tests/site.test.mjs` |
+| Public download | Notarized GitHub Release asset; `site/public/release.json` binds its URL/hash | landing page button | `scripts/verify-release.sh`, `site/tests/site.test.mjs` |
+| GitHub Packages copy | OCI artifact containing the same installer and checksum | repository Packages listing; visibility is independent | registry export and extracted installer SHA-256; `docs/RELEASING.md` |
 | Harness and project | `session_meta.originator` and `cwd`, normalized by `Project` | harness and project reports | `Tests/Dimensions` |
 | Claude Code usage | `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`, with `projects/**/*.jsonl` message snapshots plus verified increments; a missing explicit root stays unavailable | tool and project reports | `Tests/Harnesses` |
 | OpenCode usage | `opencode.db` `message` table, read-only | tool, provider and project reports | `Tests/Harnesses` |
@@ -126,8 +128,10 @@ rendered preview image, not code.
 
 - Prompt text never crosses into the ledger, archive, exports, or previews.
 - Provider-reported cost never crosses into the estimate total.
-- Secrets never cross into argv, source, logs, or the browser; the site's six
-  bindings live only in the Cloudflare project.
+- Credential values are not exported or logged. Grok account binding reads
+  identity fields from its local auth file; provider subprocesses use existing
+  sign-ins. Feedback secrets stay server-side; the public origin and Turnstile
+  site key are intentionally returned by the config endpoint.
 - Preview and audit modes never cross into the real support directory.
 - The site never becomes a control plane; deployment stays with the Cloudflare
   Authority.
@@ -137,9 +141,9 @@ rendered preview image, not code.
 **Claude Code multi-iteration messages.** A message may carry an `iterations`
 array whose counters sum higher than the message-level `usage`. Token Bar
 reports the message-level figure, which is the provider's own statement for
-that message. Measured over 71,554 deduplicated real messages, 18 were
-multi-iteration and the message-level figure undercounts output by 0.04% and
-cache reads by 0.02%. Pinned by `Tests/Harnesses`.
+that message. It does not substitute the sum of iteration counters, so those
+two representations can differ. Synthetic fixtures in `Tests/Harnesses`
+pin this choice.
 
 - Internal counters remain Codex-shaped: cache reads sit within input and
   reasoning within output. Adapters convert disjoint provider fields through
@@ -153,8 +157,8 @@ cache reads by 0.02%. Pinned by `Tests/Harnesses`.
   only proves connection transport; its quota observations have no identity.
   Grok remaining uses the installed Grok
   agent’s `_x.ai/billing` reading. OpenCode has no quota integration.
-- `README.md` names a Grok `signals.json`; counters still come from `usage.json`.
-  Live Grok activity uses `active_sessions.json` and summary `last_active_at`;
+- Grok counters come from `usage.json`. Live activity uses
+  `active_sessions.json` and summary `last_active_at`;
   `usage.json` age is not a liveness signal. Project comes from summary `info.cwd`.
 - Prompt insights read Codex transcripts only.
 
@@ -172,6 +176,22 @@ do not create an estimated rate. `MenuBarPresentation.combined` owns automatic
 multi-tool presentation for both the status item and settings preview. It sums
 available output rates, never provider allowances; `UsageModel.quota(for:)`
 uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to Codex quota.
+
+## Persistence and lazy work
+
+The durable stores are the ledger, matching metadata checkpoint, event index,
+request archive, sign-in timeline and Codex account database. Report/query caches,
+live output-rate baselines and prompt analysis are process memory. Launch restores
+saved usage and starts source discovery. Changed files resume from validated
+cursors; unchanged files reuse checkpoints. Full discovery does not imply
+replaying every transcript.
+
+Report changes rebuild on background queues. Returning to History or Cost does
+not invalidate an unchanged result. Insights waits for its destination to settle,
+defers while import/report work is busy, and throttles automatic prompt reads.
+Leaving Insights stops future scheduling. Prompt text stays in memory. Normal
+quit flushes pending usage; a crash can interrupt the deferred save window.
+Provider quota freshness is separate from usage/report cache freshness.
 
 ## Native state and clocks
 

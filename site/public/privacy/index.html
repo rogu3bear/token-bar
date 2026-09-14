@@ -38,26 +38,32 @@
         observations, local file paths, and file checkpoints are stored under
         <code>~/Library/Application Support/CodexTokenBar/</code>. Menu-bar
         preferences use macOS preferences. Prompt insights read local prompt
-        text and compute summaries in memory. In the current source build,
-        the Insights page refreshes this sample automatically while open. The app does not upload
+        text and compute summaries in memory. The Insights page refreshes this
+        sample automatically while open. The app does not upload
         that prompt text or add it to its ledger.
       </p>
       <p>
-        Current source builds also read Claude Code’s local quota cache when it
+        Token Bar also reads Claude Code’s local quota cache when it
         matches the account and is fresh. If you choose Connect Claude Code, the
         app adds its relay to the status line in your Claude Code user settings
         (keeping any existing command, with a backup) and Claude Code then writes
         its status JSON, including rate limits, to
         <code>~/Library/Application Support/CodexTokenBar/claude-statusline.json</code>
-        after each turn; only the rate-limit fields are read. This does not read
-        Claude credentials or make a Claude quota request. The installed Codex app-server and Grok agent may contact
+        after each turn. The relay keeps the supplied status JSON locally. Token
+        Bar uses rate-limit presence to show connection state; these readings
+        have no originating account identity and do not supply account quota.
+        This does not read Claude credentials or make a Claude quota request.
+        For Grok, Token Bar reads local sign-in identity fields to associate quota
+        observations with an account. The installed Codex app-server and Grok agent may contact
         their providers using your existing sign-ins. Token Bar does not send your
         usage history to the maintainer.
       </p>
       <h2>Keeping and removing local data</h2>
       <p>
-        Saved counters and checkpoints let the app reuse previous work. They
-        remain on your Mac after the app is removed. To remove this data, quit
+        Saved counters and checkpoints let the app reuse previous work. Reports
+        are cached in memory while the app runs and reconstructed from saved
+        history on relaunch. Saved data is updated incrementally. It
+        remains on your Mac after the app is removed. To remove this data, quit
         Token Bar and delete its CodexTokenBar support folder; this also removes
         saved history and account observations. macOS preferences are stored
         separately under <code>local.star.CodexTokenBar</code>. Original tool logs

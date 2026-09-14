@@ -1,6 +1,14 @@
 # macOS release
 
-The installer and app are different signed objects. A custom password alone cannot sign either. Use a Developer ID Application certificate for the app, a Developer ID Installer certificate for the `.pkg`, and an Apple app-specific password stored in Keychain for notarization.
+The public release is **v0.1**, with application version **0.1.0** and build
+**30100**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1/TokenBar-0.1.0-arm64.pkg)
+for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer,
+then open Token Bar from Applications. No build tools or reboot are required.
+The installer preserves existing usage history and preferences.
+
+The app and installer are separately signed: Developer ID Application for the
+app, Developer ID Installer for the `.pkg`. Maintainers store notarization
+credentials in Keychain; users need none of these to install.
 
 ## One-time credential setup
 
@@ -83,10 +91,62 @@ exit of 68 means Apple could not be reached, not that a ticket is invalid.
 
 ## GitHub publication
 
-Bind the exact clean source commit, version, final package hash, notarization receipt, and local test receipts. Inspect remote workflow policy; no Actions should run. Publish only the notarized package and checksum through the repository's GitHub Release. Keep receipt details and account-specific evidence local.
+Bind the exact clean source commit, version, final package hash, notarization
+receipt and local test receipts. Inspect remote workflow policy; no Actions
+should run. GitHub Releases is the primary public installer distribution path.
+Upload the notarized `.pkg` and its checksum. Keep notarization receipts, logs
+and account-specific evidence local.
+
+Before upload, ensure the checksum names only the installer basename, not a
+private build path. From the release output directory:
+
+```sh
+shasum -a 256 TokenBar-0.1.0-arm64.pkg > TokenBar-0.1.0-arm64.pkg.sha256
+shasum -a 256 -c TokenBar-0.1.0-arm64.pkg.sha256
+```
+
+Use the actual `VERSION` for later releases. A public tag remains bound to its
+original source; later documentation commits do not move the release tag.
 
 Draft releases may hold development artifacts during preparation, but are not public downloads. An unsigned development package must never be described as a signed release or linked by the public download manifest.
 
 After release publication, update `site/public/release.json` with `available: true`, the exact GitHub asset URL, package SHA-256, and `notarized: true`. Deploy the site through the registered Cloudflare route and verify the public download resolves to the same bytes.
 
 The existing bundle identifier is retained to preserve upgrades and saved menu-bar settings. Package installation does not delete local usage history or alter the user's Codex installation.
+
+## GitHub Packages distribution
+
+The separate [Packages listing](https://github.com/users/rogu3bear/packages/container/package/token-bar)
+uses `ghcr.io/rogu3bear/token-bar:0.1.0`. It contains
+`TokenBar-0.1.0-arm64.pkg`, its basename-only `.sha256`, and `README.txt`.
+This is an OCI distribution artifact, not a runnable macOS container. The
+installer inside is byte-identical to the v0.1 Release asset.
+
+As verified September 13, 2026, the package is uploaded and linked to the public
+repository, but its own visibility remains **private**. Do not describe it as an
+anonymous download. Package visibility is independent of the linked repository;
+a maintainer changes it under Package settings → Change visibility. The public
+Release download remains available regardless of registry visibility. See
+[GitHub's visibility rules](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
+
+Maintainer publication uses an authenticated OCI client with `write:packages`.
+Retain an existing version if its digest already matches; reconcile any uncertain
+upload before retrying. Include source, version, revision, license and a description
+identifying the installer archive. Never add credentials or local operating records
+to its layer. Link it with
+`org.opencontainers.image.source=https://github.com/rogu3bear/token-bar`.
+After publication, verify the registry digest, repository and visibility, then
+export and compare the extracted installer with the Release checksum. Public
+availability requires repeating the download anonymously.
+
+An authorized registry user can extract it with the `crane` OCI client:
+
+```sh
+crane export ghcr.io/rogu3bear/token-bar:0.1.0 token-bar.tar
+tar -xOf token-bar.tar TokenBar-0.1.0-arm64.pkg > TokenBar-0.1.0-arm64.pkg
+tar -xOf token-bar.tar TokenBar-0.1.0-arm64.pkg.sha256 > TokenBar-0.1.0-arm64.pkg.sha256
+shasum -a 256 -c TokenBar-0.1.0-arm64.pkg.sha256
+```
+
+Authenticate first while the listing is private. For ordinary macOS installation,
+use the direct Release asset instead of installing registry tooling.

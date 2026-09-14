@@ -35,6 +35,12 @@ are required. Requires Apple silicon and macOS 14 or later.
 
 [Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1)
 
+GitHub Releases hosts the direct macOS installer. A separate GitHub Packages
+OCI artifact, `ghcr.io/rogu3bear/token-bar:0.1.0`, contains the same installer,
+checksum and a short README. It is a distribution archive, not a runnable
+container. That listing remains private as of September 13, 2026; use the public
+Release download above. [Distribution and verification details](docs/RELEASING.md).
+
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.
 For Codex account allowance, use an existing local Codex installation and sign
@@ -75,6 +81,14 @@ Usage history lives in `~/Library/Application Support/CodexTokenBar/`. The
 legacy path and bundle identity preserve existing history and preferences.
 Records can include account labels, project paths, task identities and token
 counts. CSV exports can include those labels and paths.
+
+Saved usage is loaded before scanning. File cursors and identities persist, so
+reopening the app checks for changes without replaying unchanged transcripts.
+History and Cost reuse in-memory report results during the app session; those
+reports are reconstructed from saved usage after relaunch. Insights samples
+Codex prompts lazily while its page is open and does not persist prompt text.
+Usage saves can lag newly displayed records by up to 15 seconds; normal quit
+flushes pending work. See [storage and recovery](ARCHITECTURE.md#log-to-ledger).
 
 Token Bar does not upload usage history or include telemetry. Prompt insights
 read local Codex text in memory; prompt text is not copied into the usage ledger.
@@ -117,6 +131,11 @@ verification runs locally, without GitHub Actions.
 - `scripts/`: build, installer, preview and verification commands.
 - `site/`: product website and feedback service.
 - `docs/` and [ARCHITECTURE.md](ARCHITECTURE.md): technical guides.
+
+Documentation: [Architecture](ARCHITECTURE.md), [Design](docs/DESIGN.md),
+[Cost](docs/COST.md), [Releasing](docs/RELEASING.md), [Deployment](docs/DEPLOYMENT.md),
+[Contributing](CONTRIBUTING.md), [Security](SECURITY.md) and
+[Code of conduct](CODE_OF_CONDUCT.md).
 
 Local agent instructions, diagnostic records, credentials, usage databases and
 build outputs are ignored and excluded from the public tree. The public-tree

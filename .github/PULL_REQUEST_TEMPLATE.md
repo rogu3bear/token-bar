@@ -4,10 +4,13 @@
 
 ## How it was checked
 
-- [ ] `./scripts/test.sh` (or the affected group) passed
-- [ ] `(cd site && bun test)` passed when the site changed
-- [ ] `./scripts/build.sh` passed
-- [ ] The smallest relevant check from `ACTOR.md` was run: <!-- name it -->
+<!-- Record actual results; mark unrelated checks N/A with a brief reason. -->
+
+- Native behavior: <!-- affected ./scripts/test.sh group(s), ./scripts/build.sh, or N/A -->
+- Site behavior: <!-- (cd site && bun test && bun run build), or N/A -->
+- Documentation: <!-- checked commands, source claims and relative links, or N/A -->
+- Public tree: <!-- python3 scripts/check-public-tree.py against the staged candidate -->
+- User-facing behavior: <!-- relevant synthetic UI/installation evidence and limitations -->
 
 ## Private data
 

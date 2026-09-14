@@ -1,8 +1,13 @@
 # Cost estimates
 
-## Implementation prompt
+## Shipped behavior
 
-Add a Cost view to Token Bar that shows estimated API-equivalent cost by period, model, and recorded reasoning level. Preserve token accounting and fork deduplication. Capture reasoning effort per turn, retain unknown values honestly, and backfill only from available source records. Use dated, provider-specific pricing rules; show unpriced usage explicitly and distinguish estimates from actual charges. Include cost contributions, filters, and CSV export. Verify the calculations, history compatibility, and rendered UI without exposing private usage data.
+The Cost view estimates API-equivalent cost by period, model and recorded
+reasoning level using the shipped, dated rules below. It preserves unknown
+fields, token accounting and fork deduplication. Filters, contribution details,
+source recovery and CSV export use the same evidence boundaries. This describes
+the v0.1 rate card; the original verification dates do not claim that current
+market prices were rechecked during a documentation update.
 
 ## Meaning of the estimate
 
@@ -47,7 +52,7 @@ five-minute writes are $6.25 per million tokens and one-hour writes are $10.
 The [prompt-caching response contract](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#1-hour-cache-duration)
 confirms that `cache_creation_input_tokens` is the sum of those two fields,
 so the aggregate alone cannot select a correct write rate. No default lifetime or model alias is inferred, and no Anthropic
-rate card is shipped in 2.2.9. Adding one requires retaining and qualifying
+rate card is shipped in 0.1.0. Adding one requires retaining and qualifying
 the lifetime split through admission, increments, compaction, and recovery;
 legacy records without that evidence must remain unpriced. Claude also lacks
 a separately recorded reasoning-output counter; its total output must not be

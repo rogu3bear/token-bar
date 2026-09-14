@@ -1,6 +1,6 @@
 # Cloudflare Pages release contract
 
-Purpose: let users discover, download, and understand Token Bar, and submit feedback with a private contact address. The public source and installer downloads are hosted on GitHub. The requested site URL is `https://token-bar-9v8.pages.dev`.
+Purpose: let users discover, download, and understand Token Bar, and submit feedback with a private contact address. The public source and installer downloads are hosted on GitHub. The production site URL is `https://token-bar-9v8.pages.dev`.
 
 Use static Pages hosting and one small feedback API. Do not provision D1/R2, move binaries to Cloudflare, enable paid plans, enable GitHub Actions, or add broad middleware. `public/_routes.json` restricts Functions to `/api/*`; ordinary page requests remain static.
 
@@ -39,6 +39,13 @@ Private feedback requires exact Origin validation, bounded fields/body, server-s
 
 ## Cost and verification
 
-Static assets are free/unlimited under current Pages pricing; Functions and email have their own quotas. Confirm the user's current account plan and costs before provisioning. Keep the site static even if feedback is unavailable; never broaden the API routes just to simplify deployment.
+Static hosting, Functions and email have separate usage and pricing rules. Confirm the user's current account plan and costs before provisioning. Keep the site static even if feedback is unavailable; never broaden the API routes just to simplify deployment.
 
-Before claiming live: read provider deployment state, fetch the pages.dev landing/feedback/privacy/terms pages, check security headers, verify the GitHub source link, verify any enabled download by hash, and exercise an authorized synthetic feedback submission. The private contact address must not appear in public issue URLs, repository files, page source, or response logs.
+Before claiming live: read provider deployment state, fetch the pages.dev landing/feedback/privacy/terms pages, check security headers, verify the GitHub source link, verify any enabled download by hash, and record feedback verification separately. A real mail submission requires
+explicit authorization; without it, check non-sending API behavior and state
+that inbox delivery was not tested. The private contact address must not appear in public issue URLs, repository files, page source, or response logs.
+
+GitHub Packages is an additional installer archive, with its own visibility;
+it is not the website's download origin. Keep `release.json` bound to the
+notarized Release asset. Documentation-only changes outside `site/` require no
+site rebuild or Cloudflare deployment when the published inputs are unchanged.
