@@ -3,10 +3,11 @@ import SwiftUI
 import ServiceManagement
 
 enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
-    case icon, activity, rate, quota, zero, dial
+    case icon, activity, rate, quota, zero, dial, risk
     var id: String { rawValue }
     var label: String {
         switch self {
+        case .risk: return "Quota Guard warning"
         case .icon: return "App icon"
         case .activity: return "Running chats and agents"
         case .rate: return "Output rate"
@@ -17,7 +18,7 @@ enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
     }
 }
 struct MenuBarConfiguration: Codable, Equatable {
-    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .zero]
+    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .zero, .risk]
     var enabled: Set<MenuBarPart> = [.dial, .rate, .quota]
     var compact = false
     var unit = "dashboard"
@@ -56,7 +57,7 @@ struct MenuBarConfiguration: Codable, Equatable {
 struct MenuBarPresentation {
     /// One presentation owner for the real status item and settings preview.
     static func combined(_ settings: MenuBarConfiguration, codex: Tachometer, claude: Tachometer, grok: Tachometer,
-                         monitor: LiveMonitor, now: Date, palette: ToolPalette, claudeQuota: ToolQuotaState, grokQuota: ToolQuotaState = ToolQuotaState()) -> NSAttributedString {
+                         monitor: LiveMonitor, now: Date, palette: ToolPalette, claudeQuota: ToolQuotaState, grokQuota: ToolQuotaState = ToolQuotaState(), riskText: String? = nil) -> NSAttributedString {
         let auto = (settings.tool ?? .auto) == .auto
         let selected = (settings.tool ?? .auto).resolve(codex: codex, claude: claude, grok: grok)
         func meter(_ tool: LiveTool) -> Tachometer { tool == .grok ? grok : tool == .claude ? claude : codex }
@@ -80,7 +81,7 @@ struct MenuBarPresentation {
                 speed.enabled.remove(.zero)
             }
             let result = NSMutableAttributedString(attributedString: attributed(speed, meter: meter(tool), monitor: monitor, now: now,
-                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota))
+                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText))
             if grokAuto && !grokHasQuota {
                 let labeled = [LiveTool.codex, .claude].filter { hasQuotaReading($0, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) }
                 appendQuota(result, tools: labeled)
@@ -109,7 +110,7 @@ struct MenuBarPresentation {
         summary.enabled.remove(.zero) // A cross-provider exhaustion time has no meaning.
         let partial = tools.contains { !meter($0).hasRate }
         let result = NSMutableAttributedString(string: partial ? "Total (partial) · " : "Total · ", attributes: [.foregroundColor: NSColor.labelColor])
-        result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent)))
+        result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent), riskText: riskText))
         appendQuota(result, tools: tools)
         return result
     }
@@ -151,7 +152,7 @@ struct MenuBarPresentation {
     static func title(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> String {
         (tool.map { $0.label + " · " } ?? "") + settings.title(values: values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false))
     }
-    static func attributed(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, accent: NSColor? = nil, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> NSAttributedString {
+    static func attributed(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, accent: NSColor? = nil, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, riskText: String? = nil) -> NSAttributedString {
         let accent = accent ?? .labelColor
         let values = values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false)
         let result = NSMutableAttributedString()
@@ -160,8 +161,11 @@ struct MenuBarPresentation {
             result.append(NSAttributedString(string: tool.label, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: accent]))
         }
         for part in settings.order where settings.enabled.contains(part) {
+            if part == .risk && riskText == nil { continue }
             if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
-            if part == .dial {
+            if part == .risk {
+                result.append(NSAttributedString(string: riskText ?? "", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
+            } else if part == .dial {
                 result.append(MenuBarDial.attributed(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
                     available: meter.hasRate, accent: accent, identity: tool?.rawValue ?? "combined"))
             } else {
@@ -194,6 +198,7 @@ struct MenuBarSettingsView: View {
     @Bindable var claudeQuota: ClaudeQuotaMonitor
     @Bindable var grokQuota: GrokQuotaMonitor
     var claudeConnection: ClaudeConnectionModel? = nil
+    var quotaGuard: QuotaGuardCoordinator? = nil
     @State private var launchAtLogin = false
     @State private var loginError: String?
     @State private var reordering = false
@@ -203,7 +208,7 @@ struct MenuBarSettingsView: View {
                 PageHeader("Menu bar", subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
                 Group {
                     let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
-                        monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota)
+                        monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota, riskText: quotaGuard?.menuText(selection: preferences.configuration.tool))
                     MenuBarPreview(value: presentation)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .lineLimit(3).frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
@@ -253,6 +258,7 @@ struct MenuBarSettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.top, 12)
                 }
+                if let quotaGuard { QuotaGuardSettingsView(coordinator: quotaGuard) }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .disabled(!allowsSystemSettings)
                     .onAppear { if allowsSystemSettings { launchAtLogin = SMAppService.mainApp.status == .enabled } }

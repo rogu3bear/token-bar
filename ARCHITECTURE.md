@@ -25,6 +25,7 @@ not application state or UI code.
 | `ClaudeQuotaMonitor`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; no credential or network access | In-memory quota samples; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
 | `GrokQuotaMonitor` | JSON-RPC to `grok agent --no-leader stdio`, `_x.ai/billing` | In-memory quota samples only |
 | `LiveMonitor`, `LiveStateStore`, `ProviderUsage`, `CodexInstallation` | JSON-RPC to `codex app-server --stdio` for quota, plan, account usage | `live-accounts.sqlite`; legacy JSON retained for migration/rollback |
+| `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
 | `*View.swift`, `MenuBarSettings`, `Appearance`, `DashboardNavigation` | seven dashboard sections, popover, settings | `UserDefaults` preferences |
@@ -73,6 +74,48 @@ not application state or UI code.
    Single-day charts use minute timestamps; display-only archive expansion must
    reconcile with daily aggregates before it can supply their timing.
    The usage store prepares the compact timeline per entry revision. Clock ticks only check for local midnight, a future record becoming current, clock rollback, or a calendar/time-zone change; SwiftUI body evaluation never aggregates history.
+
+### Quota Guard
+
+`UsageModel` owns one coordinator; the main-actor app delegate observes provider
+quota changes. The existing one-second meter timer ages in-app evidence only.
+Notifications require distinct source timestamps and never come from UI ticks.
+The pure evaluator receives explicit identity, authentication, failure, time,
+policy and tool-scoped samples, then calls canonical `Runway.estimate` after
+qualification. A cached Codex account is ineligible until a successful quota
+refresh; rereading an unchanged Claude cache does not confirm a forecast.
+
+Action freshness is the smaller of the provider horizon and 120 seconds,
+without changing display horizons. Positive burn needs at least 120 seconds;
+gaps over 120 seconds, counter decreases, reset changes, invalid values and
+conflicting or out-of-order timestamps discard the affected slope. Observed
+exhaustion requires the provider to report 100% used. Forecast elapsed time
+never becomes an observed stop. Evidence and warning severity remain separate.
+
+Default low allowance is 10% remaining; forecast lead is 30 minutes before the
+reset. Forecast alerts require two distinct fresh observations. Escalations are
+5% remaining, a forecast within 10 minutes, and observed exhaustion. Recovery
+requires two fresh observations above low + 3 percentage points and beyond
+lead + 5 minutes (or no positive burn). A gap resets confirmation. Reset jitter
+up to 60 seconds uses a fixed anchor, never a drifting chain; a new period is
+accepted only after the previous anchored reset.
+
+Private state is bounded to 256 episodes and snoozes and prunes expired records
+after 35 days. Stable opaque request IDs distinguish evaluated, submitted and
+observed delivery; one delayed retry is permitted on fresh evidence. Corrupt
+or unwritable state pauses notifications and preserves data. Account switches
+retain suppression. Snooze is 30 minutes for the selected account/bucket/window
+and reset period, including escalation. Old actions never redirect to another
+account or cancel a new period's warning. Detail resolves current evidence only
+within the same verified period and otherwise labels the historical snapshot.
+
+`UNUserNotificationCenter` is constructed only in a normal app model. Enabling
+notifications explicitly requests permission; sound defaults off. macOS delivery
+is not guaranteed. View quota and Snooze actions use opaque request identifiers;
+private labels and raw account IDs are not placed in notification content.
+`--preview-quota-guard` and `--render-quota-guard` use disposable files/preferences,
+fixed synthetic time and no notification adapter. `Tests/QuotaGuard` injects a
+fake adapter for permission, submission, delivery and action routing.
 
 ### Quota read
 
@@ -170,7 +213,7 @@ pin this choice.
 ## Validation
 
 ```bash
-./scripts/test.sh [group]    # thirteen groups; each prints PASS lines, traps on failure
+./scripts/test.sh [group]    # fourteen groups; each prints PASS lines, traps on failure
 (cd site && bun test)        # site and backend tests
 ./scripts/build.sh           # compiles every discovered source, signs, verifies
 ```

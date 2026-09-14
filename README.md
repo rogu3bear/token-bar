@@ -34,6 +34,12 @@ saved measurements on your Mac and updates them as new records arrive.
 - **Make it yours.** Choose menu-bar fields, their order, rate units, appearance
   and accent color.
 
+Quota Guard in the development source adds one allowance warning in Now and the
+popover, even when no tool is active. Its optional menu-bar warning field and
+notifications are off by default. Menu bar settings controls the low threshold,
+forecast lead and sound. Warnings identify one account allowance; they do not
+mean an entire tool has stopped. This feature is not in the linked 0.1.2 installer.
+
 ## Get started
 
 [Download Token Bar 0.1.2 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.2/TokenBar-0.1.2-arm64.pkg)

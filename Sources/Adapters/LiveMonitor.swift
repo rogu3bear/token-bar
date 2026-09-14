@@ -103,6 +103,7 @@ struct Runway {
     @ObservationIgnored private(set) var comparisonRevision: UInt64 = 0
     @ObservationIgnored var comparisonChanged: (() -> Void)?
     var error: String?
+    var lastQuotaRefresh: Date?
     var busy = false
     var usageBusy = false
     var usageError: String?
@@ -143,7 +144,7 @@ struct Runway {
                     next.plans.append(LivePlan(id: UUID().uuidString, accountID: reading.id, email: reading.email, plan: reading.plan, firstSeen: reading.observed, lastSeen: reading.observed))
                 }
                 try self.store.save(next)
-                DispatchQueue.main.async { self.state = next; self.currentID = reading.id; self.error = nil; self.busy = false }
+                DispatchQueue.main.async { self.state = next; self.currentID = reading.id; self.lastQuotaRefresh = reading.observed; self.error = nil; self.busy = false }
             } catch {
                 self.process?.terminate(); self.process = nil
                 let message = error.localizedDescription

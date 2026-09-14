@@ -636,3 +636,21 @@ row without misaligning gauges. The center dividers span the columns. Inactive
 tools reserve no area. Rate digits retain their own complete height and actual
 units. Single-provider views use the available width; the same geometry owner
 supports minimum/default/wide dashboard sizes.
+
+### Quota Guard in the development source
+
+Now and the 440-point popover share one compact allowance summary independent
+of live tool activity. It exposes the highest-priority warning and an expandable
+list of all supported allowances, including stale and unavailable evidence.
+No inactive speed panels or separate dashboard destination are added. Warning
+text names the tool, allowance window and bucket; reset and source time stay
+visible. Native primary/secondary labels support Light and Dark with any accent.
+
+View quota opens the existing dashboard at Now and presents that exact allowance.
+The detail updates within a verified account/period and labels old-account or
+old-period snapshots as historical. Snooze applies to that allowance and period,
+not every window for the account. Menu bar settings owns notification opt-in,
+sound, low-remaining threshold and forecast lead. The optional Quota Guard warning
+field preserves existing field order and enabled choices during migration.
+Notification delivery remains subject to macOS; in-app evidence is always the
+available fallback. Forecasts describe account burn, never token output speed.

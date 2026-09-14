@@ -39,7 +39,7 @@ cp Assets/claude-statusline-relay.sh "$app/Contents/Resources/claude-statusline-
 chmod 755 "$app/Contents/Resources/claude-statusline-relay.sh"
 xcrun swiftc -O -swift-version 5 -target arm64-apple-macosx14.0 "${APP_SOURCES[@]}" \
   -o "$app/Contents/MacOS/TokenBar" \
-  -framework AppKit -framework SwiftUI -framework ServiceManagement -framework CoreServices -framework Charts -lsqlite3
+  -framework AppKit -framework SwiftUI -framework ServiceManagement -framework CoreServices -framework Charts -framework UserNotifications -lsqlite3
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

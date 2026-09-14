@@ -107,7 +107,7 @@ enum GrokBilling {
                     if !samples.contains(where: { $0.id == reading.id && $0.date == reading.date }) { samples.append(reading) }
                     self.quota = ToolQuotaState(readings: [reading], samples: samples,
                         unavailable: "Grok quota unavailable · billing missing or stale",
-                        accountLabel: reading.name)
+                        accountLabel: reading.name, guardAccountID: id, guardAuthenticated: true)
                     self.busy = false
                 }
             } catch {
@@ -119,6 +119,7 @@ enum GrokBilling {
                     if current == nil || self.quota.readings.contains(where: { $0.accountID != current }) || self.quota.readings.isEmpty {
                         self.quota = ToolQuotaState(unavailable: message)
                     }
+                    self.quota.guardFailed = true
                     self.busy = false
                 }
             }

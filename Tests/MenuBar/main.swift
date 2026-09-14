@@ -28,7 +28,7 @@ var older = MenuBarConfiguration()
 older.enabled = [.activity, .rate]
 older.order = [.icon, .activity, .rate, .quota, .zero]
 older.normalize()
-assert(older.order.last == .dial && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
+assert(older.order.suffix(2) == [.dial, .risk] && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
 restored.configuration.enabled = [.dial, .quota]
 assert(MenuBarPreferences(defaults: defaults).configuration.enabled == [.dial, .quota])
 assert(MenuBarDial.fraction(value: 150, minimum: 100, maximum: 200) == 0.5)

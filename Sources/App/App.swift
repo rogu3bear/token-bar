@@ -7,6 +7,7 @@ import ServiceManagement
     let usageStore: UsageStore
     let reporting = ReportState()
     let comparisons = UsageComparisonStore()
+    let quotaGuard: QuotaGuardCoordinator
     let clock = PresentationClock()
     private var sourceRevision: UInt64 { usageStore.revision }
     private var catalogRevision: UInt64 { reporting.catalogRevision }
@@ -117,6 +118,8 @@ import ServiceManagement
             ?? ProcessInfo.processInfo.environment["GROK_HOME"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".grok")
         let support = previewRoot ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        quotaGuard = QuotaGuardCoordinator(url: support.appendingPathComponent("CodexTokenBar/quota-guard.json"),
+            adapter: previewRoot == nil ? QuotaGuardNotifications() : nil, clock: { referenceDate ?? Date() })
         insights = InsightsModel(clock: { referenceDate ?? Date() }, storageURL: support.appendingPathComponent("CodexTokenBar/prompt-index"), home: home)
         reportEngine = ReportEngine(storageURL: support.appendingPathComponent("CodexTokenBar/report-index.json"))
         // A preview never reads real transcripts. Otherwise each tool is
@@ -171,6 +174,7 @@ import ServiceManagement
         }
         live.comparisonChanged = { [weak self] in self?.refreshComparisons() }
         publish(snapshot)
+        quotaGuard.update(guardInputs())
     }
     func quota(for tool: LiveTool) -> ToolQuotaState {
         if tool == .grok { return grokQuota.quota }
@@ -402,6 +406,7 @@ struct QuickLiveView: View {
                 if tools.isEmpty {
                     Text("No tools working right now").foregroundStyle(.secondary)
                 }
+                QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
                 ToolActivityErrors(model: model)
                 CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: model.showHistory)
                 if let error = monitor.error { ErrorNotice(message: error) }
@@ -466,6 +471,7 @@ struct QuickLiveView: View {
             guard let self else { return }
             let now = Date()
             self.model.clock.now = now
+            self.model.quotaGuard.tick()
             self.model.usageStore.updateCompactUsage(now: now)
             self.model.tachometer.tick(now: now)
             self.model.claudeMeter.tick(now: now)
@@ -536,7 +542,8 @@ struct QuickLiveView: View {
         let presentation = MenuBarPresentation.combined(model.menuBarPreferences.configuration,
             codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter,
             monitor: model.live, now: now, palette: model.appearance.toolPalette,
-            claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota)
+            claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota,
+            riskText: model.quotaGuard.menuText(selection: model.menuBarPreferences.configuration.tool))
         guard let button = item.button else { return }
         statusAnimator.update(presentation, in: button, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak button] in
             button?.attributedTitle = $0
@@ -551,6 +558,8 @@ struct QuickLiveView: View {
         timer?.invalidate(); providerTimer?.invalidate(); meterTimer?.invalidate(); stream?.stop(); model.live.stop(); model.grokQuota.stop()
     }
     func configureNavigationActions() {
+        observeQuotaGuard()
+        model.quotaGuard.reveal = { [weak self] in self?.openDetails(destination: .now) }
         model.showDetails = { [weak self] in self?.openDetails() }
         model.showHistory = { [weak self] in self?.openDetails(destination: .history) }
         model.showMenuBarSettings = { [weak self] in self?.openMenuBarSettings() }
@@ -579,7 +588,7 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Menu bar settings"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection) })
+            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard) })
             window.isReleasedWhenClosed = false
             window.center(); settingsWindow = window
         }
@@ -598,6 +607,14 @@ struct QuickLiveView: View {
 }
 @main struct Main {
     @MainActor static func main() {
+        if CommandLine.arguments.contains("--preview-quota-guard") || CommandLine.arguments.contains("--render-quota-guard") {
+            let arguments = CommandLine.arguments
+            let destination = arguments.firstIndex(of: "--render-quota-guard").flatMap { arguments.indices.contains($0 + 1) ? URL(fileURLWithPath: arguments[$0 + 1]) : nil }
+            if arguments.contains("--render-quota-guard") && destination == nil { print("Missing quota preview output path"); exit(1) }
+            do { try QuotaGuardPreview.run(destination: destination) }
+            catch { print("Quota Guard preview failed: " + error.localizedDescription); exit(1) }
+            return
+        }
         if CommandLine.arguments.contains("--preview-welcome") {
             _ = NSApplication.shared
             print(FirstRunWelcome.present() ? "Preview accepted; no monitoring started or preferences saved." : "Preview dismissed; no monitoring started or preferences saved.")

@@ -13,6 +13,9 @@ struct ToolQuotaState {
     var accountLabel: String?
     /// Age at which a reading stops counting as current; owned by the tool's refresh cadence.
     var horizon: TimeInterval = Runway.defaultHorizon
+    var guardAccountID: String? = nil
+    var guardAuthenticated = false
+    var guardFailed = false
 }
 enum ClaudeQuotaSource {
     /// Claude Code refreshes its cache only on demand (session start, its usage
@@ -116,7 +119,8 @@ struct ClaudeStatuslineRelay: Decodable {
                 let id = readings.first?.accountID
                 var samples = self.quota.samples.filter { $0.accountID == id && $0.date >= now.addingTimeInterval(-ClaudeQuotaSource.horizon) }
                 for reading in readings where !samples.contains(where: { $0.id == reading.id && $0.date == reading.date }) { samples.append(reading) }
-                self.quota = ToolQuotaState(readings: readings, samples: samples, unavailable: Self.unavailable, horizon: ClaudeQuotaSource.horizon)
+                self.quota = ToolQuotaState(readings: readings, samples: samples, unavailable: Self.unavailable, horizon: ClaudeQuotaSource.horizon,
+                    guardAccountID: id, guardAuthenticated: id != nil)
                 self.busy = false
             }
         }

@@ -22,6 +22,9 @@ CORE="ProviderUsage.swift UsageComparison.swift CostRateHistory.swift CostCovera
       ClaudeCodeUsage.swift OpenCodeUsage.swift ForeignHarnessScan.swift IncrementalScan.swift HarnessDiscovery.swift
       Tachometer.swift SignInTimeline.swift CodexInstallation.swift GrokInstallation.swift GrokQuotaMonitor.swift"
 
+GUARD="QuotaGuardEvaluation.swift QuotaGuardCoordinator.swift QuotaGuardNotifications.swift QuotaGuardViews.swift"
+MENU="MenuBarDial.swift MenuBarSettings.swift FirstRunWelcome.swift ClaudeConnectionControl.swift"
+
 # build_group <executable> <test entry> <extra swiftc flags> <source names...>
 build_group() {
     local exe="$1" entry="$2" flags="$3"
@@ -44,7 +47,8 @@ build_group() {
 }
 
 build_group usage      Tests/main.swift            "-swift-version 5 -lsqlite3" $CORE
-build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE MenuBarDial.swift MenuBarSettings.swift FirstRunWelcome.swift ClaudeConnectionControl.swift
+build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD
+build_group quota-guard Tests/QuotaGuard/main.swift "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
 build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
 build_group feedback   Tests/Feedback/main.swift   ""                           Feedback.swift CodexInstallation.swift

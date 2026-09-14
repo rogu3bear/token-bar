@@ -17,6 +17,7 @@ struct LiveOverview: View {
                 PageHeader("Now") {
                     if monitor.busy { ProgressView().controlSize(.small) }
                 }
+                QuotaGuardSummary(coordinator: model.quotaGuard)
                 LiveToolPanels(model: model, codex: meter, claude: model.claudeMeter)
                 if let error = monitor.error { ErrorNotice(message: error) }
                 MethodButton(title: "How activity and speed are measured") { showMethod = true }
