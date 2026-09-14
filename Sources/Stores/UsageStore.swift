@@ -7,7 +7,9 @@ import Observation
     let scanner: UsageScanner
     var snapshot = Snapshot() {
         didSet {
-            if oldValue.entries != snapshot.entries { revision &+= 1 }
+            let changed = oldValue.contentID != nil && snapshot.contentID != nil
+                ? oldValue.contentID != snapshot.contentID : oldValue.entries != snapshot.entries
+            if changed { revision &+= 1 }
             updateCompactUsage(now: referenceDate ?? Date())
         }
     }

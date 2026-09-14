@@ -38,8 +38,9 @@
         observations, local file paths, and file checkpoints are stored under
         <code>~/Library/Application Support/CodexTokenBar/</code>. Menu-bar
         preferences use macOS preferences. Prompt insights read local prompt
-        text and compute summaries in memory. The Insights page refreshes this
-        sample automatically while open. The app does not upload
+        text in memory and save derived statistics and per-chat byte checkpoints
+        locally. The Insights page reuses that saved work and refreshes changed
+        chats automatically while open. The app does not upload
         that prompt text or add it to its ledger.
       </p>
       <p>
@@ -68,8 +69,12 @@
         saved history and account observations. macOS preferences are stored
         separately under <code>local.star.CodexTokenBar</code>. Original tool logs
         belong to their respective tools and are not deleted by Token Bar.
-        Prompt summaries stay in memory for the running app; prompt text is not
-        saved to the usage ledger or request archive.
+        Derived prompt statistics and checkpoint hashes are saved in
+        <code>prompt-index/</code>; the derived report index is saved in
+        <code>report-index.json</code> inside the same support folder. Prompt and
+        answer text are not saved to either cache, the usage ledger or request
+        archive. Repeated-prompt labels are read from their original source by
+        byte position and stay in memory.
       </p>
       <h2>Private feedback</h2>
       <p>

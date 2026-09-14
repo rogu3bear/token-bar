@@ -45,7 +45,32 @@ enum HistoryNavigationPreview {
         try require(!model.detailedReporting, "Returning to Now disables detailed reporting")
         model.showDetails?()
         try require(delegate.dashboardSelection.destination == .now, "Dashboard preserves Now")
-        try JSONSerialization.data(withJSONObject: ["synthetic": true, "checks": receipts], options: [.prettyPrinted, .sortedKeys])
+        if CommandLine.arguments.contains("--large-history") {
+            let now = model.referenceDate ?? Date()
+            let sample = model.snapshot.entries[0]
+            model.snapshot = Snapshot(entries: (0..<100_000).map { position in
+                var row = sample
+                row.session = "synthetic-task-\(position % 1000)"
+                row.date = now.addingTimeInterval(Double(-position * 10))
+                return row
+            }, updated: now)
+            model.search = ""; model.period = 3
+            model.rebuild()
+            try settle()
+            try require(model.report.entries.count == 100_000, "Large synthetic history is prepared before navigation")
+        }
+        // Re-entering pages uses the prepared report; no source or query changed.
+        let publications = model.reportPublicationCount
+        var navigationMilliseconds: [Double] = []
+        for destination in [Destination.history, .cost, .now, .history, .cost, .insights, .history] {
+            let start = Date()
+            delegate.dashboardSelection.destination = destination
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            delegate.detailWindow?.contentView?.layoutSubtreeIfNeeded()
+            navigationMilliseconds.append(Date().timeIntervalSince(start) * 1000)
+        }
+        try require(model.reportPublicationCount == publications, "Warm page changes perform no report rebuild or publication")
+        try JSONSerialization.data(withJSONObject: ["synthetic": true, "checks": receipts, "navigationMilliseconds": navigationMilliseconds], options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("receipt.json"))
         print("PASS: Today/History routing, retained Dashboard selection, stable host and report state")
     }

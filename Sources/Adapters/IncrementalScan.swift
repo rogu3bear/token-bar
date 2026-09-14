@@ -88,7 +88,7 @@ extension UsageScanner {
 
     /// Serial scanner queue only. Cursor/metadata mutations count as durable work;
     /// a polling timestamp alone does not.
-    func markDirty() { dirtyGeneration &+= 1; contentGeneration &+= 1 }
+    func markDirty() { dirtyGeneration &+= 1; contentGeneration &+= 1; ledger.reportRevision = UUID() }
     func markMetadataDirty() { dirtyGeneration &+= 1 }
     var needsSave: Bool { pendingCheckpoint != nil || dirtyGeneration != savedGeneration }
     func saveIfNeeded(now: Date = Date(), force: Bool = false) throws {

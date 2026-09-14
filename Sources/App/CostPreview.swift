@@ -305,6 +305,15 @@ enum CostPreview {
         model.reportPublished = nil
         try require(publishedTotals == [total + additional.tokens.total],
                     "Obsolete generations must never publish, even when selection returns to the same value")
+        // Source-only updates must not starve visible reports while work continues.
+        publishedTotals = []
+        model.reportPublished = { publishedTotals.append($0.totals.total) }
+        model.snapshot.entries.append(additional); model.rebuild()
+        model.snapshot.entries.append(additional); model.rebuild()
+        try settle()
+        try require(publishedTotals.count >= 2 && publishedTotals.last == total + additional.tokens.total * 3,
+                    "Completed reports remain visible while newer usage is coalesced")
+        model.reportPublished = nil
         model.snapshot = original
         model.clearReportFilters(includesCost: false)
         model.costService = .standard

@@ -8,7 +8,21 @@ import Combine
     private let queue = DispatchQueue(label: "local.codex-token-bar.insights", qos: .background, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var nextRead = Date.distantPast
     private let clock: () -> Date
-    init(clock: @escaping () -> Date = Date.init) { self.clock = clock }
+    private let index: PromptIndex
+    init(clock: @escaping () -> Date = Date.init, storageURL: URL? = nil, home: URL? = nil) {
+        self.clock = clock
+        index = PromptIndex(directory: storageURL)
+        if let home {
+            queue.async {
+                if let saved = try? self.index.restoreSummary(home: home) {
+                    DispatchQueue.main.async {
+                        // Restoration never replaces a read already requested.
+                        if !self.state.loading && self.state.result == nil { self.state.succeed(saved) }
+                    }
+                }
+            }
+        }
+    }
 
     func refresh(home: URL, force: Bool = false) {
         guard !busy, force || clock() >= nextRead else { return }
@@ -16,11 +30,14 @@ import Combine
         queue.async {
             var lastPublication = Date.distantPast
             do {
-                let result = try InsightReader.read(home: home, now: self.clock(), clock: self.clock) { partial in
+                let result = try InsightReader.read(home: home, now: self.clock(), clock: self.clock, index: self.index) { partial in
                     let now = Date()
                     guard partial.filesChecked == 0 || partial.filesChecked == partial.filesTotal || now.timeIntervalSince(lastPublication) >= 0.5 else { return }
                     lastPublication = now
                     DispatchQueue.main.async { self.state.receivePartial(partial) }
+                }
+                if result.skipped == 0 || result.files > 0 {
+                    try self.index.saveSummary(result, home: home)
                 }
                 DispatchQueue.main.async {
                     self.nextRead = self.clock().addingTimeInterval(300)

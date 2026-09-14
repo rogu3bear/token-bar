@@ -63,42 +63,55 @@ struct UsageInsightsSummary {
     private(set) var hasResult = false
     private(set) var sourceUnavailable = false
     private let queue = DispatchQueue(label: "local.codex-token-bar.usage-insights", qos: .background, autoreleaseFrequency: .workItem)
-    @ObservationIgnored private var pending: ([Entry], [String: TaskInfo])?
+    @ObservationIgnored private var pending: ([Entry], [String: TaskInfo], UUID?, UInt64?)?
     @ObservationIgnored private var inFlightEntries: [Entry]?
     @ObservationIgnored private var inFlightCatalog: [String: TaskInfo]?
     @ObservationIgnored private var evaluatedEntries: [Entry]?
     @ObservationIgnored private var evaluatedCatalog: [String: TaskInfo]?
     @ObservationIgnored private var validity: ReportValidity?
+    @ObservationIgnored private var evaluatedRevision: UUID?
+    @ObservationIgnored private var evaluatedCatalogRevision: UInt64?
+    @ObservationIgnored private var inFlightRevision: UUID?
+    @ObservationIgnored private var inFlightCatalogRevision: UInt64?
     private(set) var evaluatedAt: Date?
     private let clock: () -> Date
     init(clock: @escaping () -> Date = Date.init) { self.clock = clock }
-    func refresh(entries: [Entry], catalog: [String: TaskInfo], sourceAvailable: Bool = true) {
+    func refresh(entries: [Entry], catalog: [String: TaskInfo], sourceAvailable: Bool = true, revision: UUID? = nil, catalogRevision: UInt64? = nil) {
         sourceUnavailable = !sourceAvailable
         guard sourceAvailable else { pending = nil; return }
         if busy {
-            pending = entries == inFlightEntries && catalog == inFlightCatalog ? nil : (entries, catalog)
+            let same = revision != nil && catalogRevision != nil
+                ? revision == inFlightRevision && catalogRevision == inFlightCatalogRevision
+                : entries == inFlightEntries && catalog == inFlightCatalog
+            pending = same ? nil : (entries, catalog, revision, catalogRevision)
             return
         }
         let now = clock()
-        if entries == evaluatedEntries, catalog == evaluatedCatalog, validity?.contains(now) == true { return }
+        let same = revision != nil && catalogRevision != nil
+            ? revision == evaluatedRevision && catalogRevision == evaluatedCatalogRevision
+            : entries == evaluatedEntries && catalog == evaluatedCatalog
+        if same && validity?.contains(now) == true { return }
         busy = true
-        inFlightEntries = entries; inFlightCatalog = catalog
+        inFlightEntries = revision == nil ? entries : nil; inFlightCatalog = catalogRevision == nil ? catalog : nil
+        inFlightRevision = revision; inFlightCatalogRevision = catalogRevision
         queue.async {
             let result = UsageInsightsSummary.build(entries: entries, catalog: catalog, now: now)
             DispatchQueue.main.async {
                 self.busy = false
+                self.inFlightEntries = nil; self.inFlightCatalog = nil
                 guard !self.sourceUnavailable else { return }
-                if self.pending == nil {
+                do { // Publish completed evidence even while newer usage is queued.
                     self.summary = result
                     self.hasResult = true
-                    self.evaluatedEntries = entries
-                    self.evaluatedCatalog = catalog
+                    self.evaluatedEntries = revision == nil ? entries : nil
+                    self.evaluatedCatalog = catalogRevision == nil ? catalog : nil
+                    self.evaluatedRevision = revision; self.evaluatedCatalogRevision = catalogRevision
                     self.evaluatedAt = now
                     self.validity = ReportValidity(now: now, futureRecord: entries.lazy.map(\.date).filter { $0 > now }.min())
                 }
                 if let next = self.pending {
                     self.pending = nil
-                    self.refresh(entries: next.0, catalog: next.1)
+                    self.refresh(entries: next.0, catalog: next.1, revision: next.2, catalogRevision: next.3)
                 }
             }
         }

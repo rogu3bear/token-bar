@@ -19,10 +19,11 @@ struct CostDay: Identifiable {
     var unpricedTokens = 0
     var id: Date { date }
 }
-struct CostContextIndex {
+struct CostContextIndex: Codable {
     var bands: [String: String] = [:]
     var uncertainSessions = Set<String>()
-    init(_ source: [Entry]) {
+    init(_ source: [Entry]) { append(source) }
+    mutating func append(_ source: [Entry]) {
         for entry in source {
             if entry.provider == nil || entry.model == "Unknown model" { uncertainSessions.insert(entry.session) }
             let key = CostReport.sessionKey(entry), previous = bands[key], next = entry.contextBand ?? "unknown"
