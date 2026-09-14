@@ -26,15 +26,14 @@ saved measurements on your Mac and updates them as new records arrive.
 
 ## Get started
 
-v0.1 is a source release. A signed, notarized installer for this version is not
-published yet. Build locally with Xcode command-line tools and Bun 1.3 or later:
+[Download Token Bar 0.1.0 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1/TokenBar-0.1.0-arm64.pkg)
 
-```sh
-git clone https://github.com/rogu3bear/token-bar.git
-cd token-bar
-./scripts/build.sh
-open "build/Token Bar.app"
-```
+The installer is signed with Developer ID and notarized by Apple. Open the
+`.pkg` and follow the macOS installer; it installs **Token Bar.app** in
+`/Applications`. Then open Token Bar from Applications. No build tools or reboot
+are required. Requires Apple silicon and macOS 14 or later.
+
+[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1)
 
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.
@@ -42,12 +41,11 @@ For Codex account allowance, use an existing local Codex installation and sign
 in there. API-key-only accounts may not supply subscription quota.
 
 Only one copy can use the local usage store at a time. Quit an existing copy
-before opening a development build. Build and installation do not require a
-reboot. Launch at login is optional.
+before opening a development build. Launch at login is optional.
 
-For a local development installer, run `./scripts/package.sh`. It is not a
-notarized public release. Signing and release checks are described in
-[the release guide](docs/RELEASING.md).
+To build your own installer, run `./scripts/package.sh` after following the
+build steps below. Local development packages are not notarized. See
+[the release guide](docs/RELEASING.md) for signing and verification.
 
 ## Supported readings
 
@@ -88,7 +86,19 @@ sends your report and contact email to the maintainer and can prepare a separate
 public issue draft without your email. You choose whether to publish that draft.
 Read the [privacy details](https://token-bar-9v8.pages.dev/privacy/).
 
-## Develop
+## Build from source
+
+Install Xcode command-line tools and Bun 1.3 or later. You only need these tools
+for development; the published installer is ready to install.
+
+```sh
+git clone https://github.com/rogu3bear/token-bar.git
+cd token-bar
+./scripts/build.sh
+open "build/Token Bar.app"
+```
+
+Run the local checks before contributing:
 
 ```sh
 ./scripts/test.sh
