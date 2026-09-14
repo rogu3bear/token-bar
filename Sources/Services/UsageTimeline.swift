@@ -100,12 +100,17 @@ enum TimelineDetail {
         guard let first = daily.map(\.date).min(), let last = daily.map(\.date).max() else { return source }
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: last))!
-        let originals = Dictionary(grouping: daily, by: key)
-        var details: [String: [Entry]] = [:]
+        let groups = Set(daily.map(key))
+        var retained: [Entry] = []
         try archive.forEach(start: calendar.startOfDay(for: first), end: end.addingTimeInterval(-0.001)) { entry in
-            let group = key(entry)
-            if entry.bucket != "day" && originals[group] != nil { details[group, default: []].append(entry) }
+            if entry.bucket != "day", groups.contains(key(entry)) { retained.append(entry) }
         }
+        return reconcile(source, details: retained)
+    }
+    /// Whole-group reconciliation is shared by broad timeline recovery and bounded comparison reads.
+    static func reconcile(_ source: [Entry], details retained: [Entry]) -> [Entry] {
+        let originals = Dictionary(grouping: source.filter { $0.bucket == "day" }, by: key)
+        let details = Dictionary(grouping: retained.filter { $0.bucket != "day" && originals[key($0)] != nil }, by: key)
         var replacements: [String: [Entry]] = [:]
         for (group, old) in originals {
             guard let fresh = details[group], let basis = old.first,

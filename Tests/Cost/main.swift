@@ -419,3 +419,105 @@ check(MeteringComparison.build(history: meterHistory, windowID: windowID, accoun
     query: since, effort: "All levels", now: meterNow).coarseRecords == 2,
     "A bucket starting before a partial-day selection still makes overlapping intervals uncertain")
 print("PASS: reconciled request archive supplies exact metering timing; partial-day coarse overlap stays unavailable")
+
+// Exercise indexed archive reads through the production decoder, not a synthetic
+// replacement list. Irrelevant days/accounts must never be materialized.
+let boundedArchiveURL = root.appendingPathComponent("bounded-meter.sqlite")
+let boundedArchive = try RequestArchive(url: boundedArchiveURL)
+try boundedArchive.record(detailOne, admitted: true); try boundedArchive.record(detailTwo, admitted: true)
+var oldDetail = detailOne; oldDetail.date = oldDetail.date.addingTimeInterval(-10 * 86400)
+oldDetail.recordID = "outside-period"; try boundedArchive.record(oldDetail, admitted: true)
+let irrelevantRows = 1024
+for index in 0..<irrelevantRows {
+    var irrelevant = oldDetail; irrelevant.recordID = "irrelevant-\(index)"
+    try boundedArchive.record(irrelevant, admitted: true)
+}
+var oldDaily = oldDetail; oldDaily.bucket = "day"; oldDaily.recordID = nil
+var foreignDetail = detailOne; foreignDetail.session = "foreign-account"
+foreignDetail.account = Account(id: "foreign", label: "Synthetic foreign", plan: "pro")
+foreignDetail.recordID = "foreign-detail"; try boundedArchive.record(foreignDetail, admitted: true)
+var foreignDaily = foreignDetail; foreignDaily.bucket = "day"; foreignDaily.recordID = nil
+var archiveOpens = 0
+var failRead = false
+let boundedDetails = ComparisonDetails(open: { _ in
+    archiveOpens += 1
+    return { group in
+        if failRead { throw RequestArchive.failure("Injected interrupted group read") }
+        var rows: [Entry] = []
+        try boundedArchive.forEach(group: group) { rows.append($0) }
+        return rows
+    }
+})
+let boundedStore = UsageComparisonStore(details: boundedDetails)
+let boundedSource = [dailyMeter, oldDaily, foreignDaily]
+func settle(_ store: UsageComparisonStore) {
+    let deadline = Date().addingTimeInterval(10)
+    while store.busy && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    check(!store.busy, "Bounded comparison completes")
+}
+func refreshBounded(_ source: [Entry], revision: UInt64, count: Int, at: Date = meterNow) {
+    boundedStore.refresh(source: source, revision: revision, quotaRevision: 1, state: comparisonState,
+        currentID: meterAccount.id, query: comparisonQuery, effort: "All levels", now: at,
+        archiveURL: boundedArchiveURL, archiveCount: count)
+    settle(boundedStore)
+}
+refreshBounded(boundedSource, revision: 1, count: 4 + irrelevantRows)
+check(boundedArchive.decodedRowCount == 2 && archiveOpens == 1 && boundedArchive.readVMSteps < irrelevantRows,
+      "Group-index read work stays below irrelevant row count; only relevant account/day payloads decode")
+check(boundedStore.metering[windowID]?.intervals.map(\.tokensPerPoint) == [1100, 550],
+      "Indexed group reads preserve exact reconciliation")
+var currentAppend = metered(-30); currentAppend.session = "new-current-task"; currentAppend.recordID = "current-append"
+try boundedArchive.record(currentAppend, admitted: true)
+refreshBounded(boundedSource + [currentAppend], revision: 2, count: 5 + irrelevantRows)
+check(boundedArchive.decodedRowCount == 2 && archiveOpens == 1
+      && boundedStore.metering[windowID]?.intervals.last?.tokensPerPoint == 1100,
+      "A new current request updates counters without reopening or decoding unchanged recovered history")
+let previousIntervals = boundedStore.metering[windowID]?.intervals.map(\.tokensPerPoint)
+var extraDetail = metered(-100); extraDetail.recordID = "new-historical-detail"
+try boundedArchive.record(extraDetail, admitted: true)
+var changedDaily = dailyMeter; changedDaily.tokens = changedDaily.tokens + extraDetail.tokens; changedDaily.sampleCount = 3
+failRead = true
+refreshBounded([changedDaily, currentAppend], revision: 3, count: 6 + irrelevantRows)
+check(boundedStore.recoveryError != nil && boundedStore.metering[windowID]?.intervals.map(\.tokensPerPoint) == previousIntervals,
+      "An interrupted group read is visible and preserves the completed comparison")
+failRead = false
+refreshBounded([changedDaily, currentAppend], revision: 3, count: 6 + irrelevantRows, at: meterNow.addingTimeInterval(31))
+check(boundedStore.recoveryError == nil && boundedStore.metering[windowID]?.intervals.last?.tokensPerPoint == 1650,
+      "The identical source/query/count can retry a failed expansion and publish recovered timing")
+
+var openAttempts = 0
+let retryOpenStore = UsageComparisonStore(details: ComparisonDetails(open: { url in
+    openAttempts += 1
+    if openAttempts == 1 { throw RequestArchive.failure("Injected transient open failure") }
+    let archive = try RequestArchive(url: url, readOnly: true)
+    return { group in
+        var rows: [Entry] = []; try archive.forEach(group: group) { rows.append($0) }; return rows
+    }
+}))
+func retryOpen(at: Date = meterNow) {
+    retryOpenStore.refresh(source: [dailyMeter], revision: 1, quotaRevision: 1, state: comparisonState,
+        currentID: meterAccount.id, query: comparisonQuery, effort: "All levels", now: at,
+        archiveURL: timingArchiveURL, archiveCount: 2)
+    settle(retryOpenStore)
+}
+retryOpen()
+check(retryOpenStore.recoveryError != nil && retryOpenStore.metering[windowID]?.coarseRecords == 2,
+      "An archive-open failure retains visible coarse uncertainty")
+retryOpen()
+check(openAttempts == 1 && retryOpenStore.builds == 1,
+      "A one-second dashboard refresh cannot loop on the same failed archive")
+retryOpen(at: meterNow.addingTimeInterval(31))
+check(openAttempts == 2 && retryOpenStore.recoveryError == nil
+      && retryOpenStore.metering[windowID]?.intervals.map(\.tokensPerPoint) == [1100, 550],
+      "A later same-source refresh retries archive open instead of caching the failure")
+print("PASS: indexed period/account recovery, historical cache reuse on append, visible read failure and same-source open/read retries")
+
+let scopedDetails = ComparisonDetails()
+let intervals = [MeteringInterval(start: meterNow.addingTimeInterval(-600), end: meterNow.addingTimeInterval(-300), usedPoints: 1),
+                 MeteringInterval(start: meterNow.addingTimeInterval(-450), end: meterNow.addingTimeInterval(-200), usedPoints: 1),
+                 MeteringInterval(start: meterNow.addingTimeInterval(-100), end: meterNow, usedPoints: 1)]
+let points = [-600.0, -500, -300, -200, -150, -100, -50, 0, 10].map { metered($0) }
+let selectedPoints = try scopedDetails.recover(points, intervals: intervals, account: meterAccount.id, url: nil, archiveCount: nil)
+check(selectedPoints.map { $0.date.timeIntervalSince(meterNow) } == [-500, -300, -200, -50, 0],
+      "Merged interval lookup preserves open starts, closed ends, overlaps and excluded gaps")
+print("PASS: merged interval scope boundaries and indexed physical archive read work")

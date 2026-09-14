@@ -144,8 +144,20 @@ scopes. This is evidence for investigating divergence, not a billing-error claim
 `UsageComparisonStore` prepares process-owned results on a serial utility queue.
 Source, retained quota, account, query, day and archive-count changes invalidate
 results. Navigation reuses them; queued updates retain completed results for the
-same account/query and reject results for obsolete scopes. Reconciled archive
-details are cached by source revision and archive count.
+same account/query and reject results for obsolete scopes. Archive recovery first
+merges eligible account/window intervals and filters local
+records with logarithmic timestamp lookup. Only overlapping coarse groups are
+read through the archive group index; whole-group totals/counts/account
+reconciliation remains required before timing can be used. Recovered groups are
+cached against their ledger entries, independently of unrelated source appends.
+Complete groups reuse immutable admitted details; incomplete groups are retried
+when archive count changes. The cache retains only groups needed by the current
+selection. Read/open failures do not become successful cache entries: the sheet
+shows the failure, retains a previous completed comparison when available, and
+a later refresh retries even with the same source/query/count, at most once
+every 30 seconds for unchanged data. Source/quota/query changes still invalidate
+normally. Group reads explicitly select the group index so SQLite cannot choose
+a full admitted-date traversal before filtering. No source transcripts are replayed.
 
 ## Retained details
 

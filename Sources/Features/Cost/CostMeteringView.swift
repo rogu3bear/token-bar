@@ -18,6 +18,7 @@ struct CostMeteringView: View {
                     ForEach(windows) { window in Text("\(window.name) · \(window.minutes) minutes · \(window.window)").tag(window.id) }
                 }
             }
+            if let error = model.comparisons.recoveryError { ErrorNotice(message: error) }
             if model.comparisons.busy { ProgressView("Preparing retained observations…") }
             if let calculated = model.comparisons.calculatedAt {
                 Text("Calculated " + calculated.formatted(date: .abbreviated, time: .standard) + (model.comparisons.busy ? " · previous result while updating" : ""))

@@ -12,6 +12,8 @@ final class RequestArchive {
     private var cachedCount: Int?
     private var countDataVersion: Int64?
     private(set) var countQueryCount = 0
+    private(set) var decodedRowCount = 0
+    private(set) var readVMSteps = 0
     init(url: URL, readOnly: Bool = false) throws {
         let flags = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
         guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK else { sqlite3_close(db); db = nil; throw Self.failure("Request details could not be opened") }
@@ -97,14 +99,24 @@ final class RequestArchive {
         }
         try commit(); completed = true
     }
-    func forEach(start: Date = .distantPast, end: Date = .distantFuture, _ visit: (Entry) throws -> Void) throws {
-        let statement = try prepare("SELECT payload FROM requests WHERE admitted=1 AND date>=? AND date<=? ORDER BY date,id")
-        defer { sqlite3_finalize(statement) }
+    func forEach(start: Date = .distantPast, end: Date = .distantFuture, group: String? = nil, _ visit: (Entry) throws -> Void) throws {
+        // SQLite otherwise prefers request_dates for this ORDER BY and can scan
+        // all admitted dates before applying group_key. Bind group reads to their index.
+        let statement = try prepare("SELECT payload FROM requests"
+            + (group == nil ? "" : " INDEXED BY request_groups")
+            + " WHERE admitted=1 AND date>=? AND date<=?"
+            + (group == nil ? "" : " AND group_key=?") + " ORDER BY date,id")
+        defer {
+            readVMSteps += Int(sqlite3_stmt_status(statement, SQLITE_STMTSTATUS_VM_STEP, 0))
+            sqlite3_finalize(statement)
+        }
         sqlite3_bind_double(statement, 1, start.timeIntervalSince1970); sqlite3_bind_double(statement, 2, end.timeIntervalSince1970)
+        if let group { bind(group, to: statement, at: 3) }
         var status = sqlite3_step(statement)
         while status == SQLITE_ROW {
             guard let bytes = sqlite3_column_blob(statement, 0) else { throw Self.failure("A retained request record is unreadable") }
             let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0)))
+            decodedRowCount += 1
             try visit(decoder.decode(Entry.self, from: data))
             status = sqlite3_step(statement)
         }
