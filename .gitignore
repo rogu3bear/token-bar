@@ -22,6 +22,8 @@ ledger.*.sqlite*
 live-accounts.*
 sign-ins.json
 claude-statusline.json
+report-index.json
+prompt-index/
 *.log
 *.csv
 *.dmg

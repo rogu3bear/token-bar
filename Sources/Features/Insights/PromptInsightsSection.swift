@@ -14,6 +14,9 @@ struct PromptInsightsSection: View {
                 Text(state.message).foregroundStyle(.secondary)
             }
             if let result = state.result {
+                if let warning = result.cacheWarning {
+                    StatusNotice(message: warning, severity: .warning, dismissible: false)
+                }
                 HStack(alignment: .top, spacing: PageStyle.related) {
                     stat("PROMPTS", result.prompts.formatted())
                     stat("TYPICAL LENGTH", result.prompts == 0 ? "—" : "\(result.medianWords) words")
@@ -40,7 +43,7 @@ struct PromptInsightsSection: View {
                     }
                 }
                 DetailSheet("About this sample") {
-                Text("\(result.files) logs read · \(result.tasks) chats with prompts. Copied message IDs count once; older logs use turn/message pairs. Agent messages, known setup messages, fenced code and quoted lines are excluded from word statistics. The displayed repeats and busiest hour describe this sample, not all your activity.")
+                Text("\(result.files) logs in sample · \(result.tasks) chats with prompts. Saved statistics are reused; only changed chats are processed. Prompt text is not saved. Copied message IDs count once; older logs use turn/message pairs. Agent messages, known setup messages, fenced code and quoted lines are excluded from word statistics. The displayed repeats and busiest hour describe this sample, not all your activity.")
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 if result.skipped > 0 {

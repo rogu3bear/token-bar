@@ -186,7 +186,9 @@ under Pricing assumptions and change valuation, not record selection.
 Model, Account, and search on either page, plus Reasoning level on Cost. It
 preserves the shared period/custom dates and pricing assumptions. The help text
 beside the controls states this boundary. Switching pages preserves scope.
-Rebuilds publish History and Cost together only for the current generation;
+Rebuilds publish History and Cost together only for the current query generation;
+a completed report remains usable while newer usage is coalesced. Reports are
+prepared in the background and reused on navigation;
 while rebuilding, previous results are labeled and exports are unavailable.
 Published-report CSV is captured before opening the save panel, so subsequent
 refreshes cannot change what that export contains.

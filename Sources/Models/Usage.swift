@@ -134,6 +134,8 @@ struct Ledger: Codable {
     /// Identifies the exact full-history baseline for a metadata checkpoint.
     /// Older ledgers decode without this field and migrate on their next save.
     var checkpointID: UUID?
+    /// Durable identity of admitted content; metadata-only checkpoints retain it.
+    var reportRevision: UUID?
     var cursors: [String: Cursor] = [:]
     var entries: [Entry] = []
     var quotas: [String: Quota] = [:]
@@ -164,6 +166,7 @@ struct Ledger: Codable {
     var sourceErrorPaths: [String: Set<String>]?
 }
 struct Snapshot {
+    var contentID: UUID?
     var entries: [Entry] = []
     var quotas: [Quota] = []
     var account: Account?
@@ -214,7 +217,7 @@ final class UsageScanner {
     var onSnapshot: ((Snapshot) -> Void)?
     private var lastPublication = Date.distantPast
     func currentSnapshot(now: Date = Date()) -> Snapshot {
-        Snapshot(entries: ledger.entries, quotas: Array(ledger.quotas.values), account: ledger.lastAccount,
+        Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, quotas: Array(ledger.quotas.values), account: ledger.lastAccount,
             updated: now, started: ledger.started, error: loadError ?? ledger.historyError,
             historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values),
             accounts: Array((ledger.accounts ?? [:]).values), integrity: ledger.integrity)
@@ -251,6 +254,7 @@ final class UsageScanner {
             } catch { loadError = error.localizedDescription }
         }
         ledger.lastPoll = nil
+        if loadError == nil && ledger.reportRevision == nil { markDirty() }
         compactHistoricalEntries()
         recoverMissingPricingDays()
         if !FileManager.default.fileExists(atPath: stateURL.path) { markDirty() }
@@ -474,7 +478,7 @@ final class UsageScanner {
         let startDay = Calendar.current.startOfDay(for: ledger.started)
         var errors: [String] = [], count = 0
         do { try requestArchive?.begin() }
-        catch { return Snapshot(entries: ledger.entries, error: error.localizedDescription) }
+        catch { return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, error: error.localizedDescription) }
         defer { requestArchive?.rollback() }
         var paths: [URL] = []
         if let changedPaths, !changedPaths.contains(home) {
@@ -550,9 +554,9 @@ final class UsageScanner {
             ledger.historyImportedAt = Date()
             ledger.historyError = errors.isEmpty ? nil : Array(Set(errors)).joined(separator: " ")
         }
-        if let loadError { return Snapshot(entries: ledger.entries, account: account, error: loadError) }
+        if let loadError { return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, account: account, error: loadError) }
         do { try requestArchive?.commit() }
-        catch { loadError = error.localizedDescription; return Snapshot(entries: ledger.entries, error: loadError) }
+        catch { loadError = error.localizedDescription; return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, error: loadError) }
         if observesAccount {
             if ledger.lastAccount != account { markMetadataDirty() }
             ledger.lastPoll = now; ledger.lastAccount = account
@@ -560,7 +564,7 @@ final class UsageScanner {
         do {
             try saveIfNeeded(now: now, force: historical)
         } catch { errors.append("Usage history could not be saved: \(error.localizedDescription)") }
-        return Snapshot(entries: ledger.entries, quotas: ledger.quotas.values.sorted { $0.name < $1.name }, account: account,
+        return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, quotas: ledger.quotas.values.sorted { $0.name < $1.name }, account: account,
             updated: now, started: ledger.started, error: errors.isEmpty ? ledger.historyError : Array(Set(errors)).joined(separator: " "), files: count, historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values).sorted { $0.lastSeen > $1.lastSeen }, accounts: Array((ledger.accounts ?? [:]).values).sorted { $0.label < $1.label }, additions: historical ? [] : Array(ledger.entries.dropFirst(initialCount)), integrity: ledger.integrity)
     }
 }

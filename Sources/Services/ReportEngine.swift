@@ -20,15 +20,41 @@ struct ReportValidity {
 /// Built once per entry revision. Session tariffs intentionally span the entire
 /// ledger, while the date index bounds each report selection.
 struct ReportIndex {
-    let entries: [Entry]
-    let chronological: [Int]
-    let context: CostContextIndex
+    var entries: [Entry]
+    var chronological: [Int]
+    var context: CostContextIndex
     init(_ entries: [Entry]) {
         self.entries = entries
         chronological = entries.indices.sorted {
             entries[$0].date == entries[$1].date ? $0 < $1 : entries[$0].date < entries[$1].date
         }
         context = CostContextIndex(entries)
+    }
+    /// Existing observations retain their index and session context. Historical
+    /// enrichment/replacement must rebuild because it can change prior tariffs.
+    mutating func append(_ source: [Entry]) -> Bool {
+        guard source.count >= entries.count, source.starts(with: entries) else { return false }
+        let start = entries.count
+        let added = Array(source.dropFirst(start))
+        context.append(added)
+        entries = source
+        let newOrder = (start..<source.count).sorted {
+            source[$0].date == source[$1].date ? $0 < $1 : source[$0].date < source[$1].date
+        }
+        var merged: [Int] = []; merged.reserveCapacity(source.count)
+        var old = 0, new = 0
+        while old < chronological.count && new < newOrder.count {
+            if source[chronological[old]].date <= source[newOrder[new]].date {
+                merged.append(chronological[old]); old += 1
+            } else { merged.append(newOrder[new]); new += 1 }
+        }
+        merged.append(contentsOf: chronological.dropFirst(old))
+        merged.append(contentsOf: newOrder.dropFirst(new))
+        chronological = merged
+        return true
+    }
+    init(entries: [Entry], chronological: [Int], context: CostContextIndex) {
+        self.entries = entries; self.chronological = chronological; self.context = context
     }
     private func bound(_ date: Date, inclusive: Bool) -> Int {
         var low = 0, high = chronological.count
@@ -76,14 +102,36 @@ final class ReportEngine {
     private var usage = UsageReport()
     private var costs = CostReport()
     private(set) var validity: ReportValidity?
+    private let storageURL: URL?
+    private var triedRestore = false
+    private(set) var indexRestores = 0
+    private(set) var indexAppends = 0
+    private(set) var storageError: String?
+    init(storageURL: URL? = nil) { self.storageURL = storageURL }
     private(set) var indexBuilds = 0
     private(set) var usageBuilds = 0
     private(set) var costBuilds = 0
 
-    func build(source: [Entry], inputs: ReportRevisionInputs, catalog: [String: TaskInfo], now: Date,
+    func build(source: [Entry], inputs: ReportRevisionInputs, catalog: [String: TaskInfo], now: Date, sourceID: UUID? = nil,
                expand: (([Entry]) -> [Entry]?)? = nil) -> (UsageReport, CostReport) {
         if revision != inputs.entries {
-            index = ReportIndex(source); revision = inputs.entries; indexBuilds += 1
+            var restored = false
+            if !triedRestore, let storageURL, let sourceID {
+                do {
+                    index = try ReportIndexStorage.load(storageURL, contentID: sourceID, entries: source)
+                    if index != nil { indexRestores += 1; restored = true }
+                } catch { storageError = "Saved report index could not be read; rebuilding from saved usage." }
+            }
+            triedRestore = true
+            if !restored {
+                if index != nil, index!.append(source) { indexAppends += 1 }
+                else { index = ReportIndex(source); indexBuilds += 1 }
+            }
+            revision = inputs.entries
+            if !restored, let storageURL, let sourceID {
+                do { try ReportIndexStorage.save(index!, to: storageURL, contentID: sourceID); storageError = nil }
+                catch { storageError = "Report index could not be saved; usage history remains available." }
+            }
         }
         let selectionChanged = previous?.entries != inputs.entries || previous?.catalog != inputs.catalog ||
             previous?.query != inputs.query || validity?.contains(now) != true

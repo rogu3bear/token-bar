@@ -2,12 +2,13 @@ import Foundation
 import SQLite3
 import Darwin
 
-struct PromptFact: Identifiable {
+struct PromptFact: Identifiable, Codable {
     var label: String
     var count: Int
     var id: String { label }
 }
-struct PromptInsights {
+struct PromptInsights: Codable {
+    var cacheWarning: String?
     var prompts = 0
     var tasks = 0
     var files = 0
@@ -96,7 +97,7 @@ enum InsightAnalysis {
 
 enum InsightReader {
     // Read only catalogued human chats. Cap the sample explicitly; stream logs without loading tool output into memory.
-    static func read(home: URL, now: Date = Date(), clock: () -> Date = Date.init, progress: ((PromptInsights) -> Void)? = nil) throws -> PromptInsights {
+    static func read(home: URL, now: Date = Date(), clock: () -> Date = Date.init, index: PromptIndex? = nil, progress: ((PromptInsights) -> Void)? = nil) throws -> PromptInsights {
         var db: OpaquePointer?
         guard sqlite3_open_v2(home.appendingPathComponent("state_5.sqlite").path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
             if let db { sqlite3_close(db) }; throw CocoaError(.fileReadUnknown)
@@ -109,10 +110,6 @@ enum InsightReader {
         defer { sqlite3_finalize(statement) }
         let since = now.addingTimeInterval(-30 * 86400)
         sqlite3_bind_int64(statement, 1, Int64(since.timeIntervalSince1970))
-        var analysis = InsightAnalysis.Accumulator()
-        var seen = Set<String>(), files = 0, skipped = 0
-        let dateParser = ISO8601DateFormatter(); dateParser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let plainParser = ISO8601DateFormatter()
         var status = sqlite3_step(statement)
         var selected: [(String, String)] = []
         while status == SQLITE_ROW {
@@ -121,48 +118,6 @@ enum InsightReader {
             status = sqlite3_step(statement)
         }
         guard status == SQLITE_DONE else { throw CocoaError(.fileReadUnknown) }
-        var initial = PromptInsights(); initial.filesTotal = selected.count
-        progress?(initial)
-        for (index, record) in selected.enumerated() {
-            let (task, path) = record
-            if let file = fopen(path, "r") {
-                files += 1
-                var line: UnsafeMutablePointer<CChar>?, capacity = 0
-                var turn = ""
-                var messages: [(String, PromptRecord)] = [], legacy: [(String, PromptRecord)] = []
-                while getline(&line, &capacity, file) > 0 {
-                    guard let line else { continue }
-                    guard strstr(line, "\"user\"") != nil || strstr(line, "\"user_message\"") != nil || strstr(line, "\"task_started\"") != nil else { continue }
-                    let data = Data(bytes: line, count: strlen(line))
-                    guard let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let payload = event["payload"] as? [String: Any] else { continue }
-                    if event["type"] as? String == "event_msg", payload["type"] as? String == "task_started" { turn = payload["turn_id"] as? String ?? ""; continue }
-                    guard let stamp = event["timestamp"] as? String, let date = dateParser.date(from: stamp) ?? plainParser.date(from: stamp), date >= since, date <= now else { continue }
-                    if event["type"] as? String == "response_item", payload["type"] as? String == "message", payload["role"] as? String == "user", let parts = payload["content"] as? [[String: Any]] {
-                        let text = parts.compactMap { $0["text"] as? String }.map { part in
-                            part.replacingOccurrences(of: "(?s)<recommended_plugins>.*?</recommended_plugins>", with: "", options: .regularExpression)
-                        }.filter(InsightAnalysis.isUserPrompt).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !text.isEmpty else { continue }
-                        let key = (payload["id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? ((turn.isEmpty ? stamp : turn) + "\n" + text)
-                        messages.append((key, PromptRecord(text: text, date: date, task: task)))
-                    } else if event["type"] as? String == "event_msg", payload["type"] as? String == "user_message", let text = payload["message"] as? String, InsightAnalysis.isUserPrompt(text) {
-                        legacy.append(((turn.isEmpty ? stamp : turn) + "\n" + text, PromptRecord(text: text, date: date, task: task)))
-                    }
-                }
-                for (key, record) in messages.isEmpty ? legacy : messages {
-                    if seen.insert(key).inserted { analysis.append(record) }
-                }
-                if ferror(file) != 0 { skipped += 1 }
-                free(line); fclose(file)
-            } else { skipped += 1 }
-            if let progress {
-                var partial = analysis.snapshot(now: clock())
-                partial.files = files; partial.skipped = skipped
-                partial.filesChecked = index + 1; partial.filesTotal = selected.count
-                progress(partial)
-            }
-        }
-        var result = analysis.snapshot(now: clock()); result.files = files; result.skipped = skipped
-        result.filesChecked = selected.count; result.filesTotal = selected.count
-        return result
+        return try (index ?? PromptIndex()).read(selected: selected, since: since, now: now, clock: clock, progress: progress)
     }
 }

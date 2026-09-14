@@ -35,7 +35,8 @@ struct InsightsView: View {
                 while !Task.isCancelled {
                     if !usage.busy && !usage.filtering && usage.progress == nil {
                         trends.refresh(entries: usage.snapshot.entries, catalog: usage.catalog,
-                                       sourceAvailable: usage.snapshot.error == nil || !usage.snapshot.entries.isEmpty)
+                                       sourceAvailable: usage.snapshot.error == nil || !usage.snapshot.entries.isEmpty,
+                                       revision: usage.snapshot.contentID, catalogRevision: usage.reporting.catalogRevision)
                         if !trends.busy { model.refresh(home: home) }
                     }
                     try await Task.sleep(for: .seconds(trends.busy ? 1 : 15))

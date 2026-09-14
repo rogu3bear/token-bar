@@ -2,6 +2,16 @@
 
 See your AI usage from the macOS menu bar.
 
+**Menu bar**
+
+![Token Bar menu bar showing Codex estimated output speed in tok/s and remaining account allowance](site/public/menu-bar-demo.png)
+
+**Dashboard**
+
+![Token Bar native dashboard showing estimated Codex output speed and account allowance](site/public/dashboard-demo.png)
+
+*Native app previews with synthetic sample data.*
+
 Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
 saved measurements on your Mac and updates them as new records arrive.
@@ -85,8 +95,10 @@ counts. CSV exports can include those labels and paths.
 Saved usage is loaded before scanning. File cursors and identities persist, so
 reopening the app checks for changes without replaying unchanged transcripts.
 History and Cost reuse in-memory report results during the app session; those
-reports are reconstructed from saved usage after relaunch. Insights samples
-Codex prompts lazily while its page is open and does not persist prompt text.
+reports are prepared in the background from saved usage after relaunch, using a
+durable date/context index. Insights saves derived statistics and per-chat byte
+checkpoints, then processes only appended content in changed chats. Cached
+statistics appear before its lazy refresh. Prompt text is not persisted.
 Usage saves can lag newly displayed records by up to 15 seconds; normal quit
 flushes pending work. See [storage and recovery](ARCHITECTURE.md#log-to-ledger).
 

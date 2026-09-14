@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — Patch candidate
+
+- Keep History and Cost reports warm across navigation; publish completed results while new usage is queued.
+- Persist the report index and extend it with appended usage instead of rebuilding settled entries.
+- Persist private per-chat prompt statistics and byte checkpoints; relaunch and repeat reads reuse processed chats, and changed chats read only their new tail. Prompt text stays out of storage.
+- Show native menu-bar and dashboard previews at the top of README.
+
 ## 0.1.0 — Initial public release
 
 - Native macOS menu-bar readout for active AI tools, with explicit output-rate units.

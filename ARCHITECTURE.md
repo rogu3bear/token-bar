@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the shipped v0.1 system. Known limitations are listed separately;
+> Describes the v0.1.1 source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
@@ -66,7 +66,10 @@ not application state or UI code.
    per second and a final result before cost/catalog work. Reports rebuild on
    background queues, coalescing pending updates while retaining visible results.
    History and Cost share query state and publish together only for the current
-   rebuild generation; their shared filter controls expose the scope on both pages. ReportEngine builds a date/context index per entry revision and reuses History when only pricing assumptions change. Metadata revisions and minute/future-entry boundaries invalidate the cache.
+   query generation; completed results may publish while newer usage queues,
+   preventing continuous activity from starving the visible report; their shared filter controls expose the scope on both pages. ReportEngine restores its private date/context index from `report-index.json`,
+   bound to the ledger content UUID. Appended entries extend the index; enrichment
+   or replacement rebuilds it from saved usage. History is reused when only pricing assumptions change. Metadata revisions and minute/future-entry boundaries invalidate the cache.
    Single-day charts use minute timestamps; display-only archive expansion must
    reconcile with daily aggregates before it can supply their timing.
    The usage store prepares the compact timeline per entry revision. Clock ticks only check for local midnight, a future record becoming current, clock rollback, or a calendar/time-zone change; SwiftUI body evaluation never aggregates history.
@@ -180,16 +183,25 @@ uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to C
 ## Persistence and lazy work
 
 The durable stores are the ledger, matching metadata checkpoint, event index,
-request archive, sign-in timeline and Codex account database. Report/query caches,
-live output-rate baselines and prompt analysis are process memory. Launch restores
+request archive, sign-in timeline and Codex account database. The derived report
+index and per-chat prompt checkpoints are durable too. Report results and live
+output-rate baselines are process memory. Launch restores
 saved usage and starts source discovery. Changed files resume from validated
 cursors; unchanged files reuse checkpoints. Full discovery does not imply
 replaying every transcript.
 
-Report changes rebuild on background queues. Returning to History or Cost does
-not invalidate an unchanged result. Insights waits for its destination to settle,
+Report changes rebuild on a utility queue before navigation needs them. Returning
+to History or Cost does not invalidate an unchanged result. Scanner-owned content
+identities avoid comparing all saved entries on the main thread for metadata updates. Insights waits for its destination to settle,
 defers while import/report work is busy, and throttles automatic prompt reads.
-Leaving Insights stops future scheduling. Prompt text stays in memory. Normal
+Leaving Insights stops future scheduling. `prompt-index/` stores private per-chat
+byte cursors, file stamps, boundary hashes, hashed message/repeat identities and
+derived word/language/action counters. A restart loads those counters and only
+tails changed chats. Partial lines do not advance checkpoints; replacement or
+truncation invalidates that chat alone. The sampled window remains 30 days and
+120 human chats. Cached numeric results appear before background refresh; the
+few repeated-prompt labels are read by saved byte position and kept only in memory.
+Prompt and answer text are never stored in these checkpoints. Normal
 quit flushes pending usage; a crash can interrupt the deferred save window.
 Provider quota freshness is separate from usage/report cache freshness.
 

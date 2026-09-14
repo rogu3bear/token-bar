@@ -256,3 +256,33 @@ do {
     }
 }
 print("PASS: lazy page reuse, midnight, future-record, clock rollback, calendar and timezone boundaries")
+
+// Relaunch and new usage must not re-index settled entries.
+do {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("report-index.json")
+    let contentID = UUID()
+    var inputs = cacheInputs
+    let original = ReportEngine(storageURL: url)
+    let first = original.build(source: cacheRows, inputs: inputs, catalog: [:], now: cacheNow, sourceID: contentID)
+    let restarted = ReportEngine(storageURL: url)
+    let restored = restarted.build(source: cacheRows, inputs: inputs, catalog: [:], now: cacheNow, sourceID: contentID)
+    check(restarted.indexRestores == 1 && restarted.indexBuilds == 0, "Restart restores the durable index without rebuilding it")
+    check(restored.0.csv() == first.0.csv() && restored.1.csv() == first.1.csv(), "Durable index preserves exact reports")
+    var appended = cacheRows
+    var late = cacheRows[0]; late.date = cacheNow.addingTimeInterval(-100); late.session = "new-task"
+    appended.append(late); inputs.entries += 1
+    let updated = restarted.build(source: appended, inputs: inputs, catalog: [:], now: cacheNow, sourceID: UUID())
+    check(restarted.indexBuilds == 0 && restarted.indexAppends == 1, "Only appended observations extend a restored index")
+    check(updated.0.csv() == UsageReport.build(entries: appended, query: inputs.query, catalog: [:], now: cacheNow).csv(), "Late dated appends keep chronological selection correct")
+    let mismatched = ReportEngine(storageURL: url)
+    _ = mismatched.build(source: cacheRows, inputs: inputs, catalog: [:], now: cacheNow, sourceID: contentID)
+    check(mismatched.indexRestores == 0 && mismatched.indexBuilds == 1, "A crash's newer cache cannot substitute for the older durable ledger")
+    try Data("broken".utf8).write(to: url)
+    let corrupt = ReportEngine(storageURL: url)
+    _ = corrupt.build(source: cacheRows, inputs: inputs, catalog: [:], now: cacheNow, sourceID: contentID)
+    check(corrupt.indexBuilds == 1, "A damaged derived index rebuilds from saved usage")
+}
+print("PASS: durable report index restart, incremental append, late events, mismatched baseline and corrupt-cache recovery")

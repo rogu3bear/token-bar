@@ -9,7 +9,7 @@ import ServiceManagement
     let clock = PresentationClock()
     private var sourceRevision: UInt64 { usageStore.revision }
     private var catalogRevision: UInt64 { reporting.catalogRevision }
-    private let reportEngine = ReportEngine()
+    private let reportEngine: ReportEngine
     var snapshot: Snapshot { get { usageStore.snapshot } set { usageStore.snapshot = newValue } }
     var lastSuccessfulUsageRead: Date? { get { usageStore.lastSuccessfulUsageRead } set { usageStore.lastSuccessfulUsageRead = newValue } }
     var busy: Bool { get { usageStore.busy } set { usageStore.busy = newValue } }
@@ -46,7 +46,7 @@ import ServiceManagement
     let menuBarPreferences: MenuBarPreferences
     let appearance: AppearancePreferences
     let provenanceNotices: ProvenanceNotices
-    private let reportQueue = DispatchQueue(label: "local.codex-token-bar.report", qos: .userInitiated, autoreleaseFrequency: .workItem)
+    private let reportQueue = DispatchQueue(label: "local.codex-token-bar.report", qos: .utility, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var reportPending = false
     var message: String? { get { usageStore.message } set { usageStore.message = newValue } }
@@ -102,7 +102,6 @@ import ServiceManagement
         precondition(referenceDate == nil || previewRoot != nil, "A fixed clock requires an isolated profile")
         self.referenceDate = referenceDate
         discoversSources = previewRoot == nil
-        insights = InsightsModel(clock: { referenceDate ?? Date() })
         usageInsights = UsageInsightsModel(clock: { referenceDate ?? Date() })
         allowsSystemSettings = previewRoot == nil
         tachometer = Tachometer(tool: .codex, defaults: defaults)
@@ -117,6 +116,8 @@ import ServiceManagement
             ?? ProcessInfo.processInfo.environment["GROK_HOME"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".grok")
         let support = previewRoot ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        insights = InsightsModel(clock: { referenceDate ?? Date() }, storageURL: support.appendingPathComponent("CodexTokenBar/prompt-index"), home: home)
+        reportEngine = ReportEngine(storageURL: support.appendingPathComponent("CodexTokenBar/report-index.json"))
         // A preview never reads real transcripts. Otherwise each tool is
         // enabled only where it is actually installed.
         let claudeHome = previewRoot == nil ? HarnessDiscovery.claudeCode() : nil
@@ -163,7 +164,10 @@ import ServiceManagement
             startDate = Calendar.current.date(byAdding: .day, value: -29, to: referenceDate)!
             endDate = referenceDate
         }
-        reporting.queryChanged = { [weak self] in self?.rebuild() }
+        reporting.queryChanged = { [weak self] in
+            guard let self else { return }
+            self.queryGeneration &+= 1; self.rebuild()
+        }
         publish(snapshot)
     }
     func quota(for tool: LiveTool) -> ToolQuotaState {
@@ -179,12 +183,14 @@ import ServiceManagement
     }
     var entries: [Entry] { report.entries }
     var totals: Tokens { report.totals }
+    @ObservationIgnored private var queryGeneration: UInt64 = 0
+    @ObservationIgnored private(set) var reportPublicationCount = 0
     @ObservationIgnored var reportPublished: ((UsageReport) -> Void)?
     @ObservationIgnored private var reportInputs: ReportRevisionInputs?
     @ObservationIgnored private var inFlightInputs: ReportRevisionInputs?
     @ObservationIgnored private var reportValidity: ReportValidity?
     func rebuild() {
-        guard detailedReporting else { return }
+        // Keep the process-owned report warm; navigation only consumes it.
         let now = referenceDate ?? Date()
         let inputs = ReportRevisionInputs(entries: sourceRevision, catalog: catalogRevision, query: costQuery, effort: costEffort, service: costService, basis: costBasis)
         if !filtering, inputs == reportInputs, reportValidity?.contains(now) == true { return }
@@ -193,21 +199,26 @@ import ServiceManagement
         if filtering { reportPending = true; return }
         reportPending = false
         let version = generation
+        let queryVersion = queryGeneration
         let query = costQuery
         let source = snapshot.entries, catalog = catalog
+        let sourceID = snapshot.contentID
         let effort = costEffort, service = costService, basis = costBasis
         filtering = true
         inFlightInputs = inputs
         let archiveURL = scanner.requestArchiveURL
         reportQueue.async {
-            let (result, costs) = self.reportEngine.build(source: source, inputs: inputs, catalog: catalog, now: now) { selected in
+            let (result, costs) = self.reportEngine.build(source: source, inputs: inputs, catalog: catalog, now: now, sourceID: sourceID) { selected in
                 guard let archive = try? RequestArchive(url: archiveURL, readOnly: true) else { return nil }
                 return try? TimelineDetail.expand(selected, archive: archive)
             }
             let validity = self.reportEngine.validity
+            let storageError = self.reportEngine.storageError
             DispatchQueue.main.async {
-                if self.generation == version && self.costQuery == query && self.costEffort == effort && self.costService == service && self.costBasis == basis {
+                if self.queryGeneration == queryVersion && self.costQuery == query && self.costEffort == effort && self.costService == service && self.costBasis == basis {
                     self.report = result; self.costReport = costs
+                    if let storageError { self.message = storageError }
+                    self.reportPublicationCount += 1
                     self.reportPublished?(result)
                     self.reportInputs = inputs
                     self.reportValidity = validity
@@ -230,6 +241,11 @@ import ServiceManagement
             publishedRevision = sourceRevision
         }
         rebuild()
+        if !usageInsights.hasResult {
+            usageInsights.refresh(entries: result.entries, catalog: catalog,
+                                  sourceAvailable: result.error == nil || !result.entries.isEmpty,
+                                  revision: result.contentID, catalogRevision: catalogRevision)
+        }
         changed?()
     }
     func refresh(history: Bool = false, paths: Set<URL>? = nil, recoverCosts: Bool = false) {
@@ -271,6 +287,7 @@ import ServiceManagement
                         DispatchQueue.main.async { self.progress = .costDetails }
                     })
                     result.entries = self.scanner.ledger.entries
+                    result.contentID = self.scanner.ledger.reportRevision
                 } catch { recovery = error.localizedDescription }
             }
             if TaskCatalog.shouldRefresh(home: self.scanner.home, paths: paths, historical: history, lastRead: self.catalogUpdated, now: Date()) {

@@ -149,3 +149,131 @@ for (index, record) in sample.enumerated() {
 }
 assert(accumulated.snapshot().prompts == 3 && accumulated.snapshot().words == r.words)
 print("PASS: incremental analysis preserves sampled results without reprocessing previous prompts")
+
+// Durable processing work: reopening, revisiting and adding one chat tail.
+let indexDirectory = folder.appendingPathComponent("prompt-index")
+let firstIndex = PromptIndex(directory: indexDirectory)
+let indexed = try InsightReader.read(home: folder, now: now, index: firstIndex)
+assert(firstIndex.bytesRead > 0 && firstIndex.promptsAnalyzed > 0)
+try firstIndex.saveSummary(indexed, home: folder)
+let reopenedIndex = PromptIndex(directory: indexDirectory)
+let resumedSample = try InsightReader.read(home: folder, now: now, index: reopenedIndex)
+assert(reopenedIndex.bytesRead == 0 && reopenedIndex.promptsAnalyzed == 0 && reopenedIndex.filesReused == 3)
+assert(resumedSample.prompts == indexed.prompts && resumedSample.words == indexed.words)
+let growingPath = folder.appendingPathComponent("log0.jsonl")
+let newPrompt = try line("response_item", ["type": "message", "role": "user", "id": "new-message", "content": [["text": "PRIVATE_MARKER_4379 please review Rust"]]])
+let append = try FileHandle(forWritingTo: growingPath)
+try append.seekToEnd(); try append.write(contentsOf: Data(newPrompt.utf8)); try append.close()
+let added = try InsightReader.read(home: folder, now: now, index: reopenedIndex)
+assert(added.prompts == indexed.prompts + 1 && reopenedIndex.promptsAnalyzed == 1)
+assert(reopenedIndex.bytesRead == newPrompt.utf8.count && reopenedIndex.filesReused == 2)
+try reopenedIndex.saveSummary(added, home: folder)
+let nextIndex = PromptIndex(directory: indexDirectory)
+let stable = try InsightReader.read(home: folder, now: now, index: nextIndex)
+assert(nextIndex.bytesRead == 0 && stable.prompts == added.prompts)
+let restoredSummary = try nextIndex.restoreSummary(home: folder)
+assert(restoredSummary?.words == added.words && restoredSummary?.readAt == added.readAt)
+let differentHomeSummary = try nextIndex.restoreSummary(home: absentHome)
+assert(differentHomeSummary == nil)
+for file in try FileManager.default.contentsOfDirectory(at: indexDirectory, includingPropertiesForKeys: nil) {
+    let contents = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+    assert(!contents.contains("PRIVATE_MARKER_4379") && !contents.contains("please review Rust"), "No prompt text in durable indexes")
+    let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+    assert((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+}
+print("PASS: durable chat index, zero-byte repeat/restart, exact appended-byte work, summary restore, home isolation and private prompt-free checkpoints")
+
+// Incomplete lines must not advance their durable offset or admit partial text.
+let partialPrompt = try line("response_item", ["type": "message", "role": "user", "id": "partial-message", "content": [["text": "explain Swift please"]]])
+let split = partialPrompt.utf8.count / 2
+let handle = try FileHandle(forWritingTo: growingPath)
+try handle.seekToEnd(); try handle.write(contentsOf: Data(partialPrompt.utf8.prefix(split)))
+let unfinished = try InsightReader.read(home: folder, now: now, index: nextIndex)
+assert(unfinished.prompts == stable.prompts && unfinished.skipped == 1)
+try handle.write(contentsOf: Data(partialPrompt.utf8.dropFirst(split))); try handle.close()
+let completedIndex = PromptIndex(directory: indexDirectory)
+let completedTail = try InsightReader.read(home: folder, now: now, index: completedIndex)
+assert(completedTail.prompts == stable.prompts + 1 && completedTail.skipped == 0)
+assert(completedIndex.promptsAnalyzed == 1 && completedIndex.bytesRead == partialPrompt.utf8.count)
+// Replacing a source invalidates only that file's counters.
+try old.write(to: growingPath, atomically: true, encoding: .utf8)
+let replaced = try InsightReader.read(home: folder, now: now, index: completedIndex)
+let direct = try InsightReader.read(home: folder, now: now)
+assert(replaced.prompts == direct.prompts && replaced.words == direct.words)
+assert(completedIndex.bytesRead == old.utf8.count && completedIndex.filesReused == 2)
+print("PASS: partial-tail restart, complete-line admission and per-file replacement invalidation")
+
+let warmModel = InsightsModel(storageURL: indexDirectory, home: folder)
+let restoreDeadline = Date().addingTimeInterval(3)
+while warmModel.state.result == nil && Date() < restoreDeadline { try? await Task.sleep(nanoseconds: 10_000_000) }
+assert(warmModel.state.result?.prompts == added.prompts && !warmModel.busy, "Saved numeric insights appear before source work")
+for i in 0..<3 {
+    try FileManager.default.moveItem(at: folder.appendingPathComponent("log\(i).jsonl"),
+                                    to: folder.appendingPathComponent("log\(i).unavailable"))
+}
+warmModel.refresh(home: folder, force: true); await awaitRead(warmModel)
+assert(warmModel.state.failed && warmModel.state.result?.prompts == added.prompts)
+let afterUnavailable = try PromptIndex(directory: indexDirectory).restoreSummary(home: folder)
+assert(afterUnavailable?.prompts == added.prompts, "An unreadable refresh must not overwrite durable successful results with empty data")
+print("PASS: model restores saved results before scanning and retains them durably across unreadable-source refresh")
+
+for i in 0..<3 {
+    try FileManager.default.moveItem(at: folder.appendingPathComponent("log\(i).unavailable"),
+                                    to: folder.appendingPathComponent("log\(i).jsonl"))
+}
+let newChatPath = folder.appendingPathComponent("new-chat.jsonl")
+let newChat = try line("response_item", ["type": "message", "role": "user", "id": "brand-new-chat-message", "content": [["text": "verify the Swift build please"]]])
+try newChat.write(to: newChatPath, atomically: true, encoding: .utf8)
+var catalogDB: OpaquePointer?
+assert(sqlite3_open(folder.appendingPathComponent("state_5.sqlite").path, &catalogDB) == SQLITE_OK)
+assert(sqlite3_exec(catalogDB, "INSERT INTO threads VALUES('new-chat', '\(newChatPath.path)', 'user', \(Int(now.timeIntervalSince1970)))", nil, nil, nil) == SQLITE_OK)
+sqlite3_close(catalogDB)
+let newChatIndex = PromptIndex(directory: indexDirectory)
+let withNewChat = try InsightReader.read(home: folder, now: now, index: newChatIndex)
+assert(newChatIndex.filesReused == 3 && newChatIndex.promptsAnalyzed == 1 && newChatIndex.bytesRead == newChat.utf8.count)
+assert(withNewChat.prompts == direct.prompts + 1)
+let expired = try InsightReader.read(home: folder, now: now.addingTimeInterval(31 * 86400), index: newChatIndex)
+assert(expired.prompts == 0 && newChatIndex.bytesRead == 0)
+print("PASS: new-chat discovery processes only the unseen chat and the rolling sample expires without transcript replay")
+
+// Derived storage failures must not turn readable transcripts into failed sources.
+let readable = try InsightReader.read(home: folder, now: now)
+func matchesReadable(_ result: PromptInsights) -> Bool {
+    result.prompts == readable.prompts && result.words == readable.words && result.tasks == readable.tasks && result.skipped == 0
+}
+let damagedURL = indexDirectory.appendingPathComponent(PromptIndex.digest(Data(growingPath.path.utf8)) + ".json")
+try Data("broken checkpoint".utf8).write(to: damagedURL)
+let damagedIndex = PromptIndex(directory: indexDirectory)
+let recovered = try InsightReader.read(home: folder, now: now, index: damagedIndex)
+assert(matchesReadable(recovered) && recovered.cacheWarning != nil)
+assert(damagedIndex.bytesRead == old.utf8.count && damagedIndex.filesReused == 3)
+var incompatible = try JSONSerialization.jsonObject(with: Data(contentsOf: damagedURL)) as! [String: Any]
+incompatible["version"] = 999
+try JSONSerialization.data(withJSONObject: incompatible).write(to: damagedURL)
+let migrated = try InsightReader.read(home: folder, now: now, index: PromptIndex(directory: indexDirectory))
+assert(matchesReadable(migrated) && migrated.cacheWarning != nil)
+let repairedIndex = PromptIndex(directory: indexDirectory)
+let repaired = try InsightReader.read(home: folder, now: now, index: repairedIndex)
+assert(matchesReadable(repaired) && repaired.cacheWarning == nil && repairedIndex.bytesRead == 0)
+
+let blockedCache = folder.appendingPathComponent("blocked-cache")
+try Data("synthetic obstruction".utf8).write(to: blockedCache)
+let unwritableIndex = PromptIndex(directory: blockedCache)
+let uncached = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(uncached) && uncached.cacheWarning != nil)
+let retained = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(retained) && unwritableIndex.bytesRead == 0 && retained.cacheWarning != nil)
+try FileManager.default.removeItem(at: blockedCache)
+let savedAgain = try InsightReader.read(home: folder, now: now, index: unwritableIndex)
+assert(matchesReadable(savedAgain) && savedAgain.cacheWarning == nil && unwritableIndex.bytesRead == 0)
+let afterRecovery = PromptIndex(directory: blockedCache)
+_ = try InsightReader.read(home: folder, now: now, index: afterRecovery)
+assert(afterRecovery.bytesRead == 0, "Write recovery persists retained facts without transcript replay")
+
+let summaryObstruction = blockedCache.appendingPathComponent("summary.json")
+try FileManager.default.createDirectory(at: summaryObstruction, withIntermediateDirectories: false)
+let summaryFailureModel = InsightsModel(clock: { now }, storageURL: blockedCache, home: folder)
+summaryFailureModel.refresh(home: folder, force: true); await awaitRead(summaryFailureModel)
+assert(!summaryFailureModel.state.failed && matchesReadable(summaryFailureModel.state.result!))
+assert(summaryFailureModel.state.result?.cacheWarning?.contains("summary could not be saved") == true)
+print("PASS: corrupt/incompatible checkpoints rebuild one chat; failed cache writes retain results and retry without replay; summary write failure stays separate from source availability")

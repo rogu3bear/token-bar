@@ -17,7 +17,7 @@ CORE="ProviderUsage.swift CostRateHistory.swift CostCoverage.swift RequestExport
       CoverageAudit.swift UsageMetadata.swift RequestArchive.swift LiveStateStore.swift CostPricing.swift
       CostReport.swift CostRecovery.swift UsageInsights.swift Appearance.swift PageStyle.swift
       Usage.swift UsageStore.swift ImportProgress.swift GrokUsage.swift Activity.swift LiveTool.swift ClaudeActivityReader.swift ActivityFeed.swift EventIndex.swift
-      PlanHistory.swift TaskCatalog.swift Reports.swift ReportEngine.swift UsageTimeline.swift LiveMonitor.swift ClaudeQuotaMonitor.swift ClaudeStatuslineConnection.swift
+      PlanHistory.swift TaskCatalog.swift Reports.swift ReportEngine.swift ReportIndexStorage.swift PrivateCache.swift UsageTimeline.swift LiveMonitor.swift ClaudeQuotaMonitor.swift ClaudeStatuslineConnection.swift
       Project.swift DimensionReport.swift TokenConvention.swift Integrity.swift
       ClaudeCodeUsage.swift OpenCodeUsage.swift ForeignHarnessScan.swift IncrementalScan.swift HarnessDiscovery.swift
       Tachometer.swift SignInTimeline.swift CodexInstallation.swift GrokInstallation.swift GrokQuotaMonitor.swift"
@@ -46,7 +46,7 @@ build_group() {
 build_group usage      Tests/main.swift            "-swift-version 5 -lsqlite3" $CORE
 build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE MenuBarDial.swift MenuBarSettings.swift FirstRunWelcome.swift ClaudeConnectionControl.swift
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
-build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptReadState.swift InsightsModel.swift
+build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
 build_group feedback   Tests/Feedback/main.swift   ""                           Feedback.swift CodexInstallation.swift
 build_group appearance Tests/Appearance/main.swift "-swift-version 5 -lsqlite3" $CORE FirstRunWelcome.swift PreviewFixture.swift UsageMetric.swift UsageTimelineChart.swift TokenFormatting.swift
 build_group cost       Tests/Cost/main.swift       "-swift-version 5 -lsqlite3" $CORE
