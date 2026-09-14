@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "available": false,
+  "platform": "Apple silicon \u00b7 macOS 14+",
+  "url": null,
+  "sha256": null,
+  "notarized": false,
+  "status": "v0.1 is available as source. A signed installer is not yet published."
+}

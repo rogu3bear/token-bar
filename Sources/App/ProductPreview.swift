@@ -1,0 +1,141 @@
+import SwiftUI
+
+/// Generates the website product image from the shipping view and synthetic data.
+/// It never launches monitoring, reads real usage data, or touches normal preferences.
+private final class ProductPreviewClose: NSObject, NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        NSApp.stop(nil)
+        if let event = NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0) { NSApp.postEvent(event, atStart: true) }
+    }
+}
+enum ProductPreview {
+    @MainActor static func render(to destination: URL?, compact: Bool = false) throws {
+        PreviewFixture.prepare()
+        _ = NSApplication.shared
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "local.codex-token-bar.preview." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
+        model.appearance.websitePreset()
+        let light = CommandLine.arguments.contains("--sample-light")
+        if light { model.appearance.mode = "Light"; NSApp.appearance = NSAppearance(named: .aqua) }
+        if let index = CommandLine.arguments.firstIndex(of: "--sample-accent") {
+            guard CommandLine.arguments.indices.contains(index + 1),
+                  AppearancePreferences.valid(CommandLine.arguments[index + 1]) else { throw CocoaError(.validationMissingMandatoryProperty) }
+            model.appearance.hex = CommandLine.arguments[index + 1].uppercased()
+        }
+        let now = PreviewFixture.date
+        var activity = ActivitySnapshot(readAt: now, referenceDate: now)
+        for index in 0..<6 {
+            let id = "sample-\(index)"
+            activity.turns[id] = TaskActivity(turn: id, started: now.addingTimeInterval(-120), observed: now, running: true, kind: index < 4 ? .chat : .agent, session: id, name: "Sample task \(index + 1)")
+        }
+        model.tachometer.activity = activity
+        model.tachometer.rate = 128; model.tachometer.rawRate = 128
+        model.tachometer.minimum = 80; model.tachometer.scale = 180
+        model.tachometer.hasRate = true; model.tachometer.lastReport = now
+        model.tachometer.reportingCount = 6; model.tachometer.models = ["sample-model"]
+        var claude = ActivitySnapshot(readAt: now, referenceDate: now)
+        claude.turns["claude-sample"] = TaskActivity(turn: "claude-sample", started: now.addingTimeInterval(-30), observed: now, running: true, kind: .chat, session: "claude-sample", tool: .claude)
+        claude.measurements["claude-sample"] = RateMeasurement(turn: "claude-sample", date: now, duration: 2, output: 164, model: "sample-claude")
+        model.claudeMeter.activity = claude; model.claudeMeter.tick(now: now)
+        let quota = QuotaReading(accountID: "sample-account", bucket: "sample", name: "Account quota", window: "primary", minutes: 10080, used: 36, reset: now.addingTimeInterval(86400 * 4), date: now)
+        var first = quota; first.used = 34; first.date = now.addingTimeInterval(-300)
+        model.live.currentID = "sample-account"
+        model.live.state.accounts["sample-account"] = LiveAccount(id: "sample-account", email: "developer@example.com", plan: "pro", observed: now, quotas: [quota])
+        model.live.state.samples = [first, quota]
+        var claudeQuota = quota
+        claudeQuota.accountID = "claude:sample-account"
+        claudeQuota.name = "Claude"
+        claudeQuota.bucket = "claude"
+        claudeQuota.minutes = 300
+        claudeQuota.used = 58
+        claudeQuota.reset = now.addingTimeInterval(14400)
+        var claudeFirst = claudeQuota
+        claudeFirst.used = 53
+        claudeFirst.date = now.addingTimeInterval(-300)
+        model.claudeQuota.quota = ToolQuotaState(readings: [claudeQuota], samples: [claudeFirst, claudeQuota])
+        var grokActivity = ActivitySnapshot(readAt: now, referenceDate: now)
+        grokActivity.turns["grok-sample"] = TaskActivity(turn: "grok-sample", started: now.addingTimeInterval(-45), observed: now, running: true, kind: .chat, session: "grok-sample", tool: .grok)
+        grokActivity.measurements["grok-sample"] = RateMeasurement(turn: "grok-sample", date: now, duration: 2, output: 96, model: "sample-grok")
+        model.grokMeter.activity = grokActivity; model.grokMeter.tick(now: now)
+        var grokQuota = quota
+        grokQuota.accountID = "grok:sample"
+        grokQuota.name = "X Premium+"
+        grokQuota.bucket = "grok"
+        grokQuota.window = "weekly"
+        grokQuota.used = 49
+        grokQuota.reset = now.addingTimeInterval(86400 * 5)
+        var grokFirst = grokQuota; grokFirst.used = 47; grokFirst.date = now.addingTimeInterval(-300)
+        model.grokQuota.quota = ToolQuotaState(readings: [grokQuota], samples: [grokFirst, grokQuota], accountLabel: "X Premium+")
+        precondition(LiveTool.allCases.allSatisfy { model.meter(for: $0).hasRate }, "Hero requires healthy synthetic rates")
+        precondition(LiveTool.allCases.allSatisfy { tool in
+            let state = model.quota(for: tool)
+            return Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon).flatMap {
+                Runway.estimate($0, samples: state.samples, now: now, horizon: state.horizon).exhaustion
+            } != nil
+        }, "Hero requires supported synthetic quota projections")
+        var snap = model.snapshot
+        for hour in 0..<8 {
+            let stamp = now.addingTimeInterval(TimeInterval(-1800 * (7 - hour)))
+            var row = Entry(date: stamp, session: "sample-\(hour)", model: "sample-model", tokens: Tokens(["output_tokens": 400 + hour * 120, "input_tokens": 200]))
+            row.harness = hour % 2 == 0 ? Harness.grok : "codex-desktop"
+            snap.entries.append(row)
+        }
+        model.snapshot = snap
+        if destination == nil || compact {
+            model.tachometer.unit = .minute
+            model.claudeMeter.unit = .hour
+        }
+        if CommandLine.arguments.contains("--sample-single-tool") {
+            model.claudeMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now); model.claudeMeter.tick(now: now)
+            model.grokMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now); model.grokMeter.tick(now: now)
+        }
+        precondition(model.tachometer.runningCount == 6 && model.tachometer.activity.uncertain == 0, "Hero activity must be fresh at the fixture clock")
+        if CommandLine.arguments.contains("--sample-idle") {
+            for tool in LiveTool.allCases {
+                model.meter(for: tool).activity = ActivitySnapshot(readAt: now, referenceDate: now)
+                model.meter(for: tool).tick(now: now)
+            }
+        }
+        if CommandLine.arguments.contains("--sample-claude-error") {
+            model.claudeMeter.activity = ActivitySnapshot(readAt: now,
+                error: "Synthetic transcript read failed", referenceDate: now)
+            model.claudeMeter.tick(now: now)
+        }
+        let view = AppearanceHost(preferences: model.appearance) {
+            Group {
+                if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
+                else { DetailRoot(model: model) }
+            }.frame(width: compact ? 440 : 1064, height: compact ? nil : 900)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } }
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : 1064, height: compact ? host.fittingSize.height : 900)
+        if compact { print("Compact native fitting size: \(host.frame.size)") }
+        let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let closer = ProductPreviewClose()
+        if destination == nil { window.delegate = closer }
+        window.title = "Token Bar · Synthetic Codex and Claude preview"
+        defer { window.close() }
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.contentView = host
+        if destination == nil {
+            NSApp.setActivationPolicy(.regular); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+            NSApp.run(); return
+        }
+        guard let destination else { return }
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        host.layoutSubtreeIfNeeded()
+        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
+        AppearanceRendering.capture(host, to: bitmap)
+        guard let png = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try png.write(to: destination, options: .atomic)
+        print("Rendered native dashboard with synthetic data: " + destination.path)
+    }
+}

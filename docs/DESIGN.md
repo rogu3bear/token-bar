@@ -1,0 +1,644 @@
+# Design direction
+
+Reference: [Linear on Refero Styles](https://styles.refero.design/style/90ce5883-bb24-4466-93f7-801cd617b0d1), inspected September 8, 2026.
+
+Use a dark instrument-panel canvas, crisp system typography, thin structural
+borders, and a restrained yellow-green action accent. This is Token Bar's own
+design, not a copy of another product's branding or paid fonts.
+
+## Advisory design review through the next release
+
+User-requested contract, established 2026-09-12. The continuing reviewer is an
+external advisory design review whose transcript the maintainer retains
+privately. The repository owner retains design and implementation judgment;
+the reviewer supplies concrete visual advice.
+
+Keep this contract active through the next release, including if its version or
+release date changes. Before treating visual work as accepted, send separate
+shipping-view synthetic images of Now, History, Cost, Accounts & plans, Insights,
+Menu bar settings and Appearance, plus the compact popover, menu-bar readout and
+welcome surface. Include Light/Lime, Dark/Lime, custom accent, minimum window
+size and explicit integrity states. Include affected sheets, menus, focus and
+selection states when a change touches them; absent views remain unreviewed.
+
+Keep the exchange bidirectional: return the repository owner’s assessment and
+open questions, invite the reviewer’s response, and record the resulting
+disposition before treating a round as closed.
+
+After material visual changes, return changed faces and matching before/after
+images to the same conversation. Before release, request a final complete-face
+review against the exact candidate and retain its response. Record each tip as
+accepted, rejected with rationale, deferred with reason, or awaiting reproduction
+in the dated verification record. Previously tested behavior retains its proof
+unless its inputs change; advice alone does not demonstrate a source defect.
+
+Preserve one adaptive accent, canonical Dark/Lime, customization, native controls,
+measurement semantics, keyboard behavior, persistent integrity disclosure and
+reduced motion. Send synthetic images only. Stills do not prove animation,
+VoiceOver or offscreen interactions. This is an advisory working agreement, not
+a legal contract, autonomous background monitor, or permission to edit source,
+commit, sign, install, publish or release. Existing release authority and the
+user's VoiceOver deferral remain in force. The contract closes when the actual
+next release is recorded or the user explicitly ends it, not on a green build.
+
+## Native design system
+
+`Sources/Components/PageStyle.swift` owns shared dashboard typography, spacing,
+headers, summary metrics and recorded-contribution bars. `Appearance.swift` owns
+saved appearance, the single adaptive application accent, method links, sheets
+and appearance hosting. Features supply content, values and actions; these shared
+components supply presentation. Add a shared role only when real consumers need
+it. Compact menu content, rate controls, warnings and import progress are distinct
+roles, not smaller copies of the dashboard.
+
+| Role | Shared owner / rule | Consumers |
+| --- | --- | --- |
+| Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | All seven dashboard destinations |
+| Page rhythm | `PageStyle`: 28pt gutter, 24pt sections, 16pt related content | Full pages; settings retain their narrower readable column |
+| Section heading | `PageStyle.sectionTitle`: native title2 semibold | History, Cost, Insights and tool headings; subordinate headings remain headline |
+| Summary metric | `SummaryMetric`: native caption label, 28pt rounded semibold monospaced value, optional secondary caption detail | History totals, Cost coverage/valuation, prompt sample metrics |
+| Supporting metric | `PageStyle.detailMetric`: native title3 | Cost component values below the primary summary |
+| Recorded contribution | `ReportMagnitudeStyle`: 10pt quantitative track, resolved accent, equal geometry when selected; true zero has no filled segment | History contribution buttons and Cost model/reasoning bars |
+| Chart series and legend | One explicit resolved foreground scale; native symbols and line styles distinguish tools | Shipping minute History chart, including generated legend |
+| Actions and selection | Native buttons/pickers; primary emphasis only for an explicit primary action; method links remain links | Header actions, filter/pricing/detail sheets and settings |
+| Compact surface | Existing compact spacing, type and controls | Menu-bar readout and quick popover; not forced into full-page metrics |
+| Warnings and progress | Native warning color and explicit text; persistent integrity status survives closing details; native import progress retains measured fractions | Integrity, read failures, unavailable/unpriced data and import status |
+
+Preserve content-driven control widths, native disabled/selected/focus behavior,
+Return/Escape sheet actions, stable navigation identity and reduced-motion gates.
+Do not add cards or containers solely to group content already grouped by type,
+space or dividers. Warning color communicates a warning and is not a second
+application accent. Saved accent swatches show the user's choice; functional ink
+uses the adaptive foreground when that choice is not legible.
+
+`UsageMetric.swift` and `TokenFormatting.swift` hold the unchanged token measure
+and compact-number formatting used by the shipping chart and its render test.
+The Appearance group renders that actual chart in Dark/Lime, Light/Lime and
+Light/custom states, including the native legend; it also checks stable shared
+metric/header/bar frames and zero/half/full recorded magnitudes. Palette-only
+checks are insufficient to qualify a chart generated by Swift Charts.
+
+## Two native surfaces
+
+The menu bar is a compact, distinct surface above the larger dashboard. Each
+has its own label, border, and space. The menu strip is enlarged for legibility;
+narrow screens scroll the strip instead of shrinking its native text. Website previews must depict the native
+app's real rendering and motion; a web reconstruction is not sufficient.
+
+`TokenBar --render-motion-preview <new-directory>` captures the shipping `DetailRoot` dashboard, including `LiveToolPanels`,
+`ToolSpeedCard`, and `RPMGauge`, plus the actual `MenuBarPresentation.combined`
+formatter, using isolated synthetic `RateMeasurement` inputs passed through
+`Tachometer.apply`. SwiftUI owns dial and number interpolation. The capture
+never starts monitoring or reads production history/preferences. Its
+`capture.json` records sample values and frame timestamps. Encode frames at
+those timestamps with FFmpeg; do not invent or smooth a different display.
+The genuine still render remains available through `--render-preview`.
+The motion fixture starts with Codex alone and supplies Claude activity and
+quota together when Claude joins. Its Codex-only frame 105 is the still poster;
+the settled loop retains both tools. Speed readouts place the selected `tok/s`,
+`tok/m`, or `tok/h` beside the number as well as offering the unit selector.
+
+A preview ahead of the public installer names its native version and says it
+is not yet the public download. The website presents these recordings with
+one pause/resume control and a short sample-data disclosure. It does not claim to show the visitor's usage. Quota
+is independent of output rate. Motion starts automatically when either native recording is visible and repeats
+through its settled working section; the entrance plays once. It pauses offscreen and in hidden tabs,
+respects an explicit pause until resumed, and stays still under reduced-motion
+preferences. Controls are quiet secondary actions; sample disclosure stays visible.
+
+## Spacing and interaction
+
+Page gutters, related gaps, group spacing, section rhythm, and control height
+have shared CSS owners. FAQ placement is independent of question count.
+System fonts and small static assets avoid external font requests and hydration.
+Feedback keeps private contact information separate from public draft content.
+
+All four web pages expose Skip to content, a focusable main landmark, and named
+Main navigation and Footer landmarks. Page-specific links can differ while the
+keyboard entry and return-home paths stay consistent. Current-source preview
+copy describes the shared adaptive accent and automatic Insights sampling while
+that destination is open; public-download capabilities remain version-qualified.
+
+Research checked 2026-09-11: [Carbon spacing](https://carbondesignsystem.com/elements/spacing/overview/)
+for a coherent scale and grouping; [web.dev animation guidance](https://web.dev/articles/animations-guide)
+for lightweight motion; [W3C pause controls](https://www.w3.org/WAI/WCAG21/Understanding/pause-stop-hide.html)
+and [reduced motion](https://www.w3.org/WAI/WCAG21/Techniques/css/C39.html)
+for user control. These inform tactics, not borrowed visual branding.
+
+## Native history and Insights
+
+Publish the saved usage snapshot before the startup scan. Keep it visible during
+history import, cost recovery, and catalog refresh; publish admitted additions
+while the scan continues. Usage summaries live with the app model so switching
+sections does not replace them with an empty result. Prompt analysis publishes
+partial results on its first read and preserves the last completed sample during
+refresh or a read failure.
+
+Single-day History and Cost selections use cumulative recorded values at
+one-minute resolution, including a custom date and a wider selection containing
+only one recorded day. Insights derives complete-week changes instead of
+repeating those timelines. Steps move only when timestamped records arrive; there is no
+synthetic activity between records. Daily aggregates stay outside minute lines
+unless retained request details reconcile exactly with their counters, event
+counts, and attribution. Unavailable minute timing and unpriced usage remain
+explicit, and daily summaries remain available for multi-day comparisons.
+
+The compact Today timeline spans local 12:01 AM to the current time, using the
+whole plot width. Before 12:01 AM it starts at midnight with a nonzero domain.
+Cumulative display endpoints carry recorded totals through quiet periods without
+adding events or rates. Empty timing remains empty; historical tool samples stay
+visible regardless of current activity. `--sample-single-tool` retains inactive
+provider quotas for visibility checks; `--sample-idle` checks the no-active state.
+`--sample-claude-error` checks that an inactive provider’s read failure remains
+visible as an error notice without reserving an active tool panel.
+
+## Independent tool speeds
+
+Right now shows tools with a fresh rate or currently observed running task.
+Inactive quota readings and stale unconfirmed tasks do not reserve live sections.
+Tools join with stable identity and a restrained transition; when nothing is active,
+the dashboard and quick popover say that no tools are working. The status item
+retains its Codex starting state. Each tool owns its units,
+range, activity, and estimated output rate. Rate units use directly visible buttons.
+Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover uses the same relevance rule for compact named rates, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
+speed is labeled as another tool or silently pooled into it.
+
+Menu bar settings offer Codex, Claude, Grok, and Auto. Auto shows a named
+single tool or Total when several tools are active. Total adds available output
+rates in one displayed unit and labels partial reporting; it never adds quota
+percentages or projects a combined exhaustion time. Each remaining allowance
+keeps its tool identity and the shared accent. A single-tool menu-bar readout
+names the tool once at the start; its quota field does not repeat that name,
+including when unavailable. Mixed-tool Auto readouts name each separate quota
+so an allowance cannot be mistaken for the active tool's quota. This is a
+composition rule across all field selections, orders and compactness settings;
+it does not reset saved configuration. The dropdown groups each tool's speed
+with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
+Existing visibility, order, compactness and unit preferences survive.
+Each tool's gauge, activity, quota remaining, and projected zero share one
+aligned column on the native window canvas. Dividers separate tools and their
+speed/allowance sections without adding card surfaces. The compact gauge leaves the main readings visible at the
+900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
+fits its content rather than reserving a fixed height, follows the saved
+appearance, and uses the same saved application accent as Now. The quick
+popover shows each relevant tool as name, rate, and remaining percent. Click a row for reset and projected zero. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
+its account-bound local usage cache; missing or stale readings stay unavailable. Completion removes a task's rate; stale or insufficient counter
+reports show an em dash, never a guessed zero.
+
+Claude speed uses timestamped output-counter increases within a message and
+between messages in a turn. It includes elapsed logged time, not just model
+decoding time. User/assistant/completion records determine observed activity.
+Tool results continue a turn; assistant end_turn and turn_duration stop it.
+This is a batched local estimate, not provider-reported tokens per second.
+
+
+## History and Cost scope
+
+Period, Tool, Model, Account, and task search are shared by History and Cost.
+Both pages show the same record-filter controls before their results, including
+selected values absent from the latest data. Controls remain available while
+loading or unavailable. One query scopes History totals, charts, breakdowns,
+and CSV, and the base selection for Cost. Cost additionally exposes its own
+Reasoning level filter; it does not narrow History. Rate dates and Service sit
+under Pricing assumptions and change valuation, not record selection.
+
+“Clear filters” removes all applicable non-period record restrictions: Tool,
+Model, Account, and search on either page, plus Reasoning level on Cost. It
+preserves the shared period/custom dates and pricing assumptions. The help text
+beside the controls states this boundary. Switching pages preserves scope.
+Rebuilds publish History and Cost together only for the current generation;
+while rebuilding, previous results are labeled and exports are unavailable.
+Published-report CSV is captured before opening the save panel, so subsequent
+refreshes cannot change what that export contains.
+
+Tool and project comparisons use recorded
+attribution; missing tool identity stays unattributed. A tool that reaches
+several providers lists every observed provider, not just the first row’s.
+
+
+The sample scene eases into a sustained working interval with small independent
+rate variations. The entrance plays once; subsequent loops stay in the settled
+working section so both faces remain present. Each tool reports on its own
+cadence. Synthetic quota observations decrease with its sample workload and
+feed the normal projected-zero calculation. Quota figures animate when their
+observations change; production forecasts still use provider observations.
+A short dissolve restarts the sample segment without dropping either face.
+Needle, digits, dial bounds, and tool insertion/removal animate; reduced motion
+remains respected. Sample variation belongs in the isolated input stream,
+never added to measured production rates.
+
+## Availability and retained results
+
+Prompt insights distinguish a read that has not begun, loading, a completed
+zero-prompt sample, partial samples, and failed reads. `PromptReadState` owns
+these transitions. A first failure shows unavailable content without numeric
+statistics. Refreshes retain the last completed sample; failures keep its
+original read timestamp and identify it as potentially stale. Interim results
+remain explicitly partial. A successful empty prompt sample has zero counts,
+but no typical-length value. Usage trends likewise require a completed summary
+before showing counts and retain it when the next source is unavailable.
+
+`CostReport.coverage` is unavailable when the selected-token denominator is
+zero. An empty selection has no estimate; a supported zero-token record can
+have a measured zero-dollar estimate. Nonzero wholly unpriced usage has 0%
+coverage and no estimate; mixed coverage is a partial estimate. Headline and
+evidence views use the same coverage value. Loading retains an existing
+calculation, and a failed source cannot become an empty-selection claim.
+The last successful usage-read time is retained in memory across failed reads
+and shown beside available cost results.
+
+## Rate-unit and color ownership
+
+Each tool's dashboard unit is owned by its Tachometer and saved independently
+under `dashboard.rateUnit.<tool>` using the app's injected preferences store.
+Absent or invalid values use seconds. The quick popover follows that tool's
+unit. Menu bar “Follow selected tool” uses the selected tool's dashboard unit;
+explicit seconds/minutes/hours remain menu-only overrides in the existing
+`menuBarConfiguration.v1` record. Auto changes the selected tool, not its unit
+preference. Restore menu defaults does not reset dashboard units or Appearance.
+Raw measurements remain output tokens per second; conversion is presentation only.
+
+AppearanceHost owns the rendered accent, native tint, and color scheme for every
+surface, including welcome, detail sheets and synthetic previews. ToolPalette
+resolves every tool to that same accent. Existing `appearance.toolColors` and
+`appearance.toolsFollowAccent` values remain stored for compatibility, but do
+not introduce independent colors. System/Dark/Light and custom app accents
+remain editable. Orange is reserved for warning/degraded evidence and red for
+actual failure in app-authored status styling; ordinary information uses adaptive
+system colors. A user-selected custom accent remains the single accent.
+Accent foregrounds and native tint resolve together against native page, sheet,
+and control canvases. Keep the saved hue only at 7:1 source contrast, reserving
+headroom for display conversion and small glyphs; otherwise use native adaptive
+label ink. Rendered text/icon regression coverage requires at least 4.5:1.
+The custom-color swatch retains the saved color. Dark/Lime remains the canonical
+marketing state; fallback never changes saved preferences or adds another hue.
+Tool charts distinguish series through line styles, symbols and bar positions,
+not competing hues. MenuBarPresentation.combined is shared by the status item,
+Settings and marketing recordings.
+Accounts & plans covers Codex; Claude's passive current quota has no account or
+plan history page. Synthetic previews inject disposable preferences and never
+write the production defaults or change the measurement calculation.
+
+## Native page hierarchy
+
+Scope precedes results; results precede supporting evidence. Now puts activity,
+estimated speed and account allowance together, with one visible speed-unavailable
+label per tool; missing allowance remains a separate claim. History places the
+selected usage's contributions before its time series. Cost places model/effort
+comparisons immediately after valuation, ahead of time series and components.
+Its evidence completeness, account comparison and request export remain available
+in a named detail sheet; recovery, CSV and calculation method remain in the header.
+
+Insights states its independent 30-day usage scope and Codex prompt sample before
+results. Integrity exclusions/repairs remain visible, with details and provenance
+notices under Counting method and evidence. Prompt sample methodology and separate
+Codex quota trends have their own detail buttons. A successful empty prompt sample
+shows zero statistics without four repetitive empty pattern cards. Empty usage
+insights show one no-records explanation rather than repeated empty charts. Accounts &
+plans leads with supported account observations; collection/retention methodology
+is disclosed after observations. Availability, partial coverage, read age and
+failure qualifiers stay visible rather than being hidden as methodology.
+
+## Native control consistency
+
+Entry labels name the surface they open. The quick popover's Menu bar settings
+action opens the existing dedicated Menu bar settings window; Dashboard reopens
+the dashboard at its retained destination. This separate settings presentation
+is not an additional dashboard destination or an implementation of the proposed
+scene migration. Dashboard and settings window titles match those entry labels.
+
+The account filter uses the same label in its picker and removable selection,
+including the inferred qualifier. Unattributed is the consistent label for
+history without account evidence. During report rebuilding, shared status text
+identifies previous results and unavailable export; headers do not repeat a
+spinner. History read failures qualify the figures above the results, with a
+persistent limitation even when the error detail is dismissed.
+
+Full pages share a 28-point gutter, 24-point major-section rhythm and a 28-point
+rounded semibold heading matching their destination name. Settings retain their
+604-point readable column; compact popovers and tool cards retain denser spacing.
+The persistent navigation presents seven equal destination tabs, including Menu
+bar and Appearance, without an inline Settings heading or divider. Destination
+identity and saved preferences remain unchanged.
+
+Navigation retains one restrained selection capsule and independent keyboard focus.
+Small stable report choices use native segmented pickers; larger or changing
+option sets use menu pickers. Comparisons keep an explicit Compare label;
+commands use native buttons.
+History and Cost share the period/date and report-filter components. Method
+sheet actions use an info icon and descriptive link; every sheet has trailing
+Done with Return and Escape dismissal. Contribution rows show disclosure
+chevrons, selection and keyboard focus; plain selection/navigation buttons expose
+visible focus independently of selection. Missing data is not a disabled action.
+
+Menu bar fields stay in their saved order. Reorder fields reveals the per-field
+Move earlier/later buttons only when needed; disabled fields retain their place.
+Visibility, order, compact labels, unit overrides and separators still save via
+the existing preference owner. No drag-only interaction is required. Restore
+defaults retains its existing scope. Reduced motion removes custom navigation,
+rate, quota and tool-transition animation without pausing measurements.
+
+## First launch and import
+
+Before the first local scan or account poll, a short native welcome explains
+local history, the Codex app-server, permissions, storage and user-initiated
+exports. Start local monitoring acknowledges the explanation and opens the
+dashboard; Quit does not acknowledge or start monitoring. The explanation is
+available again in Menu bar settings. This acknowledgement is distinct from
+macOS access controls and never grants an OS permission.
+
+The dashboard has one visible import progress bar fixed below page content, owned by UsageModel's typed
+ImportProgress. Discovery, Codex file reading, other tools, cost-detail recovery
+and catalog updates are separate stages. Codex, Claude and Grok report checked files; OpenCode reports checked records
+after reading its database. Each percentage describes only the named stage,
+not whole-import completion or time remaining.
+The current stage, progress bar and known remaining file count stay visible. Saved and newly admitted results remain visible with one incompleteness caveat.
+Page headers no longer repeat import messages or import spinners.
+
+Dashboard gauges retain the needle and numeric reading; compact cards omit dial tick labels to avoid crowding. Larger standalone gauges retain range labels. Minor
+ticks are reduced to twenty intervals on the dashboard and major ticks only in
+compact gauges. The numeric accessibility label includes the selected rate unit.
+Analytical charts retain axes and comparison bars because they encode scope and
+magnitude; supporting methods remain disclosed rather than competing with results.
+
+## Progressive disclosure
+
+Keep the first view useful without a wall of controls or explanation. Welcome
+shows one local-access summary; Data & privacy opens the full explanation.
+History and Cost keep the period picker and plain removable active-filter labels visible while
+a Change filters button opens native filter pickers and a native search field. Cost's pricing button names the
+selected rate basis and service. Clear filters still preserves period/pricing.
+Now opens account and estimate details in a sheet; missing quota/projection
+reasons remain visible. Compact quota panels retain their existing density.
+
+Insights leads with derived usage changes and measurable context evidence. It keeps
+three prompt statistics and bounded repeated-prompt findings visible, with sample
+methodology in native details. Read failures, partial
+coverage, sample scope and age remain visible. Menu bar settings lead with the
+preview, tool and units; Customize contains visibility, ordering and formatting.
+These detail sheets are local presentation state, not new saved preferences.
+
+
+Native controls match cardinality: small stable choices use segments; larger or
+data-dependent lists use menu pickers; related details use labeled native sheets. Detail sheets preserve access to evidence and
+exports with Done and Escape dismissal. Import progress stays visible at the bottom of dashboard pages and the popover: files checked and remaining are shown when known;
+discovery and uncounted stages show status text without an animated progress bar.
+Prompt analysis counts its selected files, including unavailable files, while
+preserving previous successful results during refresh. New token totals cannot
+be predicted before reading and deduplication. Report rebuilding uses status text
+and keeps prior results visible until the selected report is ready.
+
+The popover Today chart opens History, including when the dashboard already
+exists on another destination. Dashboard retains the current destination.
+
+The popover places Feedback at the trailing edge of its action row and uses the
+saved shared accent for its label.
+
+
+History's tool totals and colored timeline use the selected report's recorded
+tool identity, independent of which tools are running now. All tools share the
+adaptive application accent; names, line styles, symbols, and bar positions
+distinguish series. Other tools and missing tool identity remain labeled separately. Every series uses the complete selection's time resolution;
+a tool with only one recorded day cannot become a cumulative line inside a
+multi-day bar chart. Tool totals reconcile to the displayed processed total;
+daily-only records retain their timing limitation. Filters and exports keep the
+same source selection, and the detailed Tools comparison retains client names.
+
+### Insights and remembered work
+
+Insights is one scrolling page: explicit independent 30-day scope, recorded output
+change for the last seven complete days versus the preceding seven (today excluded),
+measurable context coverage, then sampled Codex prompt patterns.
+Prompt findings show sample size, typical length, busiest hour and at most three
+exact repeats. Word matching is not a productivity or quality score. Counting
+method remains accessible; raw task/model exploration belongs in History.
+
+Claude file checkpoints live with the ledger and match file size, modification
+time and inode, with a version and separate current/history boundary. Only clean,
+unchanged reads are reusable; changes and failures are retried. Reports and usage
+insights reuse identical inputs until local midnight or a future record becomes
+current; returning to a page does not itself repeat aggregation. Query, pricing,
+catalog and entry changes invalidate the applicable result. Clock rollback and
+calendar/time-zone changes also invalidate cached selections. Saved usage loads
+before monitoring; settled source cursors remain independent of page navigation.
+No prompt text is added to persistent state. Shared status notices use red for
+read failures and orange for degraded evidence, with explicit explanatory text
+and accessible severity. Errors can be dismissed for the current presentation
+without clearing the underlying error; invalid date ranges and incomplete-data
+warnings remain visible while applicable. Compact integrity indicators retain
+their existing persistent, non-banner treatment. Notice entrance/removal motion
+is disabled under Reduce Motion. The feedback page uses the same severity
+meaning and clears obsolete severity styling when its state changes.
+
+The native status button and menu preview share one presentation animator.
+Reported numbers and units crossfade as exact values; only the speed dial's
+normalized visual position interpolates, keyed by tool identity. Missing rates
+never retain a moving measurement. Compact popover values use native numeric
+transitions. Reduce Motion applies the final values immediately, and interrupted
+or completed transitions release their timers. Compact menu settings retain
+explicit `tok/s`, `tok/m`, or `tok/h` labels.
+
+Import bars measure checked files or records against a discovered denominator,
+not time remaining or an invented eventual token total. Discovery and uncounted
+reconciliation use plain status text. Progress stays at the bottom of the shell.
+
+### Lazy Insights scheduling
+
+Insights starts no analysis from usage publication. While its destination is
+open, a cancellable view task waits one second for navigation to settle and
+checks for a quiet opportunity every 15 seconds. It waits for import/report
+work and the usage summary before starting prompt sampling. Leaving the page
+cancels future scheduling; an already-running background read may finish and
+remain available for the next visit. Both successful and failed prompt reads
+wait five minutes before the next automatic attempt. There is no manual refresh
+control. Sample age remains visible between reads.
+
+Prompt analysis accumulates each admitted prompt once rather than analyzing the
+whole sample after every file. The model publishes progress at most twice per
+second, plus initial/final counts. A fixed-height status slot prevents loading
+from shifting the findings; only the progress fill and short status transition
+animate, with those animations disabled under Reduce Motion.
+
+Website recordings use one compact caption identifying native sample data and
+preview version. Playback uses a small icon button with an accessible action
+name and tooltip; routine playback status is screen-reader-only. Reduced-motion,
+visibility pause and explicit user-pause behavior remain unchanged.
+
+### Visible website previews
+
+Native still images remain visible until a recording actually starts playing,
+and return if playback fails. The homepage introduces running activity,
+allowance, and usage distribution before describing local records, the saved
+ledger, and report views. Quota observations are a separate data path.
+
+### Single-accent preview contract
+
+Marketing previews use disposable preferences with Dark appearance and Lime
+`#D5F566`. `websitePreset()` supplies the canonical selection; the normal app
+still honors the user's saved mode and custom accent. Dashboard stills and
+motion render `DetailRoot`, not a parallel arrangement of its feature views.
+Compact previews render the shipping `QuickLiveView`. Page captures retain the
+shell; explicit light/layout fixtures remain diagnostic, not marketing assets.
+All SwiftUI render roots pass through AppearanceHost, including availability and
+welcome fixtures. All bitmap captures use AppearanceRendering to resolve AppKit
+colors in the hosting window's effective drawing appearance. Neither host system
+appearance nor old tool colors may introduce a second accent into a capture.
+
+Tests/Appearance checks palette compatibility, custom selection, rendered accent
+agreement under opposite host appearances, and hosting/capture boundaries.
+Tests/MenuBar checks all tool selections and Auto with competing legacy colors.
+
+### Dashboard container hierarchy
+
+Now, History, Cost, Accounts and Insights share the continuous adaptive native
+window canvas. Spacing and headings group metrics; native Dividers separate tool
+columns and accounts. Ordinary statistics, evidence text, account observations,
+contribution details and compact rows have no decorative background or border.
+Selected report choices and navigation retain their selection fill and keyboard
+focus; unselected choices have no fill. Approximation badges remain status
+markers. Warning surfaces remain bounded to distinguish degraded evidence from
+ordinary data. The menu-bar sample keeps its boundary because it previews a
+separate native surface. Chart tracks/fills encode magnitude, not containers.
+Native buttons, pickers, sheets and popovers retain system chrome.
+
+### Persistent integrity, disclosed detail
+
+Every affected History, Cost and Insights result keeps a compact Data integrity
+status above its figures, with exact excluded/repaired record counts and a native
+Details button. Orange marks the warning icon; ordinary text stays adaptive.
+No filled warning rectangle or dismiss/silence action is shown for this status.
+Details opens a native sheet with both exact counts (including zero), every
+violation explanation, exclusion and downward-repair semantics, and the statement
+that nothing was deleted. Done/Escape closes only the sheet; the status remains
+while the report is affected. Clean reports render no warning. Insights uses the
+same status once and does not duplicate it inside its counting-method sheet.
+The ledger gate, report counts, exclusion rules and repaired totals are unchanged.
+
+### Control cardinality audit — 2026-09-12
+
+| Surface | Old → new | Reason |
+|---|---|---|
+| DashboardNavigation | Restrained selection capsule → retained | Persistent destination identity and arrow-key navigation already fit |
+| ChoiceRow | Custom button flow → native Picker with explicit caller-selected style | Native keyboard/selection semantics; option identity keyed by value |
+| History Measure | Four custom choices → segmented Picker | Four stable mutually exclusive measures |
+| History Compare | Six custom choices → menu Picker | Larger stable list, explicit Compare label |
+| Cost Compare | Two custom choices → segmented Picker | Models versus reasoning levels |
+| Shared period | Seven custom choices → menu Picker | Larger list; custom-date fields stay native and conditional |
+| Tool/model/account/reasoning filters | Dynamic button grids → menu Pickers | Data-dependent cardinality; missing selected values remain represented |
+| Search | Rounded TextField → NSSearchField | Native search and clear behavior, live binding retained |
+| Active filter removal | Bordered buttons → plain labeled actions | Commands, not additional choices |
+| Rate dates/service | Two/three custom choices → segmented Pickers | Stable valuation alternatives, no query change |
+| Appearance mode | Segmented Picker → retained | Three stable modes |
+| Accent presets | Four separate buttons → menu Picker with current Custom value | Includes custom selection without falsely selecting a preset |
+| Custom accent | ColorPicker → retained | Native color editing and saved custom values |
+| Contribution rows | Drill-down buttons → retained | Actually disclose selected record details; focus and chevrons remain |
+| Timeline and cost bars | Noninteractive chart/progress marks → retained | Magnitude, not navigation |
+
+ChoiceRow never switches style merely because a refreshed option count changes.
+Stable segments are explicitly opted into by their callers. Dynamic options use
+value identity rather than array positions. SearchField updates its existing
+native view and binding without resetting editing when the model value agrees.
+No query, pricing, metric, export, or persistence semantics change.
+
+## Surface responsibilities
+
+Each destination answers a distinct question for the product. Now owns current
+output rate, active work, allowance, projected exhaustion and freshness. History
+owns recorded token distribution over time and by task, model, account, tool and
+project. Cost owns valuation under explicit assumptions, coverage, unpriced
+usage, model/reasoning contribution and pricing evidence. Accounts owns current
+identity and allowance, supported by explicitly historical account/plan readings.
+Insights owns derived changes and evidence conditions, not another usage browser.
+
+| Repeated element and owner | Decision | Reason |
+| --- | --- | --- |
+| Insights usage timeline vs History timeline (`UsageInsightsView`) | REMOVE from Insights | History already supports period, measure and tool scope; the second chart added no inference. |
+| Insights top working directories vs History project comparison (`UsageInsightsView`) | REMOVE from Insights | Project attribution is a distribution question; History retains it with unattributed usage. |
+| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. No percentage for missing periods, unknown output counters or a zero baseline. |
+| Insights active days and busiest day (`UsageInsightsView`) | REMOVE | Descriptive summaries of the same History series, without evidence of an unusual condition. |
+| Insights peak context in counting details (`UsageInsightsView`) | MOVE to main evidence section | Known request context and its measurable-record count help interpret coverage. A maximum does not establish anomaly or predict exhaustion. |
+| Insights cached-input share (`UsageInsightsView`) | MOVE to counting details | Mechanism/context, not a primary insight or a savings claim. |
+| Cost time chart and model/reasoning contributions (`CostView`) vs History | KEEP | Dollar valuation excludes unpriced usage visibly; token distribution cannot answer the pricing question. |
+| Accounts quota remaining/reset and slope (`QuotaTrendCard`) vs Now | KEEP | Now gives a current operational summary. Accounts binds readings to identity and shows historical quota evidence, with saved readings labeled. |
+| History account attribution vs Accounts observations (`DetailView`, `SubscriptionView`) | KEEP | Recorded token attribution and current sign-in/allowance are different claims; historical unknowns must not inherit current identity. |
+| Shared integrity/freshness disclosures | KEEP | Each independently viewed result needs its evidence limitations. Compact status and native details avoid dominant repeated warning surfaces. |
+| Prompt sample (`PromptInsightsSection`) | KEEP | Sampled repeated instructions and time patterns do not appear in token History; sample limits and read failures remain explicit. |
+
+Insights compares recorded output, not productivity or subscription burn. Missing
+logs and changed source coverage can affect it. No new dominance, anomaly, or
+quota-burn claim is inferred without an appropriate comparable local baseline.
+
+### Now decision hierarchy
+
+Each live tool leads with activity and a numeric estimated output rate with its
+native s/m/h control, followed by reporting coverage and the report timestamp.
+Remaining quota and projected zero use full-width rows at the same 29-point
+numeric size as the rate, above the dial. The quota reading timestamp, reset,
+projection limitations and account/estimate details remain explicit.
+
+The tachometer remains a substantial 190-point-high instrument. Its dashboard
+arc is six points thick; it supplements the numeric decisions instead of
+containing their only readout. Before this refinement, a 210-point dial with a
+14-point arc preceded activity and smaller side-by-side quota figures. The new
+hierarchy uses native spacing and separators without adding cards. Plain activity
+actions avoid a system link color competing with the selected app accent.
+Measurement, adaptive bounds, animation, units, quota priority and projection
+rules remain owned by the existing models.
+
+### Product image and preview contract
+
+The canonical hero is one Now destination, rendered by ProductPreview through
+AppearanceHost and the shipping DetailRoot. It uses isolated synthetic data,
+a fixed fixture clock, Dark appearance and the marketing Lime accent. The hero fixture requires available rates and supported quota projections. Static
+captures disable animations through a transaction. History and Cost are separate
+secondary images, generated by CostPreview through the same shell. Never build
+a hand-styled dashboard imitation or assemble several full destinations into a
+single product image. Cost's default synthetic sample is fully priced; pricing
+assumptions and coverage remain visible. Defects belong only in explicitly named
+evidence demonstrations.
+
+| Path | Owner and role | Audit outcome |
+| --- | --- | --- |
+| `--render-preview` | ProductPreview → AppearanceHost → DetailRoot / Now | Canonical hero; fixed fixture/activity/report clock; no live reads. |
+| `--render-cost-preview` | CostPreview → AppearanceHost → DetailRoot / Cost | Replaced bare CostView capture with shipping shell; clean priced fixture. |
+| `--preview-cost`, `--preview-cost-navigation` | CostPreview → shipping Cost or Now shell | Interactive isolated counterparts; clean defaults and native controls. |
+| `--render-cost-preview --sample-history` | Same fixture → DetailRoot / History | Separate secondary image; no startup/import claim. |
+| `--render-compact-preview`, `--preview-tools` | ProductPreview → QuickLiveView or DetailRoot | Shipping compact/dashboard views; disposable preferences; explicit interactive variant. |
+| `--render-motion-preview` | ProductMotionPreview → DetailRoot / Now and MenuBarPresentation.combined | Two separate output streams, not a composite; fixed frame-indexed sample times. Real native animation scheduling may differ between hosts. |
+| `--render-pages-preview` | CostPreview → one DetailRoot destination per PNG | Default populated, fixed report clock; explicit partial/failed demonstrations. |
+| `--layout-matrix`, `--sample-light` | Native layout diagnostics | Explicit Light/Dark alternatives, each in its own image; never a mixed-theme hero. |
+| `--render-history-preview` | HistoryPreview → shipping History | Synthetic saved/import-in-progress behavior diagnostic; distinct from marketing History still. |
+| `--render-data-states` | DataStatePreview → native CostSummary or PromptInsightsSection | Split previous two-surface composition into sixteen separate diagnostic PNGs. Named states intentionally show warnings/loading; live read-age/progress text is not a marketing determinism guarantee. |
+| `--render-welcome`, `--preview-welcome` | FirstRunWelcome with AppearanceHost | Isolated onboarding diagnostic, not a dashboard product image. |
+| `scripts/encode-motion-preview.sh` | Native frame encoding only | No redraw or montage; Codex-only native frame 105 is the poster and frame 1359 anchors the settled loop. |
+| `site/public/dashboard-lime.png` | Canonical Now still | Regenerate through ProductPreview; no image-editing pass. |
+| `site/public/*-demo.png/mp4` | Native motion frames and encodes | Synthetic recordings only; no site-specific dashboard recreation. |
+
+`bash scripts/verify-product-previews.sh <new-directory>` renders each canonical
+still in two fresh processes and compares complete PNG bytes. This proves
+repeatability on the tested macOS/display environment; font rasterization across
+OS versions is not promised. Diagnostic async reads, relative-age text and native
+animation remain behavior checks rather than pixel-golden marketing artifacts.
+
+
+## Diagnostic evaluation and capture
+
+Diagnostic stills use the fixed UTC `PreviewFixture.date` for fixture values,
+Insights evaluation/read timestamps, account/menu calculations and relative ages.
+Production clocks remain live: evaluation-date environment values default to nil,
+and model clock dependencies default to `Date.init`. Isolated previews publish
+Insights explicitly and do not run the destination's automatic refresh task.
+Page fixtures wait for report and Insights publication before capture; an unmet
+settled condition fails rather than becoming a loading-state screenshot. Requested
+empty, partial and failed states remain explicit. Startup progress stays at its
+measured fixture fraction. Stills disable SwiftUI transactions, preserving the
+actual shipping destination views and AppearanceHost.
+
+Wall-clock deadlines remain appropriate for readiness timeouts and native layout
+pumping; they do not determine displayed fixture values. Motion's sample clock is
+frame index / 30. `--sample-receipts-only` on `--render-motion-preview` evaluates
+the same 1,920 samples without pacing or writing PNGs. Its `capture.json` is a
+sample receipt, not proof of native animation frame pixels. Native raster capture
+continues using SwiftUI/AppKit animation and wall-clock pacing. The repeat verifier
+compares diagnostic PNG bytes and sample receipts, and reports motion raster
+differences separately when `--motion-raster` is requested.

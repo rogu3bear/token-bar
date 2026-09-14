@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Privacy — Token Bar</title>
+    <link rel="icon" href="/token-bar-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="navigation wrap">
+      <a class="brand" href="/"
+        ><img src="/token-bar-icon.png" width="27" height="27" alt="" />Token Bar</a
+      >
+      <nav aria-label="Main navigation">
+        <a href="/feedback/">Feedback</a
+        ><a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
+      </nav>
+    </header>
+    <main class="wrap form-page prose" id="main" tabindex="-1">
+      <span class="eyebrow">WHAT GOES WHERE</span>
+      <h1>Privacy, in plain terms.</h1>
+      <p>
+        Token Bar is an independent open-source macOS utility. It does not
+        operate a hosted token-history service or add analytics to your prompts.
+      </p>
+      <h2>On your Mac</h2>
+      <p>
+        The app reads local Codex, Claude Code, Grok, and OpenCode usage records to build history. Supported activity readers use local counters to estimate
+        output speed. Codex account-bound quota readings use
+        the installed Codex app-server and your existing sign-in. Grok allowance uses the installed Grok agent and its existing sign-in. Local sign-in
+        observations can associate history with an account; these associations
+        are marked as inferred.
+      </p>
+      <p>
+        History, counter fingerprints, task identities, model names, account
+        observations, local file paths, and file checkpoints are stored under
+        <code>~/Library/Application Support/CodexTokenBar/</code>. Menu-bar
+        preferences use macOS preferences. Prompt insights read local prompt
+        text and compute summaries in memory. In the current source build,
+        the Insights page refreshes this sample automatically while open. The app does not upload
+        that prompt text or add it to its ledger.
+      </p>
+      <p>
+        Current source builds also read Claude Code’s local quota cache when it
+        matches the account and is fresh. If you choose Connect Claude Code, the
+        app adds its relay to the status line in your Claude Code user settings
+        (keeping any existing command, with a backup) and Claude Code then writes
+        its status JSON, including rate limits, to
+        <code>~/Library/Application Support/CodexTokenBar/claude-statusline.json</code>
+        after each turn; only the rate-limit fields are read. This does not read
+        Claude credentials or make a Claude quota request. The installed Codex app-server and Grok agent may contact
+        their providers using your existing sign-ins. Token Bar does not send your
+        usage history to the maintainer.
+      </p>
+      <h2>Keeping and removing local data</h2>
+      <p>
+        Saved counters and checkpoints let the app reuse previous work. They
+        remain on your Mac after the app is removed. To remove this data, quit
+        Token Bar and delete its CodexTokenBar support folder; this also removes
+        saved history and account observations. macOS preferences are stored
+        separately under <code>local.star.CodexTokenBar</code>. Original tool logs
+        belong to their respective tools and are not deleted by Token Bar.
+        Prompt summaries stay in memory for the running app; prompt text is not
+        saved to the usage ledger or request archive.
+      </p>
+      <h2>Private feedback</h2>
+      <p>
+        Opening Feedback sends only the app version to this website. You type
+        the report and contact email yourself. Submitting the form sends that
+        information through Cloudflare Pages to Resend for email delivery to the
+        maintainer. The email field is used as the reply-to address. It is not
+        added to a mailing list.
+      </p>
+      <p>
+        The website does not keep a separate feedback database. Your message
+        exists in the maintainer’s mailbox and in the email provider’s delivery
+        records under their retention settings. Contact the maintainer by
+        using the private feedback form or replying to a feedback response if you need help accessing or deleting a submitted message. Do not post contact details in a public issue. There is no app-enforced automatic mailbox deletion schedule. Provider request metadata may be processed for operation and
+        abuse prevention.
+      </p>
+      <h2>The public GitHub issue is separate</h2>
+      <p>
+        After email acceptance, the site offers a GitHub issue draft. It
+        contains your title, report, app version, and a random reference ID. The
+        dedicated email field is excluded. You review the draft and choose
+        whether to publish it on GitHub. Avoid putting private information into
+        report fields; a public issue can be read and copied by anyone.
+      </p>
+      <h2>Website services</h2>
+      <p>
+        Cloudflare serves the site and verifies feedback submissions using
+        Turnstile. GitHub hosts the source and release downloads. Resend
+        delivers feedback email. Those providers receive the information
+        necessary to perform their roles, including ordinary network/request
+        metadata. The site adds no advertising trackers or analytics scripts.
+      </p>
+      <p>
+        <a href="https://www.cloudflare.com/policies/privacy/"
+          >Cloudflare privacy policy</a
+        >
+        · <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Turnstile privacy addendum</a>
+        ·
+        <a href="https://resend.com/legal/privacy-policy"
+          >Resend privacy policy</a
+        >
+        ·
+        <a
+          href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+          >GitHub privacy statement</a
+        >
+      </p>
+      <h2>Your choices</h2>
+      <p>
+        You can use the local app without sending feedback. You can build it
+        from source, inspect its data handling, or submit an issue directly on
+        GitHub without supplying an email to this site. Exported CSV files may
+        contain account labels and task identifiers; share them deliberately.
+      </p>
+      <p>Last updated: September 13, 2026.</p>
+    </main>
+    <footer class="wrap">
+      <a href="/">← Back to Token Bar</a>
+      <nav aria-label="Footer">
+        <a href="/feedback/">Feedback</a
+        ><a href="/terms/">Terms</a><a href="https://github.com/rogu3bear/token-bar">Source ↗</a>
+      </nav>
+    </footer>
+  </body>
+</html>

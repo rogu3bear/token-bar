@@ -1,0 +1,16 @@
+{
+  "name": "token-bar-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test tests/",
+    "preview": "bun ../scripts/preview-site.mjs",
+    "build": "bun ../scripts/build-site.mjs"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

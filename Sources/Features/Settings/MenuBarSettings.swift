@@ -1,0 +1,275 @@
+import Observation
+import SwiftUI
+import ServiceManagement
+
+enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
+    case icon, activity, rate, quota, zero, dial
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .icon: return "App icon"
+        case .activity: return "Running chats and agents"
+        case .rate: return "Output rate"
+        case .quota: return "Quota remaining (%)"
+        case .dial: return "Speed dial"
+        case .zero: return "Projected zero"
+        }
+    }
+}
+struct MenuBarConfiguration: Codable, Equatable {
+    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .zero]
+    var enabled: Set<MenuBarPart> = [.dial, .rate, .quota]
+    var compact = false
+    var unit = "dashboard"
+    var separator = "  "
+    var tool: MenuBarTool? = .auto
+    func title(values: [MenuBarPart: String]) -> String {
+        let parts = order.filter { enabled.contains($0) }.compactMap { values[$0] }.filter { !$0.isEmpty }
+        return parts.isEmpty ? "◈" : parts.joined(separator: separator)
+    }
+    mutating func normalize() {
+        if tool == nil { tool = .auto }
+        var seen = Set<MenuBarPart>()
+        order = (order + MenuBarPart.allCases).filter { seen.insert($0).inserted }
+        if !["dashboard", "s", "m", "h"].contains(unit) { unit = "dashboard" }
+        if ![" · ", " | ", "  "].contains(separator) { separator = " · " }
+    }
+}
+@Observable final class MenuBarPreferences {
+    var configuration: MenuBarConfiguration { didSet { save() } }
+    private let defaults: UserDefaults
+    private let key = "menuBarConfiguration.v1"
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        var loaded = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(MenuBarConfiguration.self, from: $0) } ?? MenuBarConfiguration()
+        loaded.normalize(); configuration = loaded
+    }
+    private func save() {
+        if let data = try? JSONEncoder().encode(configuration) { defaults.set(data, forKey: key) }
+    }
+    func move(_ part: MenuBarPart, by offset: Int) {
+        guard let index = configuration.order.firstIndex(of: part), configuration.order.indices.contains(index + offset) else { return }
+        configuration.order.swapAt(index, index + offset)
+    }
+    func reset() { configuration = MenuBarConfiguration() }
+}
+struct MenuBarPresentation {
+    /// One presentation owner for the real status item and settings preview.
+    static func combined(_ settings: MenuBarConfiguration, codex: Tachometer, claude: Tachometer, grok: Tachometer,
+                         monitor: LiveMonitor, now: Date, palette: ToolPalette, claudeQuota: ToolQuotaState, grokQuota: ToolQuotaState = ToolQuotaState()) -> NSAttributedString {
+        let auto = (settings.tool ?? .auto) == .auto
+        let selected = (settings.tool ?? .auto).resolve(codex: codex, claude: claude, grok: grok)
+        func meter(_ tool: LiveTool) -> Tachometer { tool == .grok ? grok : tool == .claude ? claude : codex }
+        let tools = auto ? LiveTool.visible(codex: codex, claude: claude, grok: grok) : [selected]
+        func appendQuota(_ result: NSMutableAttributedString, tools: [LiveTool]) {
+            guard settings.enabled.contains(.quota) else { return }
+            for tool in tools {
+                if auto && tool == .grok && !hasQuotaReading(.grok, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) { continue }
+                let text = values(settings, meter: meter(tool), monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota)[.quota] ?? ""
+                result.append(NSAttributedString(string: settings.separator + text,
+                    attributes: [.foregroundColor: NSColor(tool.color(in: palette)), .font: NSFont.systemFont(ofSize: 12)]))
+            }
+        }
+        if tools.count <= 1 {
+            let tool = tools.first ?? selected
+            var speed = settings
+            let grokAuto = auto && tool == .grok
+            let grokHasQuota = hasQuotaReading(.grok, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota)
+            if grokAuto && !grokHasQuota {
+                speed.enabled.remove(.quota)
+                speed.enabled.remove(.zero)
+            }
+            let result = NSMutableAttributedString(attributedString: attributed(speed, meter: meter(tool), monitor: monitor, now: now,
+                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota))
+            if grokAuto && !grokHasQuota {
+                let labeled = [LiveTool.codex, .claude].filter { hasQuotaReading($0, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) }
+                appendQuota(result, tools: labeled)
+                if settings.enabled.contains(.zero), labeled.count == 1, let qtool = labeled.first {
+                    let zero = values(settings, meter: meter(qtool), monitor: monitor, now: now, tool: qtool, claudeQuota: claudeQuota, grokQuota: grokQuota)[.zero] ?? ""
+                    if !zero.hasSuffix("—") {
+                        result.append(NSAttributedString(string: settings.separator + zero,
+                            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular), .foregroundColor: NSColor.labelColor]))
+                    }
+                }
+            }
+            return result
+        }
+        let total = Tachometer()
+        total.unit = meter(selected).unit
+        total.rawRate = tools.reduce(0) { $0 + (meter($1).hasRate ? meter($1).rawRate : 0) }
+        total.rate = total.rawRate
+        total.hasRate = tools.contains { meter($0).hasRate }
+        total.scale = RateBounds.fitting([total.rawRate]).upper
+        for tool in tools {
+            total.activity.turns.merge(meter(tool).activity.turns) { first, _ in first }
+        }
+        total.activity.readAt = now
+        var summary = settings
+        summary.enabled.remove(.quota)
+        summary.enabled.remove(.zero) // A cross-provider exhaustion time has no meaning.
+        let partial = tools.contains { !meter($0).hasRate }
+        let result = NSMutableAttributedString(string: partial ? "Total (partial) · " : "Total · ", attributes: [.foregroundColor: NSColor.labelColor])
+        result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent)))
+        appendQuota(result, tools: tools)
+        return result
+    }
+    static func quotaState(for tool: LiveTool?, monitor: LiveMonitor, claudeQuota: ToolQuotaState?, grokQuota: ToolQuotaState? = nil) -> ToolQuotaState {
+        if tool == .grok { return grokQuota ?? ToolQuotaState() }
+        if tool == .claude { return claudeQuota ?? ToolQuotaState() }
+        let account = monitor.currentID.flatMap { monitor.state.accounts[$0] }
+        return ToolQuotaState(readings: account?.quotas ?? [], samples: monitor.state.samples)
+    }
+    static func hasQuotaReading(_ tool: LiveTool, monitor: LiveMonitor, now: Date, claudeQuota: ToolQuotaState?, grokQuota: ToolQuotaState? = nil) -> Bool {
+        let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
+        return Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon) != nil
+    }
+    static func values(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, labelQuota: Bool = true) -> [MenuBarPart: String] {
+        let unit = RateUnit(rawValue: settings.unit) ?? meter.unit
+        let amount = meter.rawRate * unit.multiplier
+        let formatted = unit != .second && amount >= 1_000
+            ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
+        let rate = meter.hasRate ? "~" + formatted : "—"
+        let activity = meter.activity
+        let counts = "\(activity.chatCount)c \(activity.agentCount)a"
+            + (activity.unknownCount > 0 ? " \(activity.unknownCount)?" : "")
+            + (activity.uncertain > 0 ? " \(activity.uncertain) unconfirmed" : "")
+        let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
+        let quota = Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon)
+        let estimate = quota.map { Runway.estimate($0, samples: state.samples, now: now, horizon: state.horizon) }
+        let remaining = estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
+        let zero = estimate?.exhaustion.map { Runway.clockLabel($0, now: now) } ?? "—"
+        // A single-tool title already establishes identity for all its fields.
+        // Standalone quotas in Auto's mixed-tool readout still need their name.
+        let quotaName = labelQuota ? tool?.label : nil
+        return [
+            .icon: "◈", .activity: settings.compact && activity.readAt != nil ? counts : meter.status,
+            .rate: rate + " tok/" + unit.rawValue,
+            .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
+            .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue
+        ]
+    }
+    static func title(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> String {
+        (tool.map { $0.label + " · " } ?? "") + settings.title(values: values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false))
+    }
+    static func attributed(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, accent: NSColor? = nil, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> NSAttributedString {
+        let accent = accent ?? .labelColor
+        let values = values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false)
+        let result = NSMutableAttributedString()
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular), .foregroundColor: NSColor.labelColor]
+        if let tool {
+            result.append(NSAttributedString(string: tool.label, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: accent]))
+        }
+        for part in settings.order where settings.enabled.contains(part) {
+            if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
+            if part == .dial {
+                result.append(MenuBarDial.attributed(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
+                    available: meter.hasRate, accent: accent, identity: tool?.rawValue ?? "combined"))
+            } else {
+                var partAttributes = attributes
+                if part == .icon || part == .quota { partAttributes[.foregroundColor] = accent }
+                result.append(NSAttributedString(string: values[part] ?? "—", attributes: partAttributes))
+            }
+        }
+        if result.length == 0 || !settings.order.contains(where: { settings.enabled.contains($0) }) {
+            if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
+            var iconAttributes = attributes
+            iconAttributes[.foregroundColor] = accent
+            result.append(NSAttributedString(string: "◈", attributes: iconAttributes))
+        }
+        return result
+    }
+
+}
+struct MenuBarSettingsView: View {
+    @Environment(\.presentationClock) private var clock
+    var allowsSystemSettings = false
+    @Environment(\.appAccent) private var accent
+    @Environment(\.evaluationDate) private var evaluationDate
+    @Environment(\.toolPalette) private var palette
+    @Bindable var preferences: MenuBarPreferences
+    @Bindable var meter: Tachometer
+    @Bindable var claudeMeter: Tachometer
+    @Bindable var grokMeter: Tachometer
+    @Bindable var monitor: LiveMonitor
+    @Bindable var claudeQuota: ClaudeQuotaMonitor
+    @Bindable var grokQuota: GrokQuotaMonitor
+    var claudeConnection: ClaudeConnectionModel? = nil
+    @State private var launchAtLogin = false
+    @State private var loginError: String?
+    @State private var reordering = false
+    var body: some View {
+        SettingsPage {
+            VStack(alignment: .leading, spacing: PageStyle.section) {
+                PageHeader("Menu bar", subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
+                Group {
+                    let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
+                        monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota)
+                    MenuBarPreview(value: presentation)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .lineLimit(3).frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+                        .padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                        .accessibilityLabel(presentation.string)
+                }
+                Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
+                    ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
+                }.pickerStyle(.segmented)
+                Text("Codex, Claude and Grok. Auto follows active speed. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota is unavailable.").font(.caption).foregroundStyle(.secondary)
+                Picker("Rate units", selection: $preferences.configuration.unit) {
+                    Text("Follow selected tool").tag("dashboard")
+                    Text("Tokens / second").tag("s")
+                    Text("Tokens / minute").tag("m")
+                    Text("Tokens / hour").tag("h")
+                }.pickerStyle(.segmented)
+                Text("Follow selected tool uses its dashboard unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
+                DetailSheet("Customize") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Toggle("Reorder fields", isOn: $reordering)
+                        VStack(spacing: 12) {
+                            ForEach(preferences.configuration.order) { part in
+                                HStack {
+                                    Toggle(part.label, isOn: Binding(get: { preferences.configuration.enabled.contains(part) }, set: { enabled in
+                                        if enabled { preferences.configuration.enabled.insert(part) }
+                                        else { preferences.configuration.enabled.remove(part) }
+                                    }))
+                                    Spacer()
+                                    if reordering {
+                                        Button { preferences.move(part, by: -1) } label: { Image(systemName: "arrow.up") }
+                                            .disabled(preferences.configuration.order.first == part).accessibilityLabel("Move \(part.label) earlier")
+                                        Button { preferences.move(part, by: 1) } label: { Image(systemName: "arrow.down") }
+                                            .disabled(preferences.configuration.order.last == part).accessibilityLabel("Move \(part.label) later")
+                                    }
+                                }
+                            }
+                        }
+                        Toggle("Compact labels", isOn: $preferences.configuration.compact)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Picker("Separator", selection: $preferences.configuration.separator) {
+                                Text("Dot ·").tag(" · ")
+                                Text("Line |").tag(" | ")
+                                Text("Space").tag("  ")
+                            }.pickerStyle(.segmented)
+                        }
+                        Text("The dial follows the dashboard’s automatic range. Quota remaining is the prioritized subscription quota, not a token balance. c = chats, a = agents. Unconfirmed activity stays labeled. With every field off, the app icon remains available. A shorter selection leaves more room for other menu-bar apps.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.padding(.top, 12)
+                }
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .disabled(!allowsSystemSettings)
+                    .onAppear { if allowsSystemSettings { launchAtLogin = SMAppService.mainApp.status == .enabled } }
+                    .onChange(of: launchAtLogin) { _, enabled in
+                        guard allowsSystemSettings, enabled != (SMAppService.mainApp.status == .enabled) else { return }
+                        do {
+                            if enabled { try SMAppService.mainApp.register() }
+                            else { try SMAppService.mainApp.unregister() }
+                            loginError = nil
+                        } catch { loginError = error.localizedDescription }
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                if let loginError { ErrorNotice(message: loginError) }
+                if let claudeConnection { ClaudeConnectionControl(model: claudeConnection) }
+                DetailSheet("Local data and permissions") { LocalAccessExplanation().padding(.top, 8) }
+                Button("Restore defaults") { preferences.reset() }
+            }
+        }
+    }
+}

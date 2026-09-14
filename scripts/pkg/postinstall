@@ -1,0 +1,12 @@
+#!/bin/bash
+# Runs as root after the payload is written.
+#
+# Registers the freshly installed bundle with Launch Services so the system
+# resolves this bundle identifier to /Applications and not to a stale copy left
+# in a downloads or archive folder. Nothing outside /Applications is touched:
+# removing a user's files is not the installer's business, and the app reports
+# any other copy it finds instead.
+set -u
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+[ -x "$LSREGISTER" ] && "$LSREGISTER" -f "/Applications/Token Bar.app" >/dev/null 2>&1
+exit 0

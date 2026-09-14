@@ -1,0 +1,24 @@
+#!/bin/bash
+# Stop only the executable this package replaces. No Apple Events permission,
+# launch-by-identifier, force-kill, or termination of unrelated development copies.
+set -u
+if [ "${3:-/}" != "/" ]; then
+    echo "Token Bar must be installed on the running startup volume." >&2
+    exit 1
+fi
+target="/Applications/Token Bar.app/Contents/MacOS/TokenBar"
+for pid in $(/usr/bin/pgrep -x TokenBar 2>/dev/null || true); do
+    command=$(/bin/ps -p "$pid" -o comm= 2>/dev/null) || continue
+    [ "$command" = "$target" ] || continue
+    /bin/kill -TERM "$pid" 2>/dev/null || true
+    waited=0
+    while /bin/kill -0 "$pid" 2>/dev/null; do
+        if [ "$waited" -ge 10 ]; then
+            echo "Quit Token Bar in Applications, then run this installer again. No files were replaced." >&2
+            exit 1
+        fi
+        /bin/sleep 1
+        waited=$((waited + 1))
+    done
+done
+exit 0
