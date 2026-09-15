@@ -2,7 +2,7 @@ import SwiftUI
 
 enum LiveTool: String, Codable, CaseIterable, Identifiable {
     case codex, claude, grok
-    static let liveCoverage = "Codex quota uses the installed app-server. Claude quota uses a fresh account-matched local cache. Grok remaining uses the installed Grok agent’s billing reading. Grok activity follows locally open sessions and recent summary updates; its speed uses successive usage.json output counts."
+    static let liveCoverage = "Codex quota uses the installed app-server. Claude quota uses an account-matched local cache that the installed Claude Code refreshes every 15 minutes. Grok remaining uses the installed Grok agent’s billing reading. Grok activity follows locally open sessions and recent summary updates; its speed uses successive usage.json output counts."
     static let compactCoverage = "Popover: name, rate, remaining. Click a row for reset and projected zero. Today’s token bar uses recorded usage only."
     static func active(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         var tools: [LiveTool] = []

@@ -3,7 +3,7 @@ import SwiftUI
 import ServiceManagement
 
 enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
-    case icon, activity, rate, quota, zero, dial, risk
+    case icon, activity, rate, quota, zero, dial, risk, fable, fablePace
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -14,11 +14,13 @@ enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
         case .quota: return "Quota remaining (%)"
         case .dial: return "Speed dial"
         case .zero: return "Projected zero"
+        case .fable: return "Fable quota (tightest Claude limit)"
+        case .fablePace: return "Fable time left at recent pace"
         }
     }
 }
 struct MenuBarConfiguration: Codable, Equatable {
-    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .zero, .risk]
+    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .fable, .fablePace, .zero, .risk]
     var enabled: Set<MenuBarPart> = [.dial, .rate, .quota]
     var compact = false
     var unit = "dashboard"
@@ -110,7 +112,7 @@ struct MenuBarPresentation {
         summary.enabled.remove(.zero) // A cross-provider exhaustion time has no meaning.
         let partial = tools.contains { !meter($0).hasRate }
         let result = NSMutableAttributedString(string: partial ? "Total (partial) · " : "Total · ", attributes: [.foregroundColor: NSColor.labelColor])
-        result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent), riskText: riskText))
+        result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent), claudeQuota: claudeQuota, riskText: riskText))
         appendQuota(result, tools: tools)
         return result
     }
@@ -142,11 +144,18 @@ struct MenuBarPresentation {
         // A single-tool title already establishes identity for all its fields.
         // Standalone quotas in Auto's mixed-tool readout still need their name.
         let quotaName = labelQuota ? tool?.label : nil
+        // Fable names itself and follows Claude's account whichever tool is selected.
+        let fable = claudeQuota.flatMap { ClaudeQuotaSource.fableBudget($0, now: now) }
+        let pace = claudeQuota.flatMap { ClaudeQuotaSource.fablePace($0, now: now) }
+        let paceName = settings.enabled.contains(.fable) ? "" : "Fable "
         return [
             .icon: "◈", .activity: settings.compact && activity.readAt != nil ? counts : meter.status,
             .rate: rate + " tok/" + unit.rawValue,
             .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
-            .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue
+            .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue,
+            .fable: fable.map { String(format: "Fable %.0f%% · ", $0.remaining) + $0.binding } ?? "Fable quota unavailable",
+            // Beside the Fable figure the projection needs no name; an enabled figure already states an unknown budget.
+            .fablePace: pace.map { paceName + $0.menuText } ?? (settings.enabled.contains(.fable) ? "" : "Fable time left unavailable")
         ]
     }
     static func title(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> String {
@@ -162,15 +171,19 @@ struct MenuBarPresentation {
         }
         for part in settings.order where settings.enabled.contains(part) {
             if part == .risk && riskText == nil { continue }
+            if part == .fablePace && (values[part] ?? "").isEmpty { continue }
             if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
             if part == .risk {
                 result.append(NSAttributedString(string: riskText ?? "", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
+            } else if part == .fablePace {
+                // Smaller and secondary: a projection beside the measured figure.
+                result.append(NSAttributedString(string: values[part] ?? "", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]))
             } else if part == .dial {
                 result.append(MenuBarDial.attributed(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
                     available: meter.hasRate, accent: accent, identity: tool?.rawValue ?? "combined"))
             } else {
                 var partAttributes = attributes
-                if part == .icon || part == .quota { partAttributes[.foregroundColor] = accent }
+                if part == .icon || part == .quota || part == .fable { partAttributes[.foregroundColor] = accent }
                 result.append(NSAttributedString(string: values[part] ?? "—", attributes: partAttributes))
             }
         }
@@ -254,7 +267,7 @@ struct MenuBarSettingsView: View {
                                 Text("Space").tag("  ")
                             }.pickerStyle(.segmented)
                         }
-                        Text("The dial follows the dashboard’s automatic range. Quota remaining is the prioritized subscription quota, not a token balance. c = chats, a = agents. Unconfirmed activity stays labeled. With every field off, the app icon remains available. A shorter selection leaves more room for other menu-bar apps.")
+                        Text("The dial follows the dashboard’s automatic range. Quota remaining is the prioritized subscription quota, not a token balance. Fable quota is the lowest remaining of Claude’s 5-hour, weekly and Fable weekly limits, named by the limit that binds, and is unavailable when any of them is missing or stale. Fable time left projects when the first of those limits runs out at the average burn of recent hours, weighted toward recent use; it needs 30 minutes of readings. c = chats, a = agents. Unconfirmed activity stays labeled. With every field off, the app icon remains available. A shorter selection leaves more room for other menu-bar apps.")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.top, 12)
                 }

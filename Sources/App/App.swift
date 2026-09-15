@@ -157,7 +157,10 @@ import ServiceManagement
         // adds it to Claude Code's status line; absent means cache-only readings.
         let claudeRelay = previewRoot.map { $0.appendingPathComponent("claude-statusline.json") }
             ?? support.appendingPathComponent("CodexTokenBar/claude-statusline.json")
-        claudeQuota = ClaudeQuotaMonitor(cacheURL: claudeConfig, relayURL: claudeRelay)
+        // Previews never start the installed Claude Code; the app asks it to refresh
+        // its own usage cache every quarter hour from an empty private directory.
+        claudeQuota = ClaudeQuotaMonitor(cacheURL: claudeConfig, relayURL: claudeRelay,
+            refreshDirectory: previewRoot == nil ? support.appendingPathComponent("CodexTokenBar/claude-usage-refresh") : nil)
         if previewRoot == nil {
             claudeConnection = ClaudeConnectionModel(settingsURL: ClaudeStatuslineConnection.settingsURL(),
                                                      relayURL: ClaudeStatuslineConnection.stableRelayURL(support: support),

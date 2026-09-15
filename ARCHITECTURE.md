@@ -22,7 +22,7 @@ not application state or UI code.
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
 | `ActivityFeed`, `Activity`, `ClaudeActivityReader`, `Tachometer` | tool-scoped tasks, counter deltas, independent dials | in-memory |
-| `ClaudeQuotaMonitor`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; no credential or network access | In-memory quota samples; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
+| `ClaudeQuotaMonitor`, `ClaudeUsageRefresh`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon, refreshed by the installed Claude Code every 15 minutes; model-scoped weekly rows (Fable) kept apart for the menu-bar roll-up; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; Token Bar reads no credential and makes no network request itself | In-memory quota samples; empty private `claude-usage-refresh/` working directory; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
 | `GrokQuotaMonitor` | JSON-RPC to `grok agent --no-leader stdio`, `_x.ai/billing` | In-memory quota samples only |
 | `LiveMonitor`, `LiveStateStore`, `ProviderUsage`, `CodexInstallation` | JSON-RPC to `codex app-server --stdio` for quota, plan, account usage | `live-accounts.sqlite`; legacy JSON retained for migration/rollback |
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
@@ -158,10 +158,27 @@ fake adapter for permission, submission, delivery and action routing.
 5. Grok remaining uses the installed `grok agent --no-leader stdio` process:
    `initialize`, then `_x.ai/billing`. No session is created. Used percent and
    period end map to a Grok-labeled reading; missing fields stay unavailable.
-6. Claude remaining uses the passive cache whose own account matches
-   `oauthAccount` in `~/.claude.json`. Claude Code's `cachedUsageUtilization`
-   is refreshed only
-   on demand (session start, its usage screen). `Assets/claude-statusline-relay.sh`
+6. Claude remaining uses the cache whose own account matches
+   `oauthAccount` in `~/.claude.json`. Claude Code rewrites
+   `cachedUsageUtilization` on demand (session start, its usage screen) and
+   after a successful usage fetch. At launch and every 15 minutes,
+   `ClaudeUsageRefresh` runs the installed `claude -p` in stream-json mode from
+   an empty private directory, with project-only setting sources, no MCP
+   servers, skills or session persistence, and telemetry, error reporting and
+   auto-update disabled, then sends one experimental `get_usage` control
+   request. The reply is undated and can come from saved data when the fetch
+   is rate limited, so it is ignored; only the rewritten cache's account and
+   `fetchedAtMs` date a reading. Model-scoped weekly rows in the cache's
+   `limits[]` (`weekly_scoped`, such as Fable) stay out of the prioritized Claude
+   allowance and Quota Guard. The opt-in Fable quota menu-bar field shows the
+   lowest remaining among the current 5-hour, weekly and Fable weekly readings,
+   named by the binding limit; any missing, stale or other-account input makes it
+   unavailable. The opt-in time-left field keeps up to four hours of the signed-in
+   account's readings in process memory and projects each limit at its
+   time-weighted average burn (one-hour half-life, restarting at a reset, at least
+   30 minutes of readings); it shows the earliest exhaustion that precedes that
+   limit's reset. Claude Code reports resets with sub-second noise that differs
+   between fetches, so reset times keep whole seconds. `Assets/claude-statusline-relay.sh`
    ships in `Contents/Resources`; at launch `ClaudeConnectionModel` copies it,
    when its bytes differ, to a stable path in the support directory so the
    settings entry survives moving the app. **Connect Claude Code** (Claude
@@ -222,9 +239,13 @@ pin this choice.
   Claude streams into live activity; OpenCode remains history-only.
 - Pricing covers OpenAI models only. Anthropic, local, and free models stay
   unpriced by design until a dated rate card exists.
-- Codex quota uses the app-server. Claude quota reads only account-matched
-  local files: Claude Code's account-matched usage cache. The status-line relay
-  only proves connection transport; its quota observations have no identity.
+- Codex quota uses the app-server. Claude quota reads only Claude Code's
+  account-matched usage cache, which the installed Claude Code rewrites after
+  Token Bar's quarter-hour `get_usage` request. That request, its reply and the
+  cache's `limits[]` rows are undocumented, experimental Claude Code interfaces
+  (verified with 2.1.272); a changed shape leaves Claude quota and the Fable
+  roll-up unavailable. The status-line relay only proves connection transport;
+  its quota observations have no identity.
   Grok remaining uses the installed Grok
   agent’s `_x.ai/billing` reading. OpenCode has no quota integration.
 - Grok counters come from `usage.json`. Live activity uses

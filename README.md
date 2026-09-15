@@ -75,14 +75,20 @@ build steps below. Local development packages are not notarized. See
 | Tool | Usage history | Estimated output speed | Account allowance |
 | --- | --- | --- | --- |
 | Codex | Yes | Yes | Supported signed-in accounts |
-| Claude Code | Yes | Yes | Fresh, account-matched local usage cache |
+| Claude Code | Yes | Yes | Account-matched usage cache, refreshed by installed Claude Code every 15 minutes |
 | Grok | Yes | When live session counters are available | Installed agent's billing reading |
 | OpenCode | Yes | Unavailable | Unavailable |
 
 Each reading depends on what the installed tool exposes. Missing, stale and
-unsupported values remain unavailable. Claude Code refreshes its usage cache on
-demand; after-turn account allowance refresh is not available. The optional
-Claude status-line connection does not supply account-bound quota.
+unsupported values remain unavailable. Token Bar asks the installed Claude Code
+to refresh its account usage every 15 minutes; between refreshes, readings show
+their age. The optional Claude status-line connection does not supply
+account-bound quota. The optional **Fable quota** menu-bar field shows the lowest
+remaining of Claude's 5-hour, weekly and Fable weekly limits and names the limit
+that binds; it is unavailable when any of them is missing or stale. An optional,
+smaller **time left** field projects when the first of those limits runs out at
+the average burn of recent hours, weighted toward recent use. It needs 30 minutes
+of readings after launch or a reset, and says so while it learns.
 
 Speed is estimated from token-counter changes over time. Token totals are
 input plus output; cached input and reasoning are already included in those

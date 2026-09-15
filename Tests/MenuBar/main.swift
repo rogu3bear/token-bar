@@ -28,7 +28,7 @@ var older = MenuBarConfiguration()
 older.enabled = [.activity, .rate]
 older.order = [.icon, .activity, .rate, .quota, .zero]
 older.normalize()
-assert(older.order.suffix(2) == [.dial, .risk] && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
+assert(older.order.suffix(4) == [.dial, .risk, .fable, .fablePace] && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
 restored.configuration.enabled = [.dial, .quota]
 assert(MenuBarPreferences(defaults: defaults).configuration.enabled == [.dial, .quota])
 assert(MenuBarDial.fraction(value: 150, minimum: 100, maximum: 200) == 0.5)
@@ -589,4 +589,271 @@ do {
     assert(AccountQuotaPresentation.visible([]).isEmpty)
     assert(try! encoder.encode(account) == stored, "Presentation must preserve stored quota evidence")
     print("PASS: Accounts & plans omits exact Spark bucket in both windows, preserves unrelated allowances and raw observations")
+}
+
+// Model-scoped weekly windows and the Fable roll-up: the tightest current limit, named, never a sum.
+func claudeLimitsCache(session: Double = 32, week: Double = 8, fable: Double? = 8, model: String = "Fable",
+                       at base: Date = cacheNow, age: Double = 0, fableReset: Double = 6 * 86400, rawLimits: Any? = nil) throws -> Data {
+    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    // Claude Code writes microsecond fractions with a numeric offset.
+    func stamp(_ offset: Double) -> String { String(iso.string(from: base.addingTimeInterval(offset)).dropLast()) + "456+00:00" }
+    var limits: [[String: Any]] = [["kind": "session", "group": "session", "percent": session, "resets_at": stamp(14400), "scope": NSNull()],
+                                   ["kind": "weekly_all", "group": "weekly", "percent": week, "resets_at": stamp(6 * 86400), "scope": NSNull()]]
+    if let fable {
+        limits.append(["kind": "weekly_scoped", "group": "weekly", "percent": fable, "resets_at": stamp(fableReset),
+                       "scope": ["model": ["id": NSNull(), "display_name": model], "surface": NSNull()]])
+    }
+    let utilization: [String: Any] = ["five_hour": ["utilization": session, "resets_at": stamp(14400)],
+                                      "seven_day": ["utilization": week, "resets_at": stamp(6 * 86400)],
+                                      "limits": rawLimits ?? limits]
+    return try JSONSerialization.data(withJSONObject: ["oauthAccount": ["accountUuid": "a"],
+        "cachedUsageUtilization": ["accountUuid": "a", "fetchedAtMs": base.addingTimeInterval(-age).timeIntervalSince1970 * 1000, "utilization": utilization]])
+}
+func claudeState(_ data: Data, now date: Date = cacheNow) throws -> ToolQuotaState {
+    let cache = try JSONDecoder().decode(ClaudeQuotaCache.self, from: data)
+    let readings = cache.readings(now: date)
+    return ToolQuotaState(readings: readings, samples: readings, horizon: ClaudeQuotaSource.horizon,
+                          guardAccountID: readings.first?.accountID, guardAuthenticated: readings.first != nil, scoped: cache.scopedReadings(now: date))
+}
+do {
+    typealias Budget = ClaudeQuotaSource.FableBudget
+    let bound = try claudeState(try claudeLimitsCache())
+    assert(bound.readings.map(\.window) == ["five_hour", "seven_day"], "Scoped windows never join the prioritized Claude allowance or Quota Guard")
+    assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == 10080)
+    assert(abs(bound.scoped[0].reset.timeIntervalSince(cacheNow.addingTimeInterval(6 * 86400))) < 0.01, "Microsecond reset stamps parse")
+    // Assertions evaluate lazily and cannot throw, so fixtures are decoded first.
+    let weekBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 20))
+    let fableBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 75))
+    let fableExhausted = try claudeState(try claudeLimitsCache(fable: 100))
+    let noFable = try claudeState(try claudeLimitsCache(fable: nil))
+    let otherModel = try claudeState(try claudeLimitsCache(model: "Sonnet"))
+    assert(ClaudeQuotaSource.fableBudget(bound, now: cacheNow) == Budget(remaining: 68, binding: "5h"))
+    assert(ClaudeQuotaSource.fableBudget(weekBinds, now: cacheNow) == Budget(remaining: 60, binding: "week"))
+    assert(ClaudeQuotaSource.fableBudget(fableBinds, now: cacheNow) == Budget(remaining: 25, binding: "Fable week"))
+    assert(ClaudeQuotaSource.fableBudget(fableExhausted, now: cacheNow) == Budget(remaining: 0, binding: "Fable week"), "Exhaustion is a measured zero")
+    // Missing, other-model, stale, reset, switched or failed inputs leave the budget unknown.
+    assert(ClaudeQuotaSource.fableBudget(noFable, now: cacheNow) == nil)
+    assert(ClaudeQuotaSource.fableBudget(otherModel, now: cacheNow) == nil)
+    assert(ClaudeQuotaSource.fableBudget(bound, now: cacheNow.addingTimeInterval(ClaudeQuotaSource.horizon)) == nil)
+    let resetting = try claudeState(try claudeLimitsCache(fableReset: 60))
+    assert(ClaudeQuotaSource.fableBudget(resetting, now: cacheNow) != nil && ClaudeQuotaSource.fableBudget(resetting, now: cacheNow.addingTimeInterval(60)) == nil)
+    var switchedAccount = bound; switchedAccount.guardAccountID = ClaudeQuotaSource.accountID("b")
+    assert(ClaudeQuotaSource.fableBudget(switchedAccount, now: cacheNow) == nil)
+    var failedRead = bound; failedRead.guardFailed = true
+    assert(ClaudeQuotaSource.fableBudget(failedRead, now: cacheNow) == nil)
+    let malformed = try claudeState(try claudeLimitsCache(rawLimits: [["kind": "weekly_scoped", "percent": "high"]]))
+    assert(malformed.readings.count == 2 && malformed.scoped.isEmpty, "A malformed limits list drops only scoped readings")
+    // The field names Fable rather than a tool, so single-tool identity and the one-accent rule still hold.
+    var fableMenu = MenuBarConfiguration(); fableMenu.enabled = [.rate, .fable]
+    assert(!MenuBarConfiguration().enabled.contains(.fable), "Fable quota is opt-in; default and saved selections are unchanged")
+    assert(MenuBarPresentation.values(fableMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: bound)[.fable] == "Fable 68% · 5h")
+    assert(MenuBarPresentation.values(fableMenu, meter: meter, monitor: monitor, now: cacheNow)[.fable] == "Fable quota unavailable")
+    assert(MenuBarPresentation.values(fableMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: noFable)[.fable] == "Fable quota unavailable")
+    fableMenu.tool = .codex
+    let codexWithFable = MenuBarPresentation.combined(fableMenu, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
+        monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
+    assert(codexWithFable.string.hasPrefix("Codex") && codexWithFable.string.hasSuffix("Fable 68% · 5h"), codexWithFable.string)
+    fableMenu.tool = .auto
+    let totalWithFable = MenuBarPresentation.combined(fableMenu, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
+        monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
+    assert(totalWithFable.string.hasPrefix("Total") && totalWithFable.string.components(separatedBy: "Fable 68% · 5h").count == 2, totalWithFable.string)
+    print("PASS: Claude model-scoped weekly rows, microsecond resets and the Fable tightest-limit roll-up across selections; missing or stale inputs stay unavailable")
+}
+
+// Installed Claude Code usage refresh: one quiet request per quarter hour, a bounded child, and cache-only trust.
+do {
+    assert(ClaudeUsageRefresh.interval == 900)
+    assert(ClaudeUsageRefresh.isDue(lastAttempt: nil, now: cacheNow))
+    assert(!ClaudeUsageRefresh.isDue(lastAttempt: cacheNow.addingTimeInterval(-899), now: cacheNow))
+    assert(ClaudeUsageRefresh.isDue(lastAttempt: cacheNow.addingTimeInterval(-900), now: cacheNow))
+    assert(ClaudeUsageRefresh.isDue(lastAttempt: cacheNow.addingTimeInterval(60), now: cacheNow), "A clock rollback cannot suppress the refresh")
+    let arguments = ClaudeUsageRefresh.arguments
+    assert(["-p", "--no-session-persistence", "--strict-mcp-config", "--disable-slash-commands"].allSatisfy { arguments.contains($0) })
+    assert(arguments.firstIndex(of: "--setting-sources").map { arguments[$0 + 1] } == "project", "No user settings, hooks or plugins load")
+    assert(ClaudeUsageRefresh.environment(["DISABLE_TELEMETRY": "0", "HOME": "/h"]) ==
+           ["DISABLE_TELEMETRY": "1", "DISABLE_AUTOUPDATER": "1", "DISABLE_ERROR_REPORTING": "1", "HOME": "/h"])
+    let request = try JSONSerialization.jsonObject(with: ClaudeUsageRefresh.request(id: "r1")) as! [String: Any]
+    let body = request["request"] as! [String: Any]
+    assert(request["type"] as? String == "control_request" && request["request_id"] as? String == "r1")
+    assert(body["subtype"] as? String == "get_usage" && body["skip_behaviors"] as? Bool == true && body.count == 2, "No prompt or other control request is sent")
+    func response(_ object: [String: Any]) -> Data { try! JSONSerialization.data(withJSONObject: ["type": "control_response", "response": object]) }
+    assert(ClaudeUsageRefresh.outcome(response(["subtype": "success", "request_id": "r1"]), id: "r1") == .success)
+    assert(ClaudeUsageRefresh.outcome(response(["subtype": "success", "request_id": "r2"]), id: "r1") == nil)
+    assert(ClaudeUsageRefresh.outcome(response(["subtype": "error", "request_id": "r1", "error": "Not logged in"]), id: "r1") == .failure("Not logged in"))
+    assert(ClaudeUsageRefresh.outcome(Data("{\"type\":\"system\"}".utf8), id: "r1") == nil && ClaudeUsageRefresh.outcome(Data("noise".utf8), id: "r1") == nil)
+    assert(ClaudeUsageRefresh.executable(environment: ["CLAUDE_CLI_PATH": "/missing/claude", "PATH": "/bin"], isExecutable: { _ in false }) == nil)
+    assert(ClaudeUsageRefresh.executable(environment: ["PATH": "/one:/two"], userHome: URL(fileURLWithPath: "/home"), isExecutable: { $0 == "/two/claude" }) == "/two/claude")
+    assert(ClaudeUsageRefresh.executable(environment: ["PATH": "/usr/bin"], userHome: URL(fileURLWithPath: "/home"), isExecutable: { $0 == "/home/.local/bin/claude" }) == "/home/.local/bin/claude",
+           "A GUI launch's short PATH still finds the native installer location")
+
+    // Synthetic executables prove the process boundary without contacting a provider.
+    let processRoot = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-claude-refresh-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: processRoot, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: processRoot) }
+    func fakeClaude(_ name: String, _ body: String) throws -> String {
+        let url = processRoot.appendingPathComponent(name)
+        try Data(("#!/bin/sh\n" + body).utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return url.path
+    }
+    let record = processRoot.appendingPathComponent("invocation")
+    let answer = """
+        printf '%s|%s|%s\\n' "$(pwd -P)" "$DISABLE_AUTOUPDATER" "$*" > '\(record.path)'
+        IFS= read -r line
+        id=$(printf '%s' "$line" | sed -E 's/.*"request_id":"([^"]+)".*/\\1/')
+        printf '{"type":"system","subtype":"init"}\\n'
+        printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{}}}\\n' "$id"
+        cat >/dev/null
+
+        """
+    let work = processRoot.appendingPathComponent("work")
+    let quiet = ["PATH": "/usr/bin:/bin"]
+    try ClaudeUsageRefresh.run(executable: try fakeClaude("answers", answer), directory: work, environment: quiet)
+    let invocation = try String(contentsOf: record, encoding: .utf8).trimmingCharacters(in: .newlines).components(separatedBy: "|")
+    assert(invocation.count == 3 && invocation[0].hasSuffix(processRoot.lastPathComponent + "/work") && invocation[1] == "1"
+           && invocation[2] == arguments.joined(separator: " "), invocation.joined(separator: "|"))
+    let workMode = (try FileManager.default.attributesOfItem(atPath: work.path)[.posixPermissions] as? NSNumber)?.intValue
+    assert(workMode == 0o700, "The working directory is private")
+    let refusing = try fakeClaude("refuses", """
+        IFS= read -r line
+        id=$(printf '%s' "$line" | sed -E 's/.*"request_id":"([^"]+)".*/\\1/')
+        printf '{"type":"control_response","response":{"subtype":"error","request_id":"%s","error":"Not logged in"}}\\n' "$id"
+
+        """)
+    func failure(_ executable: String, timeout: TimeInterval = 5) -> String? {
+        do { try ClaudeUsageRefresh.run(executable: executable, directory: work, environment: quiet, timeout: timeout); return nil }
+        catch { return error.localizedDescription }
+    }
+    let exiting = try fakeClaude("exits", "exit 0\n"), silent = try fakeClaude("silent", "exec sleep 30\n")
+    assert(failure(refusing) == "Not logged in")
+    assert(failure(exiting) != nil, "An early exit is an error, never SIGPIPE")
+    let started = Date()
+    assert(failure(silent, timeout: 1) == "Claude Code usage refresh timed out")
+    assert(Date().timeIntervalSince(started) < 5, "A silent child is terminated at the deadline")
+
+    // The monitor asks the installed tool, then trusts only the account-bound cache that tool rewrote.
+    func settle(_ done: () -> Bool) {
+        let deadline = Date().addingTimeInterval(10)
+        while !done() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    }
+    let cacheURL = processRoot.appendingPathComponent("claude.json"), relayURL = processRoot.appendingPathComponent("relay.json")
+    let fresh = processRoot.appendingPathComponent("fresh.json")
+    try claudeLimitsCache(at: Date(), age: 7200).write(to: cacheURL)
+    try claudeLimitsCache(session: 20, week: 30, fable: 45, at: Date()).write(to: fresh)
+    let rewriting = try fakeClaude("rewrites", "cp '\(fresh.path)' '\(cacheURL.path)'\n" + answer)
+    let claudeMonitor = ClaudeQuotaMonitor(cacheURL: cacheURL, relayURL: relayURL, refreshDirectory: work, executable: { rewriting })
+    claudeMonitor.refresh()
+    settle { claudeMonitor.quota.unavailable != "Awaiting fresh Claude quota" }
+    let refreshed = ClaudeQuotaSource.fableBudget(claudeMonitor.quota, now: Date())
+    assert(claudeMonitor.refreshFailure == nil && refreshed == ClaudeQuotaSource.FableBudget(remaining: 55, binding: "Fable week"), String(describing: refreshed))
+    try claudeLimitsCache(at: Date(), age: 7200).write(to: cacheURL)
+    claudeMonitor.refresh()
+    settle { claudeMonitor.quota.scoped.isEmpty }
+    assert(claudeMonitor.quota.scoped.isEmpty && claudeMonitor.quota.readings.isEmpty, "Within the quarter hour the cache is reread without starting Claude Code again")
+    let failing = ClaudeQuotaMonitor(cacheURL: cacheURL, relayURL: relayURL, refreshDirectory: work, executable: { refusing })
+    failing.refresh()
+    settle { failing.refreshFailure != nil }
+    assert(failing.refreshFailure == "Not logged in" && failing.quota.unavailable.hasSuffix("Claude Code usage refresh failed: Not logged in"))
+    var asked = false
+    let preview = ClaudeQuotaMonitor(cacheURL: cacheURL, relayURL: relayURL, executable: { asked = true; return rewriting })
+    preview.refresh()
+    settle { preview.quota.unavailable != "Awaiting fresh Claude quota" }
+    assert(!asked, "Previews and fixtures never start Claude Code")
+    print("PASS: installed Claude Code refresh sends one quiet get_usage request per quarter hour, bounds the child, reports failures and trusts only the rewritten account-bound cache")
+}
+
+// Fable time left: averaged recent burn per limit, not the latest slope, and never a partial projection.
+do {
+    typealias Pace = ClaudeQuotaSource.FablePace
+    let account = ClaudeQuotaSource.accountID("a")
+    /// The three Fable limits sampled together at a fixed step, oldest first; the last value is current.
+    func paced(session: [Double], week: [Double], fable: [Double], step: Double = 900, sessionReset: Double = 4 * 3600,
+               resetJitter: Double = 0) -> ToolQuotaState {
+        func series(_ window: String, _ values: [Double], minutes: Int, reset: Double) -> [QuotaReading] {
+            values.enumerated().map { index, used in
+                QuotaReading(accountID: account, bucket: "claude", name: "Claude", window: window, minutes: minutes, used: used,
+                             reset: cacheNow.addingTimeInterval(reset + (index % 2 == 0 ? 0 : resetJitter)),
+                             date: cacheNow.addingTimeInterval(-Double(values.count - 1 - index) * step))
+            }
+        }
+        let s = series("five_hour", session, minutes: 300, reset: sessionReset)
+        let w = series("seven_day", week, minutes: 10080, reset: 6 * 86400)
+        let f = series(ClaudeQuotaSource.fableWindow, fable, minutes: 10080, reset: 6 * 86400)
+        return ToolQuotaState(readings: [s[s.count - 1], w[w.count - 1]], horizon: ClaudeQuotaSource.horizon, guardAccountID: account,
+                              guardAuthenticated: true, scoped: [f[f.count - 1]], paceHistory: s + w + f)
+    }
+    func left(_ pace: Pace?) -> (seconds: TimeInterval, binding: String)? {
+        if case .left(let seconds, let binding)? = pace { return (seconds, binding) }
+        return nil
+    }
+    // Steady 30% an hour on the 5-hour limit with 26% left: about 52 minutes.
+    let heavy = paced(session: [44, 51.5, 59, 66.5, 74], week: [10, 10.5, 11, 11.5, 12], fable: [9, 9.5, 10, 10.5, 11])
+    let heavyLeft = left(ClaudeQuotaSource.fablePace(heavy, now: cacheNow))
+    assert(heavyLeft.map { abs($0.seconds - 3120) < 1 && $0.binding == "5h" } == true, String(describing: heavyLeft))
+    assert(ClaudeQuotaSource.fablePace(heavy, now: cacheNow)?.menuText == "≈50m left")
+    // A late burst is averaged with the quiet hour before it instead of projecting the burst rate.
+    let burst = paced(session: [30, 30, 30, 30, 42], week: [10, 10, 10, 10, 11], fable: [10, 10, 10, 10, 11], sessionReset: 5 * 3600)
+    let burstLeft = left(ClaudeQuotaSource.fablePace(burst, now: cacheNow))
+    let instant = (100 - 42) / (12.0 / 900)
+    assert(burstLeft.map { $0.seconds > 2.5 * instant && $0.binding == "5h" } == true, String(describing: burstLeft))
+    assert(ClaudeQuotaSource.fablePace(paced(session: [20, 25], week: [5, 6], fable: [5, 6]), now: cacheNow) == .learning, "Fifteen minutes is not yet an average")
+    assert(ClaudeQuotaSource.fablePace(paced(session: [20, 20, 20], week: [5, 5, 5], fable: [5, 5, 5]), now: cacheNow) == .idle)
+    assert(ClaudeQuotaSource.fablePace(paced(session: [20, 21, 22], week: [5, 5.1, 5.2], fable: [5, 5.1, 5.2]), now: cacheNow) == .resetsFirst)
+    assert(ClaudeQuotaSource.fablePace(paced(session: [80, 90, 5, 10], week: [5, 5, 5, 5], fable: [5, 5, 5, 5]), now: cacheNow) == .learning,
+           "A new period relearns instead of borrowing the previous period's burn")
+    let jittered = paced(session: [44, 51.5, 59, 66.5, 74], week: [10, 10.5, 11, 11.5, 12], fable: [9, 9.5, 10, 10.5, 11], resetJitter: 0.4)
+    assert(left(ClaudeQuotaSource.fablePace(jittered, now: cacheNow)) != nil, "Sub-second reset jitter stays one period")
+    assert(ClaudeQuotaCache.date("2026-09-15T22:40:00.453396+00:00") == ClaudeQuotaCache.date("2026-09-15T22:40:00.251995+00:00"))
+    assert(ClaudeQuotaSource.fablePace(paced(session: [90, 95, 100], week: [5, 5, 5], fable: [5, 5, 5]), now: cacheNow) == .exhausted)
+    var noScoped = heavy; noScoped.scoped = []
+    assert(ClaudeQuotaSource.fablePace(noScoped, now: cacheNow) == nil, "No Fable budget, no time left")
+    var foreign = heavy
+    foreign.paceHistory = heavy.paceHistory.map { var copy = $0; copy.accountID = ClaudeQuotaSource.accountID("b"); return copy }
+    assert(ClaudeQuotaSource.fablePace(foreign, now: cacheNow) == .learning, "Another account's history never supplies pace")
+    assert(Pace.left(9600, binding: "5h").menuText == "≈2h 40m left" && Pace.left(7300, binding: "week").menuText == "≈2h left")
+    assert(Pace.left(110_500, binding: "week").menuText == "≈1d 6h left" && Pace.left(200, binding: "5h").menuText == "<5m left")
+    assert(Pace.learning.menuText == "learning pace" && Pace.idle.menuText == "no recent use"
+           && Pace.resetsFirst.menuText == "resets first" && Pace.exhausted.menuText == "0m left")
+
+    // Beside the figure the projection is smaller and secondary; alone it names Fable; an unknown budget adds no second notice.
+    var paceMenu = MenuBarConfiguration(); paceMenu.enabled = [.fable, .fablePace]; paceMenu.tool = .claude
+    assert(!MenuBarConfiguration().enabled.contains(.fablePace), "Time left is opt-in")
+    let paceTitle = MenuBarPresentation.attributed(paceMenu, meter: meter, monitor: monitor, now: cacheNow, tool: .claude, claudeQuota: heavy)
+    assert(paceTitle.string == "Claude  Fable 26% · 5h  ≈50m left", paceTitle.string)
+    let paceRange = (paceTitle.string as NSString).range(of: "≈50m left")
+    assert((paceTitle.attribute(.font, at: paceRange.location, effectiveRange: nil) as? NSFont)?.pointSize == 11)
+    assert((paceTitle.attribute(.foregroundColor, at: paceRange.location, effectiveRange: nil) as? NSColor) == .secondaryLabelColor)
+    let unknownBudget = MenuBarPresentation.attributed(paceMenu, meter: meter, monitor: monitor, now: cacheNow, tool: .claude, claudeQuota: noScoped)
+    assert(unknownBudget.string == "Claude  Fable quota unavailable", unknownBudget.string)
+    paceMenu.enabled = [.fablePace]
+    assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: heavy)[.fablePace] == "Fable ≈50m left")
+    assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow)[.fablePace] == "Fable time left unavailable")
+
+    // The monitor keeps recent readings per signed-in account, including through a stale cache.
+    let historyRoot = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-fable-pace-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: historyRoot, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: historyRoot) }
+    let historyCache = historyRoot.appendingPathComponent("claude.json")
+    let paceMonitor = ClaudeQuotaMonitor(cacheURL: historyCache, relayURL: historyRoot.appendingPathComponent("relay.json"))
+    func settlePace(_ done: () -> Bool) {
+        let deadline = Date().addingTimeInterval(10)
+        while !done() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    }
+    try claudeLimitsCache(at: Date()).write(to: historyCache)
+    paceMonitor.refresh()
+    settlePace { paceMonitor.quota.paceHistory.count == 3 }
+    assert(paceMonitor.quota.paceHistory.count == 3, "Both windows and the Fable row enter the pace history")
+    try claudeLimitsCache(session: 40, at: Date()).write(to: historyCache)
+    paceMonitor.refresh()
+    settlePace { paceMonitor.quota.paceHistory.count == 6 }
+    assert(paceMonitor.quota.paceHistory.count == 6)
+    try claudeLimitsCache(at: Date(), age: 7200).write(to: historyCache)
+    paceMonitor.refresh()
+    settlePace { paceMonitor.quota.readings.isEmpty }
+    assert(paceMonitor.quota.readings.isEmpty && paceMonitor.quota.paceHistory.count == 6, "A stale cache keeps the same account's pace history")
+    try JSONSerialization.data(withJSONObject: ["oauthAccount": ["accountUuid": "b"]]).write(to: historyCache)
+    paceMonitor.refresh()
+    settlePace { paceMonitor.quota.paceHistory.isEmpty }
+    assert(paceMonitor.quota.paceHistory.isEmpty, "Another sign-in drops the previous account's pace history")
+    print("PASS: Fable time left averages recent burn per limit, smooths bursts, relearns after resets, ignores jitter and other accounts, and renders small secondary copy")
 }

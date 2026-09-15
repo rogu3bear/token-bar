@@ -186,7 +186,8 @@ do {
 }
 print("PASS: opt-in, forecast confirmation, hysteresis, escalation, snooze isolation, restart, retries, callbacks and cold routes")
 var config = MenuBarConfiguration(); config.order = [.quota, .rate, .dial, .icon, .activity, .zero]; config.enabled = [.quota, .rate]; config.tool = .claude; config.unit = "h"; config.normalize()
-check(config.order.last == .risk && config.enabled == [.quota, .rate] && config.tool == .claude && config.unit == "h", "risk migration preserves selections/order")
+check(Array(config.order.prefix(6)) == [.quota, .rate, .dial, .icon, .activity, .zero] && config.order.suffix(3) == [.risk, .fable, .fablePace]
+      && config.enabled == [.quota, .rate] && config.tool == .claude && config.unit == "h", "risk migration preserves selections/order")
 check(!MenuBarConfiguration().enabled.contains(.risk), "risk field not autoenabled")
 check(QuotaGuardPolicy().lowPercent == 10 && QuotaGuardPolicy().leadMinutes == 30 && QuotaGuardPolicy.escalationPercent == 5 && QuotaGuardPolicy.escalationLead == 600 && QuotaGuardPolicy.snooze == 1800, "product defaults pinned")
 let higherUsed = decision(input(reading(used: 96)))
