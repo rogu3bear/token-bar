@@ -9,10 +9,16 @@ enum HistoryPreview {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let suite = "local.tokenbar.history-preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let today = Calendar.current.startOfDay(for: PreviewFixture.date.addingTimeInterval(-86400))
+        try PreviewModelScope.run(root: root, defaults: defaults, prepare: { try seed(root: root, today: today) }) { model in
+            try render(model, to: destination, today: today)
+        }
+    }
+
+    private static func seed(root: URL, today: Date) throws {
         let support = root.appendingPathComponent("CodexTokenBar")
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        let today = Calendar.current.startOfDay(for: PreviewFixture.date.addingTimeInterval(-86400))
         var ledger = Ledger()
         ledger.started = today
         ledger.costMetadataVersion = 2
@@ -25,7 +31,9 @@ enum HistoryPreview {
             ledger.entries[index].provider = index < 2 ? "anthropic" : "openai"
         }
         try JSONEncoder().encode(ledger).write(to: support.appendingPathComponent("ledger.json"))
-        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
+    }
+
+    @MainActor private static func render(_ model: UsageModel, to destination: URL, today: Date) throws {
         model.appearance.websitePreset()
         precondition(model.snapshot.entries.count == 4, "Saved usage must be available before a scan")
         model.period = 4; model.startDate = today; model.endDate = today
@@ -55,8 +63,9 @@ enum HistoryPreview {
         }.previewStill())
         host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1200)
         let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
         window.contentView = host
-        defer { window.contentView = nil }
+        defer { PreviewModelScope.close(window) }
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }

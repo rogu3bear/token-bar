@@ -10,8 +10,8 @@ enum PreviewFixture {
         NSTimeZone.default = TimeZone(secondsFromGMT: 0)!
     }
     /// Wall time bounds waiting only; it never supplies displayed fixture data.
-    @MainActor static func settle(_ label: String, ready: () -> Bool) throws {
-        let deadline = Date().addingTimeInterval(15)
+    @MainActor static func settle(_ label: String, timeout: TimeInterval = 15, ready: () -> Bool) throws {
+        let deadline = Date().addingTimeInterval(timeout)
         while !ready() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
         guard ready() else {
             throw NSError(domain: "PreviewFixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Fixture did not settle: " + label])

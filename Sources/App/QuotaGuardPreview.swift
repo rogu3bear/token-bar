@@ -17,9 +17,14 @@ enum QuotaGuardPreview {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-quota-preview-" + UUID().uuidString)
         let suite = "local.token-bar.quota-preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try PreviewModelScope.run(root: root, defaults: defaults) { model in
+            try run(model, destination: destination)
+        }
+    }
+
+    @MainActor private static func run(_ model: UsageModel, destination: URL?) throws {
         let now = PreviewFixture.date
-        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: now)
         model.appearance.websitePreset()
         let arguments = CommandLine.arguments
         let light = arguments.contains("--sample-light")
@@ -71,7 +76,7 @@ enum QuotaGuardPreview {
         let delegate = AppDelegate(); delegate.model = model; delegate.configureNavigationActions()
         guard QuotaGuardNotifications.constructionCount == 0 else { throw CocoaError(.coderInvalidValue) }
         print("PASS: synthetic model and navigation construct zero system notification adapters")
-        defer { delegate.detailWindow?.close(); delegate.settingsWindow?.close() }
+        defer { PreviewModelScope.close(delegate.detailWindow); PreviewModelScope.close(delegate.settingsWindow) }
         if arguments.contains("--verify-quota-navigation") {
             guard let target = model.quotaGuard.decisions.first(where: { $0.risk != .none }) else { throw CocoaError(.coderInvalidValue) }
             model.quotaGuard.view(target)
@@ -105,7 +110,7 @@ enum QuotaGuardPreview {
         if destination == nil { window.delegate = closer }
         window.isReleasedWhenClosed = false; window.title = "Token Bar · Synthetic Quota Guard"
         window.appearance = NSApp.appearance; window.contentView = host
-        defer { window.close() }
+        defer { PreviewModelScope.close(window) }
         if let destination {
             host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.4)); host.layoutSubtreeIfNeeded()
             guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }

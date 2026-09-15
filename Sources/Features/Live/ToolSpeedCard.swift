@@ -26,7 +26,8 @@ struct ToolSpeedHeader: View {
             } else {
                 Text("No current rate report").font(.caption).foregroundStyle(.secondary)
             }
-        }.frame(maxWidth: .infinity, alignment: .topLeading)
+        }.accessibilityElement(children: .contain)
+            .accessibilityLabel(tool.label + " activity and speed")
             .sheet(isPresented: $showActivity) {
                 VStack(alignment: .trailing, spacing: 0) {
                     SheetDoneButton { showActivity = false }.padding(16)

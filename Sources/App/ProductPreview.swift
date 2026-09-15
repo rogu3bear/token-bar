@@ -16,8 +16,13 @@ enum ProductPreview {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let suite = "local.codex-token-bar.preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
-        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try PreviewModelScope.run(root: root, defaults: defaults) { model in
+            try render(model, to: destination, compact: compact)
+        }
+    }
+
+    @MainActor private static func render(_ model: UsageModel, to destination: URL?, compact: Bool) throws {
         model.appearance.websitePreset()
         let light = CommandLine.arguments.contains("--sample-light")
         if light { model.appearance.mode = "Light"; NSApp.appearance = NSAppearance(named: .aqua) }
@@ -159,6 +164,12 @@ enum ProductPreview {
             precondition(model.tachometer.runningCount > 0 && !model.tachometer.hasRate)
             precondition(model.tachometer.rate == 0 && model.tachometer.rawRate == 0)
         }
+        if CommandLine.arguments.contains("--sample-asymmetric-headers") {
+            model.tachometer.activity.error = "Synthetic activity catalog temporarily unavailable; previously observed work remains visible."
+            model.tachometer.models = ["synthetic-model-with-a-long-context-and-reasoning-variant"]
+            model.claudeMeter.activity.measurements = [:]
+            model.claudeMeter.tick(now: now)
+        }
         // Flush the model's observation callbacks before constructing shipping consumers.
         RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         if !CommandLine.arguments.contains("--sample-no-accounts") {
@@ -184,6 +195,15 @@ enum ProductPreview {
                             precondition(before == model.accountTools.map { AccountAllowancePresentation(quota: model.quota(for: $0), now: now).detail })
                             print("PASS: active-to-idle preserves account allowance content at unchanged account and clock")
                         }
+                        ForEach(LiveTool.allCases) { tool in
+                            Button("Toggle " + tool.label) {
+                                let meter = model.meter(for: tool)
+                                meter.activity = meter.runningCount > 0
+                                    ? ActivitySnapshot(readAt: now, referenceDate: now)
+                                    : fixtureActivities[LiveTool.allCases.firstIndex(of: tool)!]
+                                meter.tick(now: now)
+                            }
+                        }
                         Button("Start tools") {
                             for (tool, activity) in zip(LiveTool.allCases, fixtureActivities) {
                                 model.meter(for: tool).activity = activity
@@ -207,7 +227,7 @@ enum ProductPreview {
         let closer = ProductPreviewClose()
         if destination == nil { window.delegate = closer }
         window.title = "Token Bar · Synthetic allowance preview"
-        defer { window.close() }
+        defer { PreviewModelScope.close(window) }
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.contentView = host
         if destination == nil {
@@ -218,7 +238,7 @@ enum ProductPreview {
             let controller = NSHostingController(rootView: view)
             controller.sizingOptions = [.preferredContentSize]
             window.contentViewController = controller
-            defer { delegate.detailWindow?.close(); delegate.settingsWindow?.close() }
+            defer { PreviewModelScope.close(delegate.detailWindow); PreviewModelScope.close(delegate.settingsWindow) }
             NSApp.setActivationPolicy(.regular); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
             withExtendedLifetime(delegate) { NSApp.run() }; return
         }

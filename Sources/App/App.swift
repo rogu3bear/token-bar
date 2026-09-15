@@ -669,6 +669,11 @@ struct QuickLiveView: View {
             catch { print("Data-state preview failed: \(error)"); exit(1) }
             exit(0)
         }
+        if CommandLine.arguments.contains("--verify-preview-lifecycle") {
+            do { try PreviewModelScope.verify() }
+            catch { print("Preview lifecycle failed: \(error)"); exit(1) }
+            return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--render-pages-preview") {
             guard CommandLine.arguments.indices.contains(index + 1) else { print("Missing page preview directory"); exit(1) }
             do { try CostPreview.run(destination: URL(fileURLWithPath: CommandLine.arguments[index + 1]), navigation: true) }

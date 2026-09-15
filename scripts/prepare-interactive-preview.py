@@ -18,11 +18,16 @@ import uuid
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("output", type=Path, help="New disposable .app path")
-parser.add_argument("--allowance", choices=["now", "popover"], help="Use shipping synthetic allowance views")
+mode = parser.add_mutually_exclusive_group()
+mode.add_argument("--allowance", choices=["now", "popover"], help="Use shipping synthetic allowance views")
+mode.add_argument("--accounts", action="store_true", help="Exercise Accounts navigation with saved plans and hidden Spark windows")
 args = parser.parse_args()
 preview_arguments = (["--preview-tools", "--sample-width", "900", "--sample-height", "700"]
                      + (["--sample-compact"] if args.allowance == "popover" else [])) if args.allowance else [
                          "--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "failed", "--sample-history"]
+if args.accounts:
+    preview_arguments = ["--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "populated",
+                         "--sample-spark-accounts", "--sample-account-history"]
 root = Path(__file__).resolve().parent.parent
 source = root / "build/Token Bar.app"
 output = args.output.absolute()

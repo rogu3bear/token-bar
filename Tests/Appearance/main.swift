@@ -208,14 +208,16 @@ print("PASS: all hosting/capture routes retain the appearance boundary and marke
 PreviewFixture.prepare()
 assert(PreviewFixture.date.ISO8601Format() == "2026-09-12T12:00:00Z")
 assert(Calendar.current.component(.hour, from: PreviewFixture.date) == 12)
-assert(product.contains("referenceDate: PreviewFixture.date"))
+let previewScope = try String(contentsOf: sourceRoot.appendingPathComponent("App/PreviewModelScope.swift"), encoding: .utf8)
+assert(product.contains("PreviewModelScope.run(root: root, defaults: defaults)"))
+assert(previewScope.contains("referenceDate: PreviewFixture.date"))
 assert(product.contains("let now = PreviewFixture.date"))
 assert(product.contains("$0.disablesAnimations = true"))
 let costPreview = try String(contentsOf: sourceRoot.appendingPathComponent("App/CostPreview.swift"), encoding: .utf8)
 assert(costPreview.contains("DetailRoot(model: model, initialDestination: page)"))
 assert(!costPreview.contains("CostView(model: model)"), "Cost product image must retain shipping navigation")
 assert(costPreview.contains("else { state = \"populated\" }"))
-assert(costPreview.contains("referenceDate: PreviewFixture.date"))
+assert(costPreview.contains("PreviewModelScope.run(root: root, defaults: defaults)"))
 assert(motion.contains("let elapsed = Double(frame) / 30"), "Motion samples must not depend on rendering speed")
 print("PASS: fixed UTC fixture clock, shipping Cost shell, clean default and frame-indexed motion samples")
 
@@ -345,4 +347,81 @@ MainActor.assumeIsolated {
         assert(accounts < 140, "Collapsed allowances must leave room for live gauges at the minimum window")
     }
     print("PASS: shipping allowance rows and expanded popover evidence render with intrinsic sizing in dark/light/custom accent")
+}
+
+// Measure native layout boxes and retained SwiftUI identity, not a screenshot's
+// pixels or a duplicate arithmetic implementation of the layout.
+private final class ProviderLayoutProbes {
+    var views: [String: NSView] = [:]
+    func frame(_ key: String) -> CGRect { views[key]!.convert(views[key]!.bounds, to: nil) }
+}
+private struct ProviderLayoutProbe: NSViewRepresentable {
+    let key: String
+    let probes: ProviderLayoutProbes
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(); probes.views[key] = view; return view
+    }
+    func updateNSView(_ view: NSView, context: Context) {}
+}
+private final class ProviderLayoutState: ObservableObject {
+    @Published var tools = ["codex", "claude", "grok"]
+}
+private struct ProviderLayoutFixture: View {
+    @ObservedObject var state: ProviderLayoutState
+    let probes: ProviderLayoutProbes
+    var body: some View {
+        ProviderColumnsLayout(columns: state.tools.count) {
+            ForEach(state.tools, id: \.self) { tool in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tool).font(.title2)
+                    Text(tool == "claude" ? "Inspect activity read failure with additional context and unavailable reporting" : "Estimated output tokens per second")
+                        .fixedSize(horizontal: false, vertical: true)
+                }.background(ProviderLayoutProbe(key: tool + "-header", probes: probes))
+            }
+            ForEach(state.tools, id: \.self) { tool in
+                Color.clear.frame(height: 210).background(ProviderLayoutProbe(key: tool + "-gauge", probes: probes))
+            }
+            ForEach(state.tools, id: \.self) { _ in Divider() }
+            ForEach(state.tools, id: \.self) { tool in
+                Text(tool == "codex" ? "A long model name and an activity error that must stay within this provider's own column" : "Model details")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ProviderLayoutProbe(key: tool + "-footer", probes: probes))
+            }
+        }
+    }
+}
+MainActor.assumeIsolated {
+    for width: CGFloat in [796, 1096] {
+        let state = ProviderLayoutState(), probes = ProviderLayoutProbes()
+        let host = NSHostingView(rootView: ProviderLayoutFixture(state: state, probes: probes).frame(width: width))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        var retained: [String: NSView] = [:]
+        for tools in [["codex", "claude", "grok"], ["codex", "grok"], ["grok"], ["codex", "claude", "grok"]] {
+            state.tools = tools
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            host.layoutSubtreeIfNeeded()
+            let firstGauge = probes.frame(tools[0] + "-gauge")
+            for (index, tool) in tools.enumerated() {
+                let header = probes.frame(tool + "-header"), gauge = probes.frame(tool + "-gauge"), footer = probes.frame(tool + "-footer")
+                assert(abs(header.midX - gauge.midX) < 1, "Intrinsic header must center on its own gauge through active-set changes")
+                assert(abs(footer.midX - header.midX) < 1 && abs(footer.width - header.width) < 1, "Footer must use its own header's measure and center")
+                assert(abs(gauge.minY - firstGauge.minY) < 1 && abs(gauge.height - 210) < 1, "Asymmetric text must preserve the shared gauge row")
+                assert(header.width <= gauge.width + 1 && footer.width <= gauge.width + 1)
+                if index > 0 {
+                    let previous = probes.frame(tools[index - 1] + "-gauge")
+                    assert(previous.maxX < gauge.minX, "Provider columns cannot overlap")
+                    let separator = ProviderColumnsLayout(columns: tools.count).separatorPositions(width: width)[index - 1]
+                    assert(abs(separator - (previous.maxX + gauge.minX) / 2) < 1, "Divider must bisect the actual inter-provider gap")
+                }
+                if let previous = retained[tool] { assert(previous === probes.views[tool + "-gauge"], "Surviving tool must retain its own gauge view identity") }
+            }
+            retained = Dictionary(uniqueKeysWithValues: tools.map { ($0, probes.views[$0 + "-gauge"]!) })
+        }
+    }
+    print("PASS: native provider columns center intrinsic headers/footers on their own gauge, share asymmetric row heights, and retain tool identity across 3→2→1→3")
 }

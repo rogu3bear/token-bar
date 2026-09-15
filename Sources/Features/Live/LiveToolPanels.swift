@@ -36,13 +36,14 @@ struct LiveToolPanels: View {
                             Text(model.meter(for: tool).models.joined(separator: ", "))
                                 .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             if let error = model.meter(for: tool).activity.error { ErrorNotice(message: error) }
-                        }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel(tool.label + " model and activity details")
                     }
                 }.overlay {
                     GeometryReader { geometry in
-                        ForEach(1..<tools.count, id: \.self) { column in
+                        ForEach(ProviderColumnsLayout(columns: tools.count).separatorPositions(width: geometry.size.width), id: \.self) { x in
                             Path { path in
-                                let x = geometry.size.width * CGFloat(column) / CGFloat(tools.count)
                                 path.move(to: CGPoint(x: x, y: 0))
                                 path.addLine(to: CGPoint(x: x, y: geometry.size.height))
                             }.stroke(Color.primary.opacity(0.1), lineWidth: 1)
@@ -65,41 +66,6 @@ struct ToolActivityErrors: View {
             if let error = model.meter(for: tool).activity.error {
                 ErrorNotice(message: tool.label + ": " + error)
             }
-        }
-    }
-}
-
-/// Equal provider widths and shared row heights keep separators and gauges aligned,
-/// including when one provider has additional connection or unavailable text.
-struct ProviderColumnsLayout: Layout {
-    var columns: Int
-    var horizontalSpacing: CGFloat = 48
-    var verticalSpacing: CGFloat = 12
-    private func dimensions(_ width: CGFloat, subviews: Subviews) -> (CGFloat, [CGFloat]) {
-        let cell = max(0, (width - horizontalSpacing * CGFloat(columns - 1)) / CGFloat(columns))
-        let heights = stride(from: 0, to: subviews.count, by: columns).map { start in
-            (start..<min(start + columns, subviews.count)).map {
-                subviews[$0].sizeThatFits(ProposedViewSize(width: cell, height: nil)).height
-            }.max() ?? 0
-        }
-        return (cell, heights)
-    }
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 900
-        let (_, heights) = dimensions(width, subviews: subviews)
-        return CGSize(width: width, height: heights.reduce(0, +) + CGFloat(max(0, heights.count - 1)) * verticalSpacing)
-    }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let (cell, heights) = dimensions(bounds.width, subviews: subviews)
-        var y = bounds.minY
-        for (row, height) in heights.enumerated() {
-            for column in 0..<columns {
-                let index = row * columns + column
-                guard index < subviews.count else { continue }
-                subviews[index].place(at: CGPoint(x: bounds.minX + CGFloat(column) * (cell + horizontalSpacing), y: y),
-                                     anchor: .topLeading, proposal: ProposedViewSize(width: cell, height: height))
-            }
-            y += height + verticalSpacing
         }
     }
 }

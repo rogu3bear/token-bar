@@ -18,8 +18,13 @@ enum CostPreview {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-cost-preview-" + UUID().uuidString)
         let suite = "local.token-bar.cost-preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
-        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try PreviewModelScope.run(root: root, defaults: defaults) { model in
+            try run(model, root: root, destination: destination, navigation: navigation)
+        }
+    }
+
+    @MainActor private static func run(_ model: UsageModel, root: URL, destination: URL?, navigation: Bool) throws {
         model.appearance.websitePreset()
         model.period = 2
         model.costBasis = .reference
@@ -113,6 +118,7 @@ enum CostPreview {
         window.title = "Token Bar · Synthetic page preview"
         window.minSize = NSSize(width: 900, height: 728)
         window.isReleasedWhenClosed = false
+        defer { PreviewModelScope.close(window) }
         window.appearance = NSAppearance(named: .darkAqua); window.contentView = host
         if let destination {
             host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.3)); host.layoutSubtreeIfNeeded()
@@ -124,7 +130,6 @@ enum CostPreview {
             NSApp.setActivationPolicy(.regular); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
             NSApp.run()
         }
-        window.close()
     }
 
     /// Use shipping callbacks with a disposable model, never the monitoring lifecycle.
@@ -144,9 +149,9 @@ enum CostPreview {
         host.sizingOptions = [.preferredContentSize]
         quick.contentViewController = host
         defer {
-            delegate.detailWindow?.close()
-            delegate.settingsWindow?.close()
-            quick.close()
+            PreviewModelScope.close(delegate.detailWindow)
+            PreviewModelScope.close(delegate.settingsWindow)
+            PreviewModelScope.close(quick)
         }
         NSApp.setActivationPolicy(.regular)
         model.showHistory?()
@@ -175,6 +180,7 @@ enum CostPreview {
                         host.frame = NSRect(origin: .zero, size: size)
                         let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
                         window.isReleasedWhenClosed = false; window.contentView = host
+                        defer { PreviewModelScope.close(window) }
                         window.appearance = NSApp.appearance
                         host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.5)); host.layoutSubtreeIfNeeded()
                         guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
@@ -182,7 +188,6 @@ enum CostPreview {
                         guard let data = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
                         let name = matrix ? "\(page)-\(mode)-\(Int(size.width))-\(reduced ? "reduced" : "motion").png" : "\(page).png"
                         try data.write(to: directory.appendingPathComponent(name))
-                        window.close()
                     }
                 }
             }
@@ -244,6 +249,13 @@ enum CostPreview {
                 spark.accountID = "synthetic-previous"; weekly.accountID = spark.accountID
                 model.live.state.accounts[spark.accountID] = LiveAccount(id: spark.accountID, email: "previous@example.com",
                     plan: "plus", observed: observed.addingTimeInterval(-86400), quotas: [spark, weekly])
+            }
+            if arguments.contains("--sample-account-history") {
+                model.live.state.plans = (0..<8).map { index in
+                    let date = observed.addingTimeInterval(Double(index - 8) * 86400)
+                    return LivePlan(id: "synthetic-plan-\(index)", accountID: quota.accountID, email: "sample@example.com",
+                        plan: index.isMultiple(of: 2) ? "plus" : "pro", firstSeen: date, lastSeen: date.addingTimeInterval(3600))
+                }
             }
             if state != "failed" {
                 model.tachometer.activity.turns["sample"] = TaskActivity(turn: "sample", started: observed, observed: observed, running: true, kind: .chat, session: "sample")

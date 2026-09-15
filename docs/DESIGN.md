@@ -639,12 +639,20 @@ differences separately when `--motion-raster` is requested.
 
 ### Now provider alignment
 
-Now uses equal-width active-provider columns with shared row heights for rate,
-separator, quota, gauge and model detail. Connection/unavailable text can grow its
-row without misaligning gauges. The center dividers span the columns. Inactive
-tools reserve no area. Rate digits retain their own complete height and actual
-units. Single-provider views use the available width; the same geometry owner
-supports minimum/default/wide dashboard sizes.
+Now uses equal-width active-provider columns with shared row heights for the
+speed header, gauge, separator and model/error detail. ProviderColumnsLayout
+centers each intrinsic header group on its own gauge; model/error detail uses
+that same text width and center. Internal text stays leading aligned. This keeps
+the identity, rate and status attached to the dial as the active set changes
+between one, two and three tools. Asymmetric unavailable/error text grows the
+shared row without moving one gauge out of alignment with the others.
+
+The center dividers span the columns. Inactive tools reserve no speed area;
+account allowances remain in their independent section. Rate digits retain their
+complete height and actual units. ForEach uses the tool identity in every row,
+so surviving tools keep their own controls and gauge when another tool stops.
+Accessibility groups name each tool and contain its speed controls and details.
+The same geometry owner supports minimum/default/wide dashboard sizes.
 
 ### Quota Guard in the development source
 

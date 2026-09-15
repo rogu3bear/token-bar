@@ -11,11 +11,13 @@ enum ProductMotionPreview {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let suite = "local.codex-token-bar.motion-preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
-        defer {
-            defaults.removePersistentDomain(forName: suite)
-            try? FileManager.default.removeItem(at: root)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try PreviewModelScope.run(root: root, defaults: defaults) { model in
+            try render(model, to: directory)
         }
-        let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
+    }
+
+    @MainActor private static func render(_ model: UsageModel, to directory: URL) throws {
         model.appearance.websitePreset()
         let now = PreviewFixture.date
         var quota = QuotaReading(accountID: "sample-account", bucket: "sample", name: "Account quota", window: "primary", minutes: 10080, used: 36, reset: now.addingTimeInterval(86400 * 4), date: now)
@@ -68,7 +70,7 @@ enum ProductMotionPreview {
         menuWindow.isReleasedWhenClosed = false
         menuWindow.appearance = NSAppearance(named: .darkAqua)
         menuWindow.contentView = menuHost
-        defer { window.close(); menuWindow.close() }
+        defer { PreviewModelScope.close(window); PreviewModelScope.close(menuWindow) }
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         model.menuBarPreferences.configuration = settings
