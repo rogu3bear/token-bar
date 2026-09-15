@@ -122,6 +122,15 @@ struct Cursor: Codable, Equatable {
     var previousFields: [String]?
     /// Last admitted Grok session `costUsdTicks`. Codex cursors leave this unset.
     var previousTicks: Int?
+    /// Optional for backward-compatible migration of legacy byte cursors.
+    var continuity: CodexContinuity?
+    var sourceSession: String?
+    var lastFingerprint: String?
+    var admittedBoundary: CodexCounterBoundary?
+    var lastObservation: CodexCounterBoundary?
+    var reconciliation: CodexReconciliation?
+    var continuityGap: String?
+    var aliasWitness: String?
 }
 struct Quota: Codable {
     var name: String
@@ -210,6 +219,8 @@ final class UsageScanner {
     var pendingCheckpoint: UsageCheckpoint?
     /// Optional fault injection at durable storage boundaries; unset in production.
     var checkpointWillRun: ((CheckpointPhase) throws -> Void)?
+    /// File-race/read-failure seam; production leaves this unset.
+    var codexReadWillRun: ((CodexReadPhase, URL) throws -> Void)?
     var lastWork = ScanWork()
     var eventIndex: EventIndex?
     var requestArchive: RequestArchive?
@@ -315,12 +326,25 @@ final class UsageScanner {
         historicalIndex = [:]
         for (index, entry) in ledger.entries.enumerated() where entry.bucket == "day" { historicalIndex[historyKey(entry)] = index }
     }
-    func consume(_ data: Data, session: String, cursor: inout Cursor, account: Account?, poll: Date, historical: Bool = false) {
+    func consume(_ data: Data, session: String, cursor: inout Cursor, account: Account?, poll: Date, historical: Bool = false, continuous: Bool = true) {
         // Ignore prompt-bearing records without decoding them.
         guard ["token_count", "turn_context", "session_meta"].contains(where: { data.range(of: Data($0.utf8)) != nil }) else { return }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let payload = root["payload"] as? [String: Any] else { return }
         if root["type"] as? String == "session_meta" {
+            let sourceSession = payload["id"] as? String
+            if let prior = cursor.sourceSession, sourceSession != prior {
+                let offset = cursor.offset, continuity = cursor.continuity, aliasWitness = cursor.aliasWitness
+                let gap = cursor.continuityGap ?? (cursor.reconciliation == nil ? nil : "Source continuity is incomplete across a session change; prior totals retained.")
+                cursor = Cursor(offset: offset)
+                cursor.continuity = continuity; cursor.continuityGap = gap; cursor.aliasWitness = aliasWitness
+            }
+            cursor.sourceSession = sourceSession
+            if let sourceSession, let prior = cursor.reconciliation?.session, sourceSession != prior {
+                cursor.continuityGap = "Source was replaced by a different session; prior totals retained."
+                cursor.reconciliation = nil
+                cursor.admittedBoundary = nil
+            }
             cursor.provider = payload["model_provider"] as? String
             cursor.harness = Harness.codex(originator: payload["originator"])
             cursor.projectPath = Project.path(payload["cwd"])
@@ -342,10 +366,52 @@ final class UsageScanner {
         guard let info = payload["info"] as? [String: Any], let raw = info["total_token_usage"] as? [String: Any] else { return }
         let total = Tokens(raw)
         let last = (info["last_token_usage"] as? [String: Any]).map { Tokens($0) }
+        let canonical = (try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])) ?? Data()
+        // Preserve the established fingerprint contract, including fork deduplication.
+        let identity = (cursor.turnID ?? "fallback|\(session)|\(stamp)") + "|" + String(decoding: canonical, as: UTF8.self)
+        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         let previousFields = cursor.previousFields
+        let reconciling = cursor.reconciliation != nil
+        let recoveredBoundary = cursor.reconciliation.map { recovery in
+            let matches = recovery.fingerprint.map { $0 == fingerprint && recovery.session == cursor.sourceSession } ??
+                ((ledger.eventIDs?.contains(fingerprint) == true || eventIndex?.contains(fingerprint) == true))
+            return matches && recovery.previous == total &&
+                (recovery.covered.map { total.input >= $0.total.input && total.output >= $0.total.output && date >= $0.date } ?? true)
+        } ?? false
+        if recoveredBoundary { cursor.reconciliation = nil }
+        var resumedAtVerifiedBoundary = false
         let delta: Tokens
-        if let old = cursor.previous {
-            if total == old { return } // Repeated snapshots are not new usage.
+        if reconciling {
+            // A replayed earlier snapshot is not a safe cumulative baseline:
+            // A100/B200 admitted, then A100/C300 must add only C's last100.
+            let rawLast = info["last_token_usage"] as? [String: Any]
+            let complete = rawLast?["input_tokens"] as? Int != nil && rawLast?["output_tokens"] as? Int != nil
+            let covered = cursor.reconciliation?.covered ?? cursor.admittedBoundary
+            let disjoint = covered.map { old in
+                guard old.session != nil, old.session == cursor.sourceSession, let last else { return false }
+                return date >= old.date && last.input >= 0 && last.output >= 0 &&
+                    total.input >= last.input && total.output >= last.output &&
+                    total.input - last.input >= old.total.input && total.output - last.output >= old.total.output
+            } ?? (cursor.reconciliation == nil)
+            let legacyFloor = cursor.reconciliation?.legacy == true ? cursor.reconciliation?.previous : nil
+            let beyondLegacy = legacyFloor.map { floor in
+                guard let last else { return false }
+                return total.input >= last.input && total.output >= last.output &&
+                    total.input - last.input >= floor.input && total.output - last.output >= floor.output
+            } ?? true
+            // If the old anchor is gone, a later dated request on a verified
+            // append can establish a new boundary without erasing the old gap.
+            resumedAtVerifiedBoundary = cursor.reconciliation?.resume.map { observed in
+                guard let verifiedAt = observed.verifiedAt, let last,
+                      observed.session != nil, observed.session == cursor.sourceSession else { return false }
+                return continuous && date > verifiedAt && date <= poll && date > observed.date &&
+                    last.input >= 0 && last.output >= 0 && total.input >= last.input && total.output >= last.output &&
+                    total.input - last.input >= observed.total.input && total.output - last.output >= observed.total.output &&
+                    (covered.map { date >= $0.date } ?? true)
+            } ?? false
+            delta = complete && ((disjoint && beyondLegacy) || resumedAtVerifiedBoundary) ? (last ?? Tokens()) : Tokens()
+        } else if let old = cursor.previous {
+            if total == old { return }
             delta = total.input >= old.input && total.output >= old.output ? total.delta(from: old) : (last ?? Tokens())
         } else {
             // A fork can inherit a parent's cumulative counters: only admit its last request.
@@ -353,16 +419,22 @@ final class UsageScanner {
         }
         cursor.previous = total
         cursor.previousFields = UsageMetadata.recordedFields(raw)
+        cursor.lastFingerprint = fingerprint
+        if raw["input_tokens"] as? Int != nil, raw["output_tokens"] as? Int != nil, total.input >= 0, total.output >= 0 {
+            cursor.lastObservation = CodexCounterBoundary(session: cursor.sourceSession, total: total, date: date, fingerprint: fingerprint)
+        }
         let boundary = Calendar.current.startOfDay(for: ledger.started)
         guard rebuilding || (historical ? date < boundary : date >= boundary) else { return }
-        let canonical = (try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])) ?? Data()
-        let identity = (cursor.turnID ?? "fallback|\(session)|\(stamp)") + "|" + String(decoding: canonical, as: UTF8.self)
-        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         if cursor.turnID == nil { ledger.unkeyedEvents = (ledger.unkeyedEvents ?? 0) + 1 }
-        if let duplicate = identityKnown(fingerprint) { if duplicate { return } } else { return }
+        if let duplicate = identityKnown(fingerprint) {
+            if duplicate {
+                rememberCodexBoundary(total, date: date, fingerprint: fingerprint, cursor: &cursor)
+                return
+            }
+        } else { return }
         if let rate = payload["rate_limits"] as? [String: Any] {
             if let plan = rate["plan_type"] as? String {
-                let observed = !historical && (ledger.lastPoll.map { poll.timeIntervalSince($0) <= 45 && date > $0 && date <= poll && account?.id != nil && account?.id == ledger.lastAccount?.id } ?? false)
+                let observed = continuous && !historical && (ledger.lastPoll.map { poll.timeIntervalSince($0) <= 45 && date > $0 && date <= poll && account?.id != nil && account?.id == ledger.lastAccount?.id } ?? false)
                 recordPlan(plan, date: date, account: observed ? account : nil,
                     evidence: observed ? "Usage snapshot · inferred account" : "Usage snapshot · account unknown", model: cursor.model)
             }
@@ -377,7 +449,7 @@ final class UsageScanner {
             }
         }
         guard delta.total > 0, rebuilding || (historical ? date < boundary : date >= boundary) else { return }
-        let associated = !historical && (ledger.lastPoll.map { poll.timeIntervalSince($0) <= 45 && date > $0 && date <= poll && account != nil && account == ledger.lastAccount } ?? false)
+        let associated = continuous && !historical && (ledger.lastPoll.map { poll.timeIntervalSince($0) <= 45 && date > $0 && date <= poll && account != nil && account == ledger.lastAccount } ?? false)
         var entry = Entry(date: date, session: session, model: cursor.model, tokens: delta, account: associated ? account : nil)
         entry.provider = cursor.provider; entry.effort = cursor.effort; entry.costMetadataVersion = 1
         entry.harness = cursor.harness; entry.projectPath = cursor.projectPath
@@ -391,6 +463,17 @@ final class UsageScanner {
         UsageMetadata.enrich(&entry, cursor: cursor, fields: fields, fingerprint: fingerprint, last: last, info: info)
         if rebuilding { entry.account = restoredAccounts[Self.restoreKey(entry)] }
         persistAdmitted(entry, fingerprint: fingerprint, date: date)
+        if loadError == nil, ledger.eventIDs?.contains(fingerprint) == true {
+            if resumedAtVerifiedBoundary { cursor.reconciliation = nil; cursor.admittedBoundary = nil }
+            rememberCodexBoundary(total, date: date, fingerprint: fingerprint, cursor: &cursor, allowReset: !reconciling)
+        }
+    }
+    private func rememberCodexBoundary(_ total: Tokens, date: Date, fingerprint: String, cursor: inout Cursor, allowReset: Bool = false) {
+        if let old = cursor.admittedBoundary, old.session == cursor.sourceSession,
+           (date < old.date || (!allowReset && (total.input < old.total.input || total.output < old.total.output))) { return }
+        let boundary = CodexCounterBoundary(session: cursor.sourceSession, total: total, date: date, fingerprint: fingerprint)
+        cursor.admittedBoundary = boundary
+        if cursor.reconciliation != nil { cursor.reconciliation?.covered = boundary }
     }
     func identityKnown(_ fingerprint: String) -> Bool? {
         if ledger.eventIDs == nil { ledger.eventIDs = [] }
@@ -439,30 +522,6 @@ final class UsageScanner {
             onSnapshot?(currentSnapshot(now: now))
         }
     }
-    private func readLog(_ url: URL, size: UInt64, session: String, cursor: inout Cursor,
-                         account: Account?, poll: Date, historical: Bool) throws {
-        guard let file = fopen(url.path, "r") else { throw POSIXError(.EACCES) }
-        defer { fclose(file) }
-        guard fseeko(file, off_t(cursor.offset), SEEK_SET) == 0 else { throw POSIXError(.EIO) }
-        var line: UnsafeMutablePointer<CChar>?
-        var capacity = 0
-        defer { free(line) }
-        while UInt64(ftello(file)) < size {
-            let length = getline(&line, &capacity, file)
-            if length < 0 { break }
-            guard let line else { break }
-            // Leave an unfinished append for the next scan, without storing prompt bytes.
-            guard line[length - 1] == 10 else { break }
-            let prefix = Data(bytes: line, count: min(length, 1024))
-            if ["token_count", "turn_context", "session_meta"].contains(where: { prefix.range(of: Data($0.utf8)) != nil }) {
-                consume(Data(bytes: line, count: length - 1), session: session, cursor: &cursor,
-                    account: account, poll: poll, historical: historical)
-            }
-            if let loadError { throw NSError(domain: "CodexTokenBar", code: 3, userInfo: [NSLocalizedDescriptionKey: loadError]) }
-            cursor.offset = UInt64(ftello(file))
-        }
-        if ferror(file) != 0 { throw POSIXError(.EIO) }
-    }
     func scan(historical: Bool = false, changedPaths: Set<URL>? = nil, otherTools: (() -> Void)? = nil, toolProgress: ((String, Int, Int) -> Void)? = nil, progress: ((Int, Int) -> Void)? = nil) -> Snapshot {
         lastWork = ScanWork()
         let initialCount = ledger.entries.count
@@ -503,19 +562,17 @@ final class UsageScanner {
         progress?(0, paths.count)
         for (index, url) in paths.enumerated() {
             defer { if (index + 1) % 25 == 0 { progress?(index + 1, paths.count) } }
+            let key = codexCursorKey(url, historical: historical)
+            let errorScope = "Codex · " + (historical ? "history · " : "live · ") + key
             do {
-                let values = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-                guard historical || (values.contentModificationDate ?? .distantPast) >= startDay else { continue }
-                let key = url.path.replacingOccurrences(of: home.path + "/", with: "")
                 var cursor = historical ? (ledger.historyCursors?[key] ?? Cursor()) : (ledger.cursors[key] ?? Cursor())
+                let previousCursor = cursor
+                try reconcileCodexAliases(url, key: key, historical: historical, cursor: &cursor)
                 count += 1
                 lastWork.codexFiles += 1
-                let size = UInt64(values.fileSize ?? 0)
-                if size < cursor.offset { errors.append("A session log was truncated; retained prior totals."); continue }
-                if size == cursor.offset { continue }
-                let previousCursor = cursor
-                try readLog(url, size: size, session: String(url.lastPathComponent.suffix(42).prefix(36)), cursor: &cursor,
-                    account: account, poll: now, historical: historical)
+                try readLog(url, session: String(url.lastPathComponent.suffix(42).prefix(36)), cursor: &cursor,
+                    account: account, poll: now, historical: historical, startDay: startDay)
+                retainErrors(cursor.continuityGap.map { [errorScope + ": " + $0] } ?? [], for: errorScope)
                 guard cursor != previousCursor else { continue }
                 markMetadataDirty()
                 if historical {
@@ -523,7 +580,10 @@ final class UsageScanner {
                     ledger.historyCursors?[key] = cursor
                     if rebuilding { ledger.cursors[key] = cursor }
                 } else { ledger.cursors[key] = cursor }
-            } catch { errors.append("A session could not be read: \(error.localizedDescription)") }
+            } catch {
+                let cursor = historical ? ledger.historyCursors?[key] : ledger.cursors[key]
+                retainErrors([errorScope + ": Session could not be read: \(error.localizedDescription)"] + (cursor?.continuityGap.map { [errorScope + ": " + $0] } ?? []), for: errorScope)
+            }
         }
         progress?(paths.count, paths.count)
         if Self.contains(changedPaths, root: home) { retainErrors(errors, for: "Codex", paths: changedPaths?.contains(home) == true ? nil : changedPaths?.filter { Self.contains([$0], root: home) }) }

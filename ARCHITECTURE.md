@@ -54,8 +54,28 @@ not application state or UI code.
 ### Log to ledger
 
 1. FSEvents dispatch changed paths only to the owning provider, including OpenCode database/WAL and Codex catalog changes. Launch, Refresh history, dropped-event recovery and a 30-minute timer discover missed files. Full history discovery also rebinds newly present or changed Claude/OpenCode roots, retaining path-scoped history cursors and replacing obsolete live readers/watchers; no extra polling loop or restart is required. Catalog database events bypass the ordinary metadata throttle. Provider warnings persist across unrelated successful paths and clear only when the failed scope or a full provider scan succeeds; the failed scope survives restart. Grok child metadata remains available when its event precedes the child summary.
-2. Read from the cursor offset; decode only `token_count`, `turn_context`,
-   `session_meta` lines.
+2. Codex validates the opened file's device/inode, metadata, prefix and cursor
+   boundary before an unchanged-size skip or tail read. Validation and parsing
+   use the same descriptor; a post-read identity/mutation check precedes admission.
+   Only complete `token_count`, `turn_context` and `session_meta` records from
+   the affected tail are retained until that check; prompt bytes are skipped.
+   Unchanged validation reads at most 768 digest bytes per file. Prefix/boundary
+   witnesses do not claim to detect arbitrary interior edits that preserve both
+   witnesses and evade the metadata checks.
+   A discontinuity replays only that file into fresh source context. Persisted
+   observed counters and admitted interval boundaries remain separate: a new
+   fingerprint alone cannot prove new usage. Reconciliation admits only a stated
+   last-request interval disjoint from retained coverage, or resumes ordinary
+   deltas after recovering the exact old boundary. Legacy cursors lack verified
+   continuity and acquire it by re-reading; missing anchors or overlaps remain
+   explicit file/scope warnings. When an old anchor cannot be recovered, a later
+   request dated after the verified scan, on a continuous append with matching
+   session and disjoint counters, can establish a new baseline. The old gap stays
+   visible. Session changes reset counter, turn, model and attribution context;
+   replacement replay is unattributed, while a new chat retains stable-poll rules.
+   Live/history alias lookup is namespace-specific. Multiple legacy aliases are
+   retained as evidence and reconciled against a conservative counter bound;
+   neither a stale alias nor a cursor from the other scope starts blind replay.
 3. Claude uses persisted transcript byte cursors with boundary/inode checks, separate from live rate cursors. Only complete lines advance; counter baselines admit verified increases. OpenCode pages by a persisted `(time_created, id)` watermark and rereads unfinished messages by ID. Grok rereads only the changed session. Missing legacy baselines remain an explicit gap.
    OpenCode retains one read-only SQLite connection across scanner refreshes while the resolved database path and inode match. Missing or replaced files and failed scans release it; scanner teardown releases the final connection. Every page finalizes its statement so new WAL commits remain visible and checkpoints are not pinned between reads. Standalone full reads still scope their connection to that call; admission and cursor authority are unchanged.
 4. Delta from previous totals; a first report or fork admits only

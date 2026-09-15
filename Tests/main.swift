@@ -724,3 +724,362 @@ do {
     assert(trends.evaluatedAt == clock, "Local midnight invalidates time-dependent trends")
 }
 print("PASS: Insights lazily reuses unchanged page results and refreshes at clock/day boundaries")
+
+// Exercise file continuity at the ordinary scan boundary, never by replaying
+// consume directly. All fixtures are disposable and contain no user content.
+var continuityFailures: [String] = []
+func continuityCheck(_ condition: Bool, _ message: String) {
+    if !condition { continuityFailures.append(message); print("FAIL: Codex continuity: " + message) }
+}
+func continuityLine(_ value: [String: Any]) -> Data {
+    try! JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) + Data([10])
+}
+func continuityMeta(_ session: String) -> Data {
+    continuityLine(["type": "session_meta", "payload": ["id": session, "cwd": "/synthetic/" + session, "originator": "codex_cli_rs", "model_provider": "openai"]])
+}
+func continuityRecord(_ turn: String, _ total: Int, at date: Date, last: Int = 100) -> Data {
+    continuityLine(["type": "turn_context", "payload": ["turn_id": turn, "model": "synthetic-model"]]) +
+    continuityLine(["timestamp": iso.string(from: date), "type": "event_msg", "payload": ["type": "token_count", "info": [
+        "total_token_usage": ["input_tokens": total, "cached_input_tokens": 0, "output_tokens": 0],
+        "last_token_usage": ["input_tokens": last, "cached_input_tokens": 0, "output_tokens": 0]]]])
+}
+func continuityPadding(_ count: Int) -> Data {
+    continuityLine(["type": "response_item", "payload": ["content": String(repeating: "x", count: count)]])
+}
+for historical in [false, true] {
+    for kind in ["smaller", "equal", "larger", "regrow", "partial", "legacy", "new-session"] {
+        let fixture = temp.appendingPathComponent("continuity-\(historical)-\(kind)")
+        let file = fixture.appendingPathComponent("sessions/rollout.jsonl")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let state = fixture.appendingPathComponent("ledger.json")
+        let date = historical ? oldDate : now
+        let a = continuityRecord("continuity-A", 100, at: date)
+        let b = continuityRecord("continuity-B", 200, at: date)
+        let c = continuityRecord("continuity-C", 300, at: date)
+        let original = continuityMeta("original") + a + b + continuityPadding(3000)
+        try original.write(to: file)
+        var owner: UsageScanner? = UsageScanner(home: fixture, stateURL: state)
+        owner!.readAccount = false
+        _ = owner!.scan(historical: historical, changedPaths: [file])
+        try owner!.saveIfNeeded(force: true)
+        continuityCheck(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "\(kind) valid original \(historical)")
+        if kind == "legacy" {
+            owner = nil
+            var json = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+            for field in ["cursors", "historyCursors"] {
+                if var cursors = json[field] as? [String: [String: Any]] {
+                    for key in cursors.keys { cursors[key]?.removeValue(forKey: "continuity") }
+                    json[field] = cursors
+                }
+            }
+            try JSONSerialization.data(withJSONObject: json).write(to: state)
+        }
+        var replacement = continuityMeta("original") + a + c
+        if kind == "new-session" { replacement = continuityMeta("different") + continuityRecord("new-session-C", 1000, at: date) }
+        if kind == "equal" { replacement += continuityPadding(original.count - replacement.count - continuityPadding(0).count) }
+        if kind == "larger" || kind == "regrow" { replacement += continuityPadding(5000) }
+        if kind == "partial" { replacement.removeLast(25) }
+        if kind == "regrow" {
+            let writer = try FileHandle(forWritingTo: file)
+            try writer.truncate(atOffset: 0); try writer.write(contentsOf: replacement); try writer.close()
+        } else { try replacement.write(to: file, options: .atomic) }
+        if owner == nil { owner = UsageScanner(home: fixture, stateURL: state); owner!.readAccount = false }
+        _ = owner!.scan(historical: historical, changedPaths: [file])
+        if kind == "partial" {
+            continuityCheck(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "partial waits for complete line \(historical)")
+            let complete = continuityMeta("original") + a + c
+            let writer = try FileHandle(forWritingTo: file)
+            try writer.seekToEnd(); try writer.write(contentsOf: complete.suffix(25)); try writer.close()
+            _ = owner!.scan(historical: historical, changedPaths: [file])
+        }
+        continuityCheck(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "\(kind) A100/B200 then A100/C300 must total300, not400; historical=\(historical), got \(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input })")
+        try owner!.saveIfNeeded(force: true)
+        owner = nil
+        owner = UsageScanner(home: fixture, stateURL: state); owner!.readAccount = false
+        _ = owner!.scan(historical: historical, changedPaths: [file])
+        continuityCheck(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "\(kind) repeat/restart exactly300 \(historical)")
+        owner = nil
+    }
+}
+
+func continuityFixture(_ name: String, at date: Date = now) throws -> (UsageScanner, URL, URL) {
+    let home = temp.appendingPathComponent("continuity-extra-" + name)
+    let file = home.appendingPathComponent("sessions/rollout.jsonl")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try (continuityMeta("original") + continuityRecord("A", 100, at: date) + continuityRecord("B", 200, at: date)).write(to: file)
+    let state = home.appendingPathComponent("ledger.json")
+    let owner = UsageScanner(home: home, stateURL: state); owner.readAccount = false
+    _ = owner.scan(historical: date == oldDate, changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    return (owner, file, state)
+}
+for historical in [false, true] {
+    let date = historical ? oldDate : now
+    let (owner, file, state) = try continuityFixture("overlap-\(historical)", at: date)
+    let originalEntries = owner.ledger.entries
+    let replacement = continuityMeta("original") + continuityRecord("A", 100, at: date) +
+        continuityRecord("unseen-older", 150, at: date.addingTimeInterval(-1)) +
+        continuityRecord("overlap", 250, at: date.addingTimeInterval(1))
+    try replacement.write(to: file, options: .atomic)
+    _ = owner.scan(historical: historical, changedPaths: [file])
+    continuityCheck(owner.ledger.entries == originalEntries, "old or overlapping intervals never add100 atop200 \(historical)")
+    continuityCheck(owner.currentSnapshot().error != nil || owner.ledger.sourceErrors?.isEmpty == false, "overlap is explicit incomplete evidence")
+    let append = try FileHandle(forWritingTo: file); try append.seekToEnd()
+    try append.write(contentsOf: continuityRecord("independent", 300, at: date.addingTimeInterval(2))); try append.close()
+    _ = owner.scan(historical: historical, changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "independently disjoint interval resumes after overlap")
+    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    let restored = UsageScanner(home: owner.home, stateURL: state); restored.readAccount = false
+    continuityCheck(restored.loadError == nil, "restart opens its durable stores")
+    _ = restored.scan(historical: historical, changedPaths: [file])
+    continuityCheck(restored.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "overlap/gap replay remains300")
+    continuityCheck(restored.ledger.sourceErrors?.isEmpty == false, "unrecoverable interval warning survives restart and successful read")
+}
+
+// An observed counter filtered out of this cursor's date scope is not an
+// admitted boundary. Live and historical readers must both retain their share.
+do {
+    let home = temp.appendingPathComponent("continuity-mixed-scope")
+    let file = home.appendingPathComponent("sessions/mixed.jsonl")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let owner = UsageScanner(home: home, stateURL: home.appendingPathComponent("ledger.json")); owner.readAccount = false
+    try (continuityMeta("mixed") + continuityRecord("historical-A", 100, at: oldDate) + continuityRecord("live-B", 200, at: now)).write(to: file)
+    _ = owner.scan(historical: true, changedPaths: [file]); _ = owner.scan(changedPaths: [file])
+    try owner.saveIfNeeded(force: true)
+    try (continuityMeta("mixed") + continuityRecord("historical-A", 100, at: oldDate) +
+        continuityRecord("historical-missing", 150, at: oldDate.addingTimeInterval(1), last: 50) +
+        continuityRecord("live-B", 200, at: now) + continuityRecord("live-C", 300, at: now.addingTimeInterval(1))).write(to: file, options: .atomic)
+    _ = owner.scan(historical: true, changedPaths: [file]); _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 350, "scope-local historical increment is not hidden by live observed boundary")
+    continuityCheck(owner.ledger.entries.filter { $0.date < Calendar.current.startOfDay(for: owner.ledger.started) }.reduce(0) { $0 + $1.tokens.input } == 150, "historical scope retains its own admitted interval")
+}
+
+// Legacy migration without replacement and alias/archive moves retain identities.
+do {
+    var (owner, file, state) = try continuityFixture("legacy-unchanged")
+    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+    var cursors = legacy["cursors"] as! [String: [String: Any]]
+    for key in cursors.keys {
+        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
+    }
+    legacy["cursors"] = cursors
+    try JSONSerialization.data(withJSONObject: legacy).write(to: state)
+    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    continuityCheck(owner.loadError == nil, "restart opens its durable stores")
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "legacy unchanged replay does not duplicate")
+    let append = try FileHandle(forWritingTo: file); try append.seekToEnd()
+    try append.write(contentsOf: continuityRecord("C", 300, at: now)); try append.close()
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "legacy recovered boundary permits ordinary append")
+    _ = owner.scan()
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300 && owner.lastWork.codexBytes == 0, "discovery/path alias reuses cursor without replay")
+    continuityCheck(owner.lastWork.codexValidationBytes <= 768, "unchanged validation is bounded independently of log size")
+    let archived = owner.home.appendingPathComponent("archived_sessions/rollout.jsonl")
+    try FileManager.default.createDirectory(at: archived.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.moveItem(at: file, to: archived)
+    _ = owner.scan(historical: true); _ = owner.scan()
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "archive moves preserve IDs and totals")
+}
+
+for (phase, inPlace) in [(CodexReadPhase.opened, false), (.line, false), (.validated, false), (.validated, true)] {
+    let (owner, file, state) = try continuityFixture("race-\(phase)-\(inPlace)")
+    let before = owner.ledger.cursors
+    let append = try FileHandle(forWritingTo: file); try append.seekToEnd()
+    try append.write(contentsOf: continuityRecord("C", 300, at: now)); try append.close()
+    var fired = false, lines = 0
+    owner.codexReadWillRun = { step, path in
+        guard step == phase, !fired else { return }
+        if step == .line { lines += 1; if lines < 2 { return } }
+        fired = true
+        if step == .line { throw POSIXError(.EIO) }
+        let bytes = continuityMeta("original") + continuityRecord("A", 100, at: now) + continuityRecord("C", 300, at: now)
+        if inPlace {
+            let writer = try FileHandle(forWritingTo: path); try writer.truncate(atOffset: 0)
+            try writer.write(contentsOf: bytes); try writer.close()
+        } else { try bytes.write(to: path, options: .atomic) }
+    }
+    let failed = owner.scan(changedPaths: [file])
+    continuityCheck(fired && failed.error != nil && owner.ledger.cursors == before, "\(phase) failure/race retains exact prior cursor")
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "\(phase) failure admits no staged usage")
+    let unrelated = owner.home.appendingPathComponent("sessions/unrelated.jsonl")
+    try Data().write(to: unrelated); _ = owner.scan(changedPaths: [unrelated])
+    continuityCheck(owner.ledger.sourceErrors?.isEmpty == false, "unrelated success retains failed file diagnostic")
+    owner.codexReadWillRun = nil
+    _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    let restored = UsageScanner(home: owner.home, stateURL: state); restored.readAccount = false
+    continuityCheck(restored.loadError == nil, "restart opens its durable stores")
+    _ = restored.scan(changedPaths: [file])
+    continuityCheck(restored.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "\(phase) retry/restart admits C exactly once")
+}
+for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
+    var (owner, file, state) = try continuityFixture("checkpoint-\(phase)")
+    let prior = owner.ledger.cursors
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now) + continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
+    owner.lastSave = .distantPast
+    owner.checkpointWillRun = { if $0 == phase { throw RequestArchive.failure("Synthetic \(phase) failure") } }
+    continuityCheck(owner.scan(changedPaths: [file]).error != nil, "\(phase) reports checkpoint failure")
+    let durable = try UsageScanner.loadLedger(from: state)
+    continuityCheck(durable.entries.reduce(0) { $0 + $1.tokens.input } == (phase == .ledger ? 200 : 300), "\(phase) durable totals match phase")
+    if phase == .ledger { continuityCheck(durable.cursors == prior, "undurable usage cannot advance durable cursor") }
+    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    continuityCheck(owner.loadError == nil, "restart opens its durable stores")
+    _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    var ids = Set<String>(), archivedTotal = 0
+    try owner.requestArchive!.forEach { entry in ids.insert(entry.recordID!); archivedTotal += entry.tokens.input }
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300 && ids.count == 3 && archivedTotal == 300, "\(phase) restart reconciles ledger/index/archive exactly")
+    let settled = owner.ledger.cursors
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.cursors == settled && owner.lastWork.codexBytes == 0, "\(phase) settled cursor does not replay")
+}
+
+// Old schemas have only cumulative counters. Unknown evidence is not an
+// implicit permission to bill a replayed last_request interval.
+do {
+    var (owner, file, state) = try continuityFixture("legacy-overlap")
+    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+    var cursors = legacy["cursors"] as! [String: [String: Any]]
+    for key in cursors.keys {
+        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
+    }
+    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now) +
+        continuityRecord("legacy-old", 150, at: now) + continuityRecord("legacy-overlap", 250, at: now) +
+        continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
+    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    continuityCheck(owner.loadError == nil, "restart opens its durable stores")
+    let result = owner.scan(changedPaths: [file])
+    continuityCheck(result.entries.reduce(0) { $0 + $1.tokens.input } == 300, "legacy unknown evidence admits only C's disjoint100")
+    continuityCheck(result.error != nil, "legacy missing boundary remains explicitly incomplete")
+}
+
+do {
+    let instant = Date()
+    let home = temp.appendingPathComponent("continuity-account")
+    let file = home.appendingPathComponent("sessions/fresh.jsonl")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try JSONSerialization.data(withJSONObject: ["tokens": ["account_id": "synthetic-account"]]).write(to: home.appendingPathComponent("auth.json"))
+    let owner = UsageScanner(home: home, stateURL: home.appendingPathComponent("ledger.json"))
+    owner.ledger.lastAccount = Account.read(home: home); owner.ledger.lastPoll = instant.addingTimeInterval(-30)
+    try (continuityMeta("fresh") + continuityRecord("fresh-A", 100, at: instant)).write(to: file)
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.last?.account?.id == "synthetic-account", "new chat retains stable-poll inferred account")
+    let originalAccount = owner.ledger.entries.first?.account
+    owner.ledger.lastPoll = instant.addingTimeInterval(-30)
+    try (continuityMeta("fresh") + continuityRecord("fresh-A", 100, at: instant) + continuityRecord("fresh-B", 200, at: instant)).write(to: file, options: .atomic)
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.last?.account == nil && owner.ledger.entries.first?.account == originalAccount, "replacement replay is unattributed and preserves prior account")
+    owner.ledger.lastPoll = instant.addingTimeInterval(-30)
+    let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+    // Omit turn_context deliberately: the new session cannot inherit its model/turn.
+    let record = continuityRecord("unused", 1000, at: instant)
+    let tokenOnly = record.suffix(from: record.firstIndex(of: 10)! + 1)
+    try writer.write(contentsOf: continuityMeta("different") + tokenOnly); try writer.close()
+    _ = owner.scan(changedPaths: [file])
+    let last = owner.ledger.entries.last!
+    continuityCheck(last.tokens.input == 100 && last.model == "Unknown model" && last.projectPath == "/synthetic/different" && last.account == nil,
+                    "session change inside append resets counters/model/turn/project and inferred account")
+}
+
+do {
+    var (owner, file, state) = try continuityFixture("legacy-no-anchor")
+    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+    var cursors = legacy["cursors"] as! [String: [String: Any]]
+    for key in cursors.keys {
+        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
+    }
+    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
+    owner.eventIndex = nil; owner.requestArchive = nil
+    try (continuityMeta("unverified") + continuityRecord("unseen-initial", 100, at: now)).write(to: file, options: .atomic)
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    let first = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(first.entries.reduce(0) { $0 + $1.tokens.input } == 200 && first.error != nil, "no-anchor legacy prefix is withheld with an explicit gap")
+    owner.eventIndex = nil; owner.requestArchive = nil
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    continuityCheck(owner.loadError == nil, "no-anchor restart restores verified source boundary")
+    // Production accepts fractional timestamps too; this fixture's ISO formatter
+    // uses whole seconds, so cross one timestamp tick after the verified scan.
+    Thread.sleep(forTimeInterval: 1.1)
+    let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+    let bytes = continuityRecord("provably-later", 200, at: Date())
+    try writer.write(contentsOf: bytes); try writer.close()
+    let next = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(next.entries.reduce(0) { $0 + $1.tokens.input } == 300 && next.error != nil, "verified later append resumes100 while historical gap remains")
+    continuityCheck(owner.lastWork.codexBytes == bytes.count, "ordinary append reads only its tail")
+    owner.eventIndex = nil; owner.requestArchive = nil
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.loadError == nil && owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "no-anchor recovered append is counted exactly once after restart")
+}
+
+for historical in [false, true] {
+    let (owner, file, _) = try continuityFixture("opposite-alias-\(historical)", at: historical ? oldDate : now)
+    let relative = "sessions/rollout.jsonl", absolute = file.resolvingSymlinksInPath().path
+    if historical {
+        let prior = owner.ledger.historyCursors?.removeValue(forKey: relative)
+        owner.ledger.historyCursors?[absolute] = prior
+        owner.ledger.cursors[relative] = Cursor()
+    } else {
+        let prior = owner.ledger.cursors.removeValue(forKey: relative)
+        owner.ledger.cursors[absolute] = prior
+        owner.ledger.historyCursors = [relative: Cursor()]
+    }
+    try (continuityMeta("original") + continuityRecord("A", 100, at: historical ? oldDate : now) +
+        continuityRecord("C", 300, at: historical ? oldDate : now)).write(to: file, options: .atomic)
+    _ = owner.scan(historical: historical, changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "opposite namespace aliases retain B200 during A/C replay \(historical)")
+}
+do {
+    let home = temp.appendingPathComponent("multiple-aliases")
+    let file = home.appendingPathComponent("sessions/rollout.jsonl")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let owner = UsageScanner(home: home, stateURL: home.appendingPathComponent("ledger.json")); owner.readAccount = false
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now)).write(to: file)
+    _ = owner.scan(changedPaths: [file])
+    let stale = owner.ledger.cursors["sessions/rollout.jsonl"]!
+    let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+    try writer.write(contentsOf: continuityRecord("B", 200, at: now)); try writer.close()
+    _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    let absolute = file.resolvingSymlinksInPath().path
+    owner.ledger.cursors[absolute] = owner.ledger.cursors["sessions/rollout.jsonl"]
+    owner.ledger.cursors["sessions/rollout.jsonl"] = stale
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now) + continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
+    _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "multiple aliases cannot silently choose weaker A100 boundary")
+    let cursors = owner.ledger.cursors
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.cursors == cursors && owner.lastWork.codexBytes == 0, "resolved alias evidence is stable without repeated replay")
+}
+
+do {
+    let (owner, file, _) = try continuityFixture("missing-last")
+    let c = continuityRecord("C-without-last", 300, at: now)
+    let lines = c.split(separator: 10)
+    var token = try JSONSerialization.jsonObject(with: Data(lines[1])) as! [String: Any]
+    var payload = token["payload"] as! [String: Any], info = (token["payload"] as! [String: Any])["info"] as! [String: Any]
+    info.removeValue(forKey: "last_token_usage"); payload["info"] = info; token["payload"] = payload
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now) + Data(lines[0]) + Data([10]) + continuityLine(token)).write(to: file, options: .atomic)
+    let held = owner.scan(changedPaths: [file])
+    continuityCheck(held.entries.reduce(0) { $0 + $1.tokens.input } == 200 && held.error != nil, "missing request counters cannot manufacture recovered usage")
+    let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+    try writer.write(contentsOf: continuityRecord("D", 400, at: now)); try writer.close()
+    let resumed = owner.scan(changedPaths: [file])
+    continuityCheck(resumed.entries.reduce(0) { $0 + $1.tokens.input } == 300 && resumed.error != nil, "later supported request resumes without inventing missing C")
+    _ = owner.scan(historical: true, changedPaths: [file])
+    continuityCheck(owner.ledger.sourceErrors?.isEmpty == false, "successful opposite date scope cannot clear the missing live interval")
+}
+do {
+    let (owner, file, _) = try continuityFixture("counter-reset")
+    let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+    try writer.write(contentsOf: continuityRecord("reset", 100, at: now.addingTimeInterval(1))); try writer.close()
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "ordinary counter reset admits only last request")
+    try (continuityMeta("original") + continuityRecord("after-reset", 200, at: now.addingTimeInterval(2))).write(to: file, options: .atomic)
+    _ = owner.scan(changedPaths: [file])
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 400, "recovery uses the admitted post-reset boundary rather than an older counter epoch")
+}
+if !continuityFailures.isEmpty { fflush(stdout); exit(1) }
+print("PASS: Codex scan continuity live/history matrix, disjoint interval recovery, legacy no-anchor resumption, aliases, races, account boundaries and checkpoint restarts")
