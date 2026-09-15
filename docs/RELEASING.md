@@ -102,7 +102,9 @@ owns membership; full executable comparison remains required.
 It rebuilds the unsigned installer using the commit's own scripts. Disposable
 expanded copies have their app signatures removed; complete executable bytes,
 payload paths and modes, resources, installer scripts and install metadata must
-match. Signature directories and signing-dependent installed sizes are excluded.
+match. Signature directories, signing-dependent installed sizes and the `__LINKEDIT`
+mapping size that signature removal leaves behind are excluded; that size must
+stay page-aligned and within signature slack of the compared file size.
 Unexpected payloads and toolchain differences fail closed. This content check
 is separate from the shipped package signature and notarization checks. A stapler
 exit of 68 means Apple could not be reached, not that a ticket is invalid.

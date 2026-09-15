@@ -1,17 +1,54 @@
 #!/usr/bin/env python3
 """Compare two pkgutil --expand-full trees after removing app signatures.
 
-Only signature directories and signing-dependent installed size metadata are
-excluded. Installer scripts, payload paths/modes, resources, and complete
-unsigned executables must agree. Any other difference fails closed.
+Only signature directories, signing-dependent installed size metadata and the
+__LINKEDIT mapping size that signature removal leaves behind are excluded.
+Installer scripts, payload paths/modes, resources, and complete unsigned
+executables must agree. Any other difference fails closed.
 """
 import hashlib
 import os
 from pathlib import Path
 import stat
+import struct
 import sys
 import subprocess
 import xml.etree.ElementTree as ET
+
+PAGE = 0x4000
+# A signature is kilobytes; anything beyond this is not signing residue.
+SIGNATURE_SLACK = 0x100000
+
+
+def unsigned_macho(data):
+    """Zero __LINKEDIT vmsize in a thin 64-bit Mach-O.
+
+    codesign --remove-signature restores the segment's file size but keeps the
+    page-rounded mapping size the removed signature needed, so a Developer ID
+    signature and an ad-hoc one can leave different values. The field must stay
+    page-aligned and within signature slack of the file size; every other byte,
+    including that file size, still compares.
+    """
+    if data[:4] != b'\xcf\xfa\xed\xfe':
+        return data
+    ncmds, sizeofcmds = struct.unpack_from('<II', data, 16)
+    offset, end = 32, 32 + sizeofcmds
+    for _ in range(ncmds):
+        if offset + 8 > end:
+            raise ValueError('Malformed Mach-O load commands')
+        command, size = struct.unpack_from('<II', data, offset)
+        if size < 8 or offset + size > end:
+            raise ValueError('Malformed Mach-O load commands')
+        if command == 0x19 and data[offset + 8:offset + 24].rstrip(b'\0') == b'__LINKEDIT':
+            vmsize, _, filesize = struct.unpack_from('<QQQ', data, offset + 32)
+            rounded = -(-filesize // PAGE) * PAGE
+            if vmsize % PAGE or not rounded <= vmsize <= rounded + SIGNATURE_SLACK:
+                raise ValueError('__LINKEDIT mapping size differs beyond signature slack')
+            normalized = bytearray(data)
+            normalized[offset + 32:offset + 40] = bytes(8)
+            return bytes(normalized)
+        offset += size
+    raise ValueError('Mach-O executable has no __LINKEDIT segment')
 
 
 def inventory(root):
@@ -25,7 +62,7 @@ def inventory(root):
         if path.is_symlink():
             value = ('link', os.readlink(path))
         elif path.is_file():
-            value = ('file', hashlib.sha256(path.read_bytes()).hexdigest())
+            value = ('file', hashlib.sha256(unsigned_macho(path.read_bytes())).hexdigest())
         elif path.is_dir():
             value = ('directory', '')
         else:

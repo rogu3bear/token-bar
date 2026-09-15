@@ -51,7 +51,22 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-release-test-') as temporary:
              lambda: shutil.copy2(left / 'PackageInfo', metadata))
     metadata.write_text('<pkg-info identifier="local.star.CodexTokenBar"><payload installKBytes="2"/></pkg-info>')
     module.compare(left, right)
-print('PASS: release comparison rejects changed executable, resource, script, mode, payload and metadata; installed-size normalization is narrow')
+    # Signature removal can leave a different page-rounded __LINKEDIT mapping size; nothing else may differ.
+    import struct
+    def macho(vmsize, filesize=0x5000, code=b'code'):
+        header = struct.pack('<IiiIIIII', 0xfeedfacf, 0x0100000c, 0, 2, 1, 72, 0, 0)
+        segment = struct.pack('<II16sQQQQiiII', 0x19, 72, b'__LINKEDIT', 0x100000000, vmsize, 0x4000, filesize, 1, 1, 0, 0)
+        return header + segment + code
+    for side in (left, right):
+        (side / 'Payload/Token Bar.app/Contents/MacOS/TokenBar').write_bytes(macho(0x8000))
+    module.compare(left, right)
+    binary.write_bytes(macho(0xc000))
+    module.compare(left, right)
+    for changed in (macho(0x8000 + 0x104000), macho(0x9000), macho(0x4000), macho(0x8000, filesize=0x5001), macho(0x8000, code=b'edit')):
+        rejected(lambda: binary.write_bytes(changed), lambda: binary.write_bytes(macho(0x8000)))
+    truncated = macho(0x8000)[:40]
+    rejected(lambda: binary.write_bytes(truncated), lambda: binary.write_bytes(macho(0x8000)))
+print('PASS: release comparison rejects changed executable, resource, script, mode, payload and metadata; installed-size and signature-residue normalization is narrow')
 
 # Exercise the real shell entry points without compiling or contacting Apple.
 with tempfile.TemporaryDirectory(prefix='tokenbar-output-test-') as temporary:
