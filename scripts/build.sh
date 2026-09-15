@@ -14,6 +14,7 @@ if [ -z "$build_number" ] || [ "$build_number" -le 0 ]; then
   echo "build.sh: VERSION '$version' does not yield a usable CFBundleVersion" >&2
   exit 1
 fi
+require_swift_toolchain || exit 1
 mkdir -p "$PWD/build"
 output="$PWD/build/Token Bar.app"
 stage=$(mktemp -d "$PWD/build/.token-bar-build.XXXXXX")

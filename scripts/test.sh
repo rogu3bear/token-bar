@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/sources.sh
+require_swift_toolchain || exit 1
 mkdir -p build/tests
 
 # Optional single-group run: ./scripts/test.sh cost

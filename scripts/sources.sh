@@ -80,3 +80,21 @@ read_into() {
         eval "$__name+=(\"\$__line\")"
     done
 }
+
+# Token Bar's SwiftUI sources need Xcode's toolchain. An unaccepted Xcode license
+# stops xcrun entirely, and Command Line Tools lack the SwiftUI macro plugin, so
+# state the remedy before compiling instead of after a page of compiler errors.
+require_swift_toolchain() {
+    local report
+    if ! report=$(xcrun swiftc --version 2>&1); then
+        printf '%s\n' "$report" >&2
+        case "$report" in
+            *license*) echo 'Swift toolchain blocked: accept the Xcode license in Terminal with: sudo xcodebuild -license accept' >&2 ;;
+            *) echo 'Swift toolchain unavailable: install Xcode and select it with xcode-select.' >&2 ;;
+        esac
+        return 1
+    fi
+    case "${DEVELOPER_DIR:-$(xcode-select -p 2>/dev/null)}" in
+        *CommandLineTools*) echo 'Swift toolchain warning: Command Line Tools cannot expand the SwiftUI macros these sources use; select Xcode if compilation fails.' >&2 ;;
+    esac
+}
