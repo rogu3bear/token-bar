@@ -1081,5 +1081,52 @@ do {
     _ = owner.scan(changedPaths: [file])
     continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 400, "recovery uses the admitted post-reset boundary rather than an older counter epoch")
 }
+
+// A verified recovery time is an admission fence, not the time of the latest
+// held read. Delayed source timestamps must not chase a moving wall clock.
+do {
+    let previousOptions = iso.formatOptions
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    defer { iso.formatOptions = previousOptions }
+    var (owner, file, state) = try continuityFixture("delayed-no-anchor")
+    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+    var cursors = legacy["cursors"] as! [String: [String: Any]]
+    for key in cursors.keys {
+        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
+    }
+    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
+    owner.eventIndex = nil; owner.requestArchive = nil
+    try (continuityMeta("delayed") + continuityRecord("unknown-prefix", 100, at: Date().addingTimeInterval(-60))).write(to: file, options: .atomic)
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    let initial = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(initial.entries.reduce(0) { $0 + $1.tokens.input } == 200 && initial.error != nil, "delayed stream starts with an explicitly held legacy prefix")
+    let afterInitialVerification = Date()
+    Thread.sleep(forTimeInterval: 0.02) // Cross fractional timestamp precision.
+    let laterSourceDate = Date()
+    Thread.sleep(forTimeInterval: 0.02)
+    func appendDelayed(_ turn: String, _ total: Int, _ date: Date) throws {
+        let writer = try FileHandle(forWritingTo: file); try writer.seekToEnd()
+        try writer.write(contentsOf: continuityRecord(turn, total, at: date)); try writer.close()
+    }
+    // This older record arrives late and must remain held. Its read must not
+    // move the initial time fence ahead of a newer, independently dated request.
+    try appendDelayed("backdated-held", 200, afterInitialVerification.addingTimeInterval(-1))
+    let held = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(held.entries.reduce(0) { $0 + $1.tokens.input } == 200 && held.error != nil, "pre-fence delayed replay remains withheld")
+    owner.eventIndex = nil; owner.requestArchive = nil
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    continuityCheck(owner.loadError == nil, "delayed-stream restart opens durable state")
+    try appendDelayed("delayed-new-C", 300, laterSourceDate)
+    let firstNew = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    continuityCheck(firstNew.entries.reduce(0) { $0 + $1.tokens.input } == 300 && firstNew.error != nil,
+                    "post-fence delayed C must reach300 despite intervening held scan; got \(firstNew.entries.reduce(0) { $0 + $1.tokens.input })")
+    try appendDelayed("delayed-new-D", 400, laterSourceDate.addingTimeInterval(0.005))
+    _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
+    owner.eventIndex = nil; owner.requestArchive = nil
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    let restarted = owner.scan(changedPaths: [file])
+    continuityCheck(owner.loadError == nil && restarted.entries.reduce(0) { $0 + $1.tokens.input } == 400 && restarted.error != nil,
+                    "sustained delayed requests advance exactly once across restart while preserving the gap")
+}
 if !continuityFailures.isEmpty { fflush(stdout); exit(1) }
 print("PASS: Codex scan continuity live/history matrix, disjoint interval recovery, legacy no-anchor resumption, aliases, races, account boundaries and checkpoint restarts")

@@ -352,7 +352,10 @@ extension UsageScanner {
         }
         if next.reconciliation != nil {
             if (!records.isEmpty || !continuous), var observation = next.lastObservation, observation.date <= poll {
-                observation.verifiedAt = Date()
+                // Keep the initial verified time fence while this file remains
+                // continuous. Held delayed records update counters, not the fence.
+                // A discontinuity clears resume above and establishes a new fence.
+                observation.verifiedAt = next.reconciliation?.resume?.verifiedAt ?? Date()
                 next.reconciliation?.resume = observation
             }
             next.continuityGap = "Source continuity is incomplete; retained prior totals and admitted only independently supported requests."

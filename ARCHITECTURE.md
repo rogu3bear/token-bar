@@ -69,8 +69,10 @@ not application state or UI code.
    deltas after recovering the exact old boundary. Legacy cursors lack verified
    continuity and acquire it by re-reading; missing anchors or overlaps remain
    explicit file/scope warnings. When an old anchor cannot be recovered, a later
-   request dated after the verified scan, on a continuous append with matching
-   session and disjoint counters, can establish a new baseline. The old gap stays
+   request dated after the initial verified scan, on a continuous append with
+   matching session and disjoint counters, can establish a new baseline. Held
+   delayed records advance observed counters without moving that time fence;
+   a new file discontinuity establishes a new fence. The old gap stays
    visible. Session changes reset counter, turn, model and attribution context;
    replacement replay is unattributed, while a new chat retains stable-poll rules.
    Live/history alias lookup is namespace-specific. Multiple legacy aliases are
