@@ -661,3 +661,7 @@ footer nav {
   .footer-bottom { flex-direction: column; gap: 14px; }
   .draft-versions { grid-template-columns: 1fr; }
 }
+
+.popover-preview { display: flex; align-items: center; flex-wrap: wrap; gap: 24px 40px; }
+.popover-preview img { width: min(100%, 440px); height: auto; border: 1px solid var(--edge); border-radius: 12px; }
+.popover-preview .recording-note { flex: 1 1 240px; margin: 0; max-width: 380px; }

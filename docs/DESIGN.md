@@ -654,7 +654,7 @@ so surviving tools keep their own controls and gauge when another tool stops.
 Accessibility groups name each tool and contain its speed controls and details.
 The same geometry owner supports minimum/default/wide dashboard sizes.
 
-### Quota Guard in the development source
+### Quota Guard
 
 Now and the 440-point popover share one compact allowance summary independent
 of live tool activity. It exposes the highest-priority warning and an expandable

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.3 — Release candidate
+## 0.1.3 — Released 2026-09-15
 
 - Keep each active tool’s name, rate, status and model details attached to its speed gauge, with aligned column separators and provider-specific accessibility groups.
 - Keep account allowances visible while tools are idle; hide Spark allowance cards on Accounts & plans without deleting saved account or plan history.

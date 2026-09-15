@@ -6,12 +6,12 @@
     <title>Token Bar — Your AI usage, at a glance.</title>
     <meta
       name="description"
-      content="See active AI tools, estimated output speed and saved usage history from your Mac’s menu bar. Open source. Local data. Token Bar v0.1.2."
+      content="See active AI tools, estimated output speed and saved usage history from your Mac’s menu bar. Open source. Local data. Token Bar v0.1.3."
     />
     <meta name="theme-color" content="#0b0d0e" />
     <link rel="icon" href="/token-bar-icon.png" type="image/png" />
-    <link rel="stylesheet" href="/style.css?v=226-clear" />
-    <script src="/demo.js?v=226-clear" type="module"></script>
+    <link rel="stylesheet" href="/style.css?v=013-release" />
+    <script src="/demo.js?v=013-release" type="module"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -31,7 +31,7 @@
     <main id="main" tabindex="-1">
       <section class="hero wrap">
         <div class="eyebrow">
-          <span class="status-dot"></span> v0.1.2 · OPEN SOURCE FOR MAC
+          <span class="status-dot"></span> v0.1.3 · OPEN SOURCE FOR MAC
         </div>
         <h1>Your AI usage.<br /><span>At a glance.</span></h1>
         <p class="intro">
@@ -43,8 +43,8 @@
           <a
             class="button primary"
             id="download"
-            href="https://github.com/rogu3bear/token-bar/releases/download/v0.1.2/TokenBar-0.1.2-arm64.pkg"
-            >Download v0.1.2 .pkg <span aria-hidden="true">↓</span></a
+            href="https://github.com/rogu3bear/token-bar/releases/download/v0.1.3/TokenBar-0.1.3-arm64.pkg"
+            >Download v0.1.3 .pkg <span aria-hidden="true">↓</span></a
           ><a class="button secondary" href="#try"
             >See the app <span aria-hidden="true">↓</span></a
           >
@@ -66,9 +66,9 @@
           </div>
           <div class="menu-viewport" tabindex="0" role="region" aria-label="Enlarged menu-bar preview">
             <div class="recording-frame native-menu">
-              <img src="/menu-bar-demo.png?v=228-release" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
+              <img src="/menu-bar-demo.png?v=013-release" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
               <video id="menu-recording" controls muted playsinline preload="metadata"
-                poster="/menu-bar-demo.png?v=228-release" src="/menu-bar-demo.mp4?v=228-release"
+                poster="/menu-bar-demo.png?v=013-release" src="/menu-bar-demo.mp4?v=013-release"
                 aria-label="Native menu-bar recording with synthetic token measurements">
                 Your browser cannot play this recording.
               </video>
@@ -77,22 +77,30 @@
         </div>
         <div class="surface-heading dashboard-heading">
           <h3>Dashboard</h3>
-          <p>Activity, output speed, and allowance in one place.</p>
+          <p>Each tool’s activity, rate and gauge stay together.</p>
         </div>
         <div class="native-preview recording-frame">
-          <img src="/dashboard-demo.png?v=228-release" width="1064" height="800" alt="Native Token Bar dashboard showing sample Codex activity before Claude joins" />
+          <img src="/dashboard-demo.png?v=013-release" width="1064" height="800" alt="Native Token Bar dashboard showing sample Codex activity before Claude joins" />
           <video id="dashboard-recording" data-loop-start="45.3" controls muted playsinline preload="metadata"
-            poster="/dashboard-demo.png?v=228-release" src="/dashboard-demo.mp4?v=228-release"
+            poster="/dashboard-demo.png?v=013-release" src="/dashboard-demo.mp4?v=013-release"
             aria-label="Native Token Bar dashboard recording with synthetic token measurements">
             Your browser cannot play this recording.
           </video>
         </div>
         <div class="demo-footer">
-          <p class="demo-caption">Native app preview · sample data · recordings from the development build</p>
+          <p class="demo-caption">Token Bar 0.1.3 · native previews with synthetic sample data</p>
           <div class="recording-controls" hidden>
             <button id="demo-play" type="button" aria-label="Pause preview" title="Pause preview"><span id="demo-icon" aria-hidden="true">Ⅱ</span></button>
             <span id="recording-status" class="visually-hidden" role="status"></span>
           </div>
+        </div>
+        <div class="surface-heading dashboard-heading">
+          <h3>A quick look, even while idle</h3>
+          <p>Account allowance stays visible independently of live speed.</p>
+        </div>
+        <div class="popover-preview">
+          <img src="/popover-idle.png?v=013-release" width="440" height="440" loading="lazy" alt="Token Bar 0.1.3 popover with Codex, Claude and Grok idle, their separate remaining allowances, and saved Today history" />
+          <p class="recording-note">Open the popover for current activity and saved usage. Quota Guard shows available evidence; no warning does not guarantee remaining capacity. Notifications are optional and off by default.</p>
         </div>
       </section>
       <section class="details wrap" id="how">
@@ -107,7 +115,7 @@
           </div></article>
           <article><span class="index mono">02</span><div>
             <h3>What allowance remains?</h3>
-            <p>Check remaining allowance and reset times for supported accounts. Estimates show how long it may last at your recent pace. Unavailable readings are clearly labeled.</p>
+            <p>Keep supported account allowances visible even when tools are idle. Quota Guard identifies fresh, account-bound risks; stale and unavailable readings stay explicit. Forecasts use account observations, independently of output speed.</p>
           </div></article>
           <article><span class="index mono">03</span><div>
             <h3>Where did the usage go?</h3>
@@ -117,9 +125,9 @@
       </section>
       <section class="details wrap" id="comparison" aria-labelledby="comparison-heading">
         <div class="section-heading">
-          <span class="eyebrow">NEW IN 0.1.2</span>
+          <span class="eyebrow">COST &amp; CONTEXT</span>
           <h2 id="comparison-heading">Put cost in context.<br />Compare what produced it.</h2>
-          <p class="flow-note">Included in Token Bar 0.1.2. Output includes reasoning and does not measure answer quality. API estimates, local tokens, account totals and allowance changes remain separate measurements.</p>
+          <p class="flow-note">Output includes reasoning and does not measure answer quality. API estimates, local tokens, account totals and allowance changes remain separate measurements.</p>
         </div>
         <div class="feature-list">
           <article><span class="index mono">01</span><div>
