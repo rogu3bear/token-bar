@@ -11,10 +11,13 @@ struct QuotaGuardSummary: View {
                 Label("Quota Guard", systemImage: warnings.isEmpty ? "gauge.with.dots.needle.33percent" : "exclamationmark.triangle")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(warnings.isEmpty ? Color.primary : Color.orange)
+                if warnings.count > 1 { Text("\(warnings.count) allowance warnings").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
                 Button(expanded ? "Less" : "All allowances") { expanded.toggle() }.font(.caption)
             }
-            if let first = warnings.first { row(first) }
+            if let first = warnings.first {
+                if expanded { row(first) } else { summary(first) }
+            }
             else { Text("No current quota warning. Missing evidence does not mean capacity is available.").font(.caption).foregroundStyle(.secondary) }
             if expanded {
                 ScrollView {
@@ -22,8 +25,6 @@ struct QuotaGuardSummary: View {
                         ForEach(coordinator.decisions.filter { $0.id != warnings.first?.id }) { row($0) }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(maxHeight: compact ? 180 : 260)
-            } else if warnings.count > 1 {
-                Text("\(warnings.count - 1) other allowance " + (warnings.count == 2 ? "warning" : "warnings")).font(.caption).foregroundStyle(.secondary)
             }
             if let error = coordinator.persistenceError { Text(error).font(.caption).foregroundStyle(.orange) }
             if coordinator.submissionState.hasPrefix("That allowance") { Text(coordinator.submissionState).font(.caption).foregroundStyle(.orange) }
@@ -32,6 +33,35 @@ struct QuotaGuardSummary: View {
         .sheet(item: Binding(get: { compact ? nil : coordinator.selected }, set: { coordinator.selected = $0 })) { decision in
             QuotaGuardDetail(coordinator: coordinator, decision: decision)
         }
+    }
+    private func summary(_ decision: QuotaGuardDecision) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 16) {
+                summaryText(decision).frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
+                actions(decision).fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                summaryText(decision)
+                actions(decision)
+            }
+        }
+    }
+    private func summaryText(_ decision: QuotaGuardDecision) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(decision.title).font(.caption.weight(.semibold)).lineLimit(2).help(decision.title)
+            Text(decision.riskLabel + (decision.remaining.map { String(format: " · %.0f%% remaining", $0) } ?? "") +
+                 (decision.forecast.map { " · " + Runway.clockLabel($0, now: decision.evaluated) } ?? ""))
+                .font(.caption).fixedSize(horizontal: false, vertical: true)
+        }.help(decision.reason.label + ". Expand All allowances for source and reset times.")
+    }
+    private func actions(_ decision: QuotaGuardDecision) -> some View {
+        HStack {
+            Button("View quota") { coordinator.view(decision) }
+                .accessibilityLabel("View quota for " + decision.title)
+            Button(coordinator.isSnoozed(decision) ? "Snoozed 30 min" : "Snooze 30 min") { coordinator.snooze(decision) }
+                .disabled(coordinator.isSnoozed(decision))
+                .accessibilityLabel("Snooze notifications for " + decision.title + " for 30 minutes")
+        }.font(.caption)
     }
     private func row(_ decision: QuotaGuardDecision) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -43,13 +73,7 @@ struct QuotaGuardSummary: View {
             if let reading = decision.reading {
                 Text("Reset " + reading.reset.formatted(date: .abbreviated, time: .shortened) + " · read " + reading.date.formatted(date: .omitted, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
-                HStack {
-                    Button("View quota") { coordinator.view(decision) }
-                        .accessibilityLabel("View quota for " + decision.title)
-                    Button(coordinator.isSnoozed(decision) ? "Snoozed 30 min" : "Snooze 30 min") { coordinator.snooze(decision) }
-                        .disabled(coordinator.isSnoozed(decision))
-                        .accessibilityLabel("Snooze notifications for " + decision.title + " for 30 minutes")
-                }.font(.caption)
+                actions(decision)
             }
         }
     }

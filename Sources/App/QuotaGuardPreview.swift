@@ -57,7 +57,8 @@ enum QuotaGuardPreview {
             }
         }
         if arguments.contains("--sample-active") {
-            for tool in LiveTool.allCases {
+            let count = arguments.contains("--sample-single-tool") ? 1 : arguments.contains("--sample-two-tools") ? 2 : 3
+            for tool in Array(LiveTool.allCases.prefix(count)) {
                 let meter = model.meter(for: tool)
                 let id = "synthetic-" + tool.rawValue
                 var activity = ActivitySnapshot(readAt: now, referenceDate: now)
@@ -87,16 +88,18 @@ enum QuotaGuardPreview {
             print("PASS: View quota opens Now with exact allowance and reuses the dashboard window/controller")
         }
         let compact = arguments.contains("--sample-compact")
+        let width: CGFloat = arguments.contains("--sample-default-size") ? 1120 : 900
+        let height: CGFloat = arguments.contains("--sample-default-size") ? 800 : 700
         let settings = arguments.contains("--sample-settings")
         let view = AppearanceHost(preferences: model.appearance, clock: model.clock) {
             Group {
                 if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
                 else { DetailRoot(model: model, initialDestination: settings ? .menuBar : .now) }
-            }.frame(width: compact ? 440 : 900, height: compact ? nil : 700)
+            }.frame(width: compact ? 440 : width, height: compact ? nil : height)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.previewStill()
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : 900, height: compact ? host.fittingSize.height : 700)
+        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : width, height: compact ? host.fittingSize.height : height)
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
         let closer = QuotaGuardPreviewClose()
         if destination == nil { window.delegate = closer }

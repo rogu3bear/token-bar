@@ -643,8 +643,12 @@ Now and the 440-point popover share one compact allowance summary independent
 of live tool activity. It exposes the highest-priority warning and an expandable
 list of all supported allowances, including stale and unavailable evidence.
 No inactive speed panels or separate dashboard destination are added. Warning
-text names the tool, allowance window and bucket; reset and source time stay
-visible. Native primary/secondary labels support Light and Dark with any accent.
+text names the tool, allowance window and bucket. The collapsed warning remains
+brief; All allowances and View quota expose reset/source times and full evidence.
+The shared provider layout places each existing RPM gauge immediately after its
+speed header, ahead of detailed allowance rows. Gauges remain visible in the
+initial 900×700 dashboard with one, two or three active tools; an explicit
+expansion can use the existing page scroll. Native primary/secondary labels support Light and Dark with any accent.
 
 View quota opens the existing dashboard at Now and presents that exact allowance.
 The detail updates within a verified account/period and labels old-account or

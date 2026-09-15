@@ -19,18 +19,18 @@ struct LiveToolPanels: View {
                     ForEach(tools) { tool in
                         ToolSpeedHeader(tool: tool, rateSize: tools.count > 2 ? 29 : 34, meter: model.meter(for: tool))
                     }
-                    ForEach(tools) { _ in Divider() }
-                    ForEach(tools) { tool in
-                        ToolQuotaSummary(tool: tool, quota: model.quota(for: tool),
-                                         now: model.referenceDate ?? clock.now, embedded: true,
-                                         connection: tool == .claude ? model.claudeConnection : nil)
-                    }
                     ForEach(tools) { tool in
                         let meter = model.meter(for: tool)
                         RPMGauge(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
                                  measured: meter.rawRate, hasRate: meter.hasRate, unit: Binding(get: { meter.unit }, set: { meter.unit = $0 }),
                                  compactLayout: true, showsReadout: false)
                             .frame(height: tools.count > 2 ? 210 : 260)
+                    }
+                    ForEach(tools) { _ in Divider() }
+                    ForEach(tools) { tool in
+                        ToolQuotaSummary(tool: tool, quota: model.quota(for: tool),
+                                         now: model.referenceDate ?? clock.now, embedded: true,
+                                         connection: tool == .claude ? model.claudeConnection : nil)
                     }
                     ForEach(tools) { tool in
                         VStack(alignment: .leading) {
