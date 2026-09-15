@@ -45,7 +45,11 @@
       </p>
       <p>
         Token Bar also reads Claude Code’s local quota cache when it
-        matches the account and is fresh. If you choose Connect Claude Code, the
+        matches the account and is fresh. Every 15 minutes it asks the installed
+        Claude Code for usage, without a prompt or a saved session; Claude Code
+        then contacts its provider with your existing sign-in and updates that
+        cache. Optional Fable quota and time-left fields are calculated on your
+        Mac from those readings. If you choose Connect Claude Code, the
         app adds its relay to the status line in your Claude Code user settings
         (keeping any existing command, with a backup) and Claude Code then writes
         its status JSON, including rate limits, to
@@ -53,9 +57,9 @@
         after each turn. The relay keeps the supplied status JSON locally. Token
         Bar uses rate-limit presence to show connection state; these readings
         have no originating account identity and do not supply account quota.
-        This does not read Claude credentials or make a Claude quota request.
+        Token Bar does not read Claude credentials or make a Claude quota request itself.
         For Grok, Token Bar reads local sign-in identity fields to associate quota
-        observations with an account. The installed Codex app-server and Grok agent may contact
+        observations with an account. The installed Codex app-server, Claude Code and Grok agent may contact
         their providers using your existing sign-ins. Token Bar does not send your
         usage history to the maintainer.
       </p>
