@@ -10,6 +10,15 @@ The app and installer are separately signed: Developer ID Application for the
 app, Developer ID Installer for the `.pkg`. Maintainers store notarization
 credentials in Keychain; users need none of these to install.
 
+## Preparing the successor
+
+The source candidate is **0.1.4**, build **30104**. It is not a public download
+until its exact source-bound installer passes signing, notarization, source
+binding and the authorized publication step. The public links above, the README
+download and the site release manifest remain on 0.1.3 until that publication
+is verified. The candidate's website copy, including the privacy page's Claude
+usage refresh, deploys with that publication through the registered Cloudflare route.
+
 ## Current release binding
 
 The v0.1.3 tag is bound to source commit
