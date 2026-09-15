@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — Release candidate
+
+- Keep each active tool’s name, rate, status and model details attached to its speed gauge, with aligned column separators and provider-specific accessibility groups.
+- Keep account allowances visible while tools are idle; hide Spark allowance cards on Accounts & plans without deleting saved account or plan history.
+- Warn on fresh, account-bound quota exhaustion risk while keeping stale or unavailable readings explicit.
+- Recover Codex log continuity and delayed appends without recounting previously admitted usage.
+- Release synthetic preview models and database owners before removing their temporary files, including interactive close and failure paths.
+
 ## 0.1.2 — Released 2026-09-13
 
 - Restore equal active-provider columns and aligned separators, quota rows and large gauges on Now, with complete rate digits and explicit units.

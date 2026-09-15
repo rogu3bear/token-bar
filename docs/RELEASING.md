@@ -10,6 +10,14 @@ The app and installer are separately signed: Developer ID Application for the
 app, Developer ID Installer for the `.pkg`. Maintainers store notarization
 credentials in Keychain; users need none of these to install.
 
+## Preparing the successor
+
+The source candidate is **0.1.3**, build **30103**. It is not a public download
+until its exact source-bound installer passes signing, notarization, installation
+qualification and the authorized publication step. The public links above remain
+on 0.1.2 until that publication is verified; the site release manifest is updated
+only afterward through the registered Cloudflare route.
+
 ## One-time credential setup
 
 Create an app-specific password in the Apple account UI. In a local Terminal, run the following and supply the password only at the hidden prompt:
