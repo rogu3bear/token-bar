@@ -138,9 +138,9 @@ visible as an error notice without reserving an active tool panel.
 ## Independent tool speeds
 
 Right now shows tools with a fresh rate or currently observed running task.
-Inactive quota readings and stale unconfirmed tasks do not reserve live sections.
+Inactive quota readings and stale unconfirmed tasks do not reserve speed panels; relevant account allowances remain visible.
 Tools join with stable identity and a restrained transition; when nothing is active,
-the dashboard and quick popover say that no tools are working. The status item
+the dashboard says that no tools are working and popover rows distinguish Idle from Unconfirmed. The status item
 retains its Codex starting state. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
 Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover uses the same relevance rule for compact named rates, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
@@ -158,13 +158,20 @@ composition rule across all field selections, orders and compactness settings;
 it does not reset saved configuration. The dropdown groups each tool's speed
 with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
 Existing visibility, order, compactness and unit preferences survive.
-Each tool's gauge, activity, quota remaining, and projected zero share one
-aligned column on the native window canvas. Dividers separate tools and their
-speed/allowance sections without adding card surfaces. The compact gauge leaves the main readings visible at the
+Now places a compact Account allowances section before the larger live gauges.
+Known tools keep a stable allowance disclosure through idle, stale and failed
+reads. Relevance comes from verified discovery, configured connections, recorded
+usage, account identity, quota or observed activity, never a default path or an
+initial monitor error. Remembered relevance retains tool identity only, not quota
+payloads. OpenCode has no account allowance row.
+Each active tool's speed and activity share one aligned gauge column. Stopping a
+tool removes its speed panel but keeps its relevant account allowance. The
+210-point compact gauge preserves room for the independent account section.
+Dividers separate tools without adding card surfaces. The compact gauge leaves the main readings visible at the
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
 fits its content rather than reserving a fixed height, follows the saved
 appearance, and uses the same saved application accent as Now. The quick
-popover shows each relevant tool as name, rate, and remaining percent. Click a row for reset and projected zero. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
+popover shows each relevant tool as name, rate, and remaining percent. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
 its account-bound local usage cache; missing or stale readings stay unavailable. Completion removes a task's rate; stale or insufficient counter
 reports show an em dash, never a guessed zero.
 

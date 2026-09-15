@@ -438,7 +438,7 @@ for selection in [MenuBarTool.codex, .claude, .grok, .auto] {
 }
 print("PASS: every field subset, compactness and order direction names the selected tool exactly once, including stale quota")
 
-// Live panels have no idle fallback and no quota-only provider sections.
+// Speed panels have no idle fallback; independent account allowances persist.
 assert(LiveTool.active(codex: idleCodex, claude: idleClaude, grok: staleGrok).isEmpty)
 assert(LiveTool.active(codex: idleCodex, claude: idleClaude, grok: openGrok) == [.grok])
 openGrok.activity.turns["g"]?.running = false
@@ -518,3 +518,56 @@ do {
     assert(MenuBarPresentation.values(compactSettings, meter: meter, monitor: monitor, now: now)[.rate]!.contains(" tok/"))
 }
 print("PASS: native menu animation preserves measured text/units, tool identity, missing values, reduced motion, retargeting and timer cleanup")
+
+// Account relevance survives the meter window, retaining identities, never payloads.
+do {
+    var relevance = AccountToolRelevance()
+    assert(relevance.tools.isEmpty)
+    relevance.observe(.grok) // A default home, enabled monitor, or initial error is no evidence.
+    assert(relevance.tools.isEmpty)
+    relevance.observe(.claude, discovered: true)
+    relevance.observe(.codex, quota: true)
+    relevance.observe(.grok, account: true)
+    assert(relevance.tools == [.codex, .claude, .grok])
+    for tool in LiveTool.allCases { relevance.observe(tool) }
+    assert(relevance.tools == [.codex, .claude, .grok], "Idle, stale and failed updates cannot erase known tools")
+    var activeOnly = AccountToolRelevance()
+    activeOnly.observe(.claude, activity: true)
+    activeOnly.observe(.claude)
+    assert(activeOnly.tools == [.claude])
+    let reading = QuotaReading(accountID: "synthetic-a", bucket: "codex", name: "Account", window: "primary", minutes: 300,
+                               used: 36, reset: now.addingTimeInterval(3600), date: now)
+    let current = ToolQuotaState(readings: [reading], accountLabel: "Synthetic account", guardAccountID: "synthetic-a")
+    let shown = AccountAllowancePresentation(quota: current, now: now)
+    assert(shown.remaining == "64%" && shown.qualifier == "Remaining")
+    assert(shown.detail.contains("Resets") && shown.detail.contains("Quota read") && shown.detail.contains("Synthetic account"))
+    assert(shown.detail.contains("Learning quota burn"), "Insufficient slope remains explicit")
+    var exhaustedQuota = current; exhaustedQuota.readings[0].used = 100
+    let empty = AccountAllowancePresentation(quota: exhaustedQuota, now: now)
+    assert(empty.remaining == "0%" && empty.qualifier == "Exhausted")
+    var stale = current; stale.readings[0].date = now.addingTimeInterval(-3600)
+    assert(AccountAllowancePresentation(quota: stale, now: now).remaining == "—")
+    assert(AccountAllowancePresentation(quota: stale, now: now).detail.contains("Stale"))
+    var expired = current; expired.readings[0].reset = now
+    assert(AccountAllowancePresentation(quota: expired, now: now).remaining == "—")
+    assert(AccountAllowancePresentation(quota: expired, now: now).qualifier.contains("Reset passed"))
+    var failed = current; failed.guardFailed = true
+    assert(AccountAllowancePresentation(quota: failed, now: now).remaining == "—")
+    assert(AccountAllowancePresentation(quota: failed, now: now).detail.contains("Read failed"))
+    var switched = current; switched.guardAccountID = "synthetic-b"; switched.accountLabel = "Second synthetic account"
+    let switchedFace = AccountAllowancePresentation(quota: switched, now: now)
+    assert(switchedFace.reading == nil && switchedFace.remaining == "—")
+    assert(!switchedFace.detail.contains("64%"), "Old account allowance cannot be labeled as the new account")
+    var invalid = current; invalid.readings[0].used = -1
+    assert(AccountAllowancePresentation(quota: invalid, now: now).remaining == "—")
+    print("PASS: account relevance survives idle/failure with stable order; allowance preserves reset/freshness/identity/zero boundaries")
+}
+assert(CompactLiveCopy.activity(idleCodex) == "Unconfirmed", "No source read is not proof of idle")
+idleCodex.activity = ActivitySnapshot(readAt: now, referenceDate: now)
+assert(CompactLiveCopy.activity(idleCodex) == "Idle")
+assert(CompactLiveCopy.activity(recoveringClaude) == "Working")
+recoveringClaude.hasRate = false
+assert(CompactLiveCopy.activity(recoveringClaude) == "Working", "Working without speed remains working")
+recoveringClaude.activity = failedFeed.filtered(for: .claude); recoveringClaude.tick(now: now)
+assert(CompactLiveCopy.activity(recoveringClaude) == "Unconfirmed")
+print("PASS: compact activity distinguishes working without rate, idle and unconfirmed")

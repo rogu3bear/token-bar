@@ -11,9 +11,13 @@ struct LiveToolPanels: View {
     var body: some View {
         Group {
             let tools = LiveTool.active(codex: codex, claude: claude, grok: model.grokMeter)
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
+            AccountAllowanceSection(tools: model.accountTools, quota: { model.quota(for: $0) },
+                                    now: model.referenceDate ?? clock.now, connection: model.claudeConnection)
             if tools.isEmpty {
-                Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                if !model.accountTools.isEmpty {
+                    Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                }
             } else {
                 ProviderColumnsLayout(columns: tools.count) {
                     ForEach(tools) { tool in
@@ -24,14 +28,9 @@ struct LiveToolPanels: View {
                         RPMGauge(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
                                  measured: meter.rawRate, hasRate: meter.hasRate, unit: Binding(get: { meter.unit }, set: { meter.unit = $0 }),
                                  compactLayout: true, showsReadout: false)
-                            .frame(height: tools.count > 2 ? 210 : 260)
+                            .frame(height: 210)
                     }
                     ForEach(tools) { _ in Divider() }
-                    ForEach(tools) { tool in
-                        ToolQuotaSummary(tool: tool, quota: model.quota(for: tool),
-                                         now: model.referenceDate ?? clock.now, embedded: true,
-                                         connection: tool == .claude ? model.claudeConnection : nil)
-                    }
                     ForEach(tools) { tool in
                         VStack(alignment: .leading) {
                             Text(model.meter(for: tool).models.joined(separator: ", "))

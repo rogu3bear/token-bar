@@ -7,14 +7,16 @@ struct ToolSpeedHeader: View {
     @State private var showActivity = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(tool.label).font(PageStyle.sectionTitle)
-                Spacer()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(tool.label).font(PageStyle.sectionTitle)
+                    activityButton
+                }.fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tool.label).font(PageStyle.sectionTitle)
+                    activityButton
+                }
             }
-            Button { showActivity = true } label: {
-                Label(meter.activity.error == nil ? meter.status : "Inspect activity read failure", systemImage: meter.runningCount > 0 ? "waveform" : "pause.circle")
-                    .font(.callout).foregroundStyle(.primary)
-            }.buttonStyle(.plain).help("Inspect observed chats and agents")
             RateReadout(measured: meter.rawRate, hasRate: meter.hasRate, unit: $meter.unit, size: rateSize)
             Text(meter.hasRate ? "Estimated · \(meter.reportingCount) of \(meter.runningCount) reporting" : "Speed unavailable")
                 .font(.caption).foregroundStyle(.secondary)
@@ -32,4 +34,11 @@ struct ToolSpeedHeader: View {
                 }.frame(width: 560, height: 450).onExitCommand { showActivity = false }
             }
     }
+    private var activityButton: some View {
+        Button { showActivity = true } label: {
+            Label(meter.activity.error == nil ? meter.status : "Inspect activity read failure", systemImage: meter.runningCount > 0 ? "waveform" : "pause.circle")
+                .font(.callout).foregroundStyle(.primary)
+        }.buttonStyle(.plain).help("Inspect observed chats and agents")
+    }
+
 }

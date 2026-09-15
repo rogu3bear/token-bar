@@ -62,6 +62,27 @@ import ServiceManagement
     let tachometer: Tachometer
     let claudeMeter: Tachometer
     let grokMeter: Tachometer
+    var accountRelevance = AccountToolRelevance()
+    var accountTools: [LiveTool] { accountRelevance.tools }
+    /// Watches existing in-memory evidence. No provider or filesystem work in presentation.
+    private func observeAccountTools() {
+        let refresh: @MainActor @Sendable () -> Void = { [weak self] in self?.observeAccountTools() }
+        let evidence = withObservationTracking {
+            LiveTool.allCases.map { tool in
+                let state = quota(for: tool)
+                let meter = meter(for: tool)
+                return (tool, (tool == .codex && (live.currentID != nil || !live.state.accounts.isEmpty)) || state.guardAccountID != nil,
+                        !state.readings.isEmpty || !state.samples.isEmpty,
+                        meter.hasRate || !meter.activity.turns.isEmpty,
+                        tool == .claude && claudeConnection.status != .notConnected)
+            }
+        } onChange: {
+            DispatchQueue.main.async { refresh() }
+        }
+        for (tool, account, quota, activity, configured) in evidence {
+            accountRelevance.observe(tool, discovered: configured, account: account, quota: quota, activity: activity)
+        }
+    }
     var menuTool: LiveTool { (menuBarPreferences.configuration.tool ?? .auto).resolve(codex: tachometer, claude: claudeMeter, grok: grokMeter) }
     var menuMeter: Tachometer { meter(for: menuTool) }
     func meter(for tool: LiveTool) -> Tachometer { tool == .grok ? grokMeter : tool == .claude ? claudeMeter : tachometer }
@@ -154,7 +175,7 @@ import ServiceManagement
                 default: return nil
                 }
             }
-            let sparse = ["empty", "failed"].contains { CommandLine.arguments.contains($0) }
+            let sparse = ["empty", "failed", "--sample-no-accounts"].contains { CommandLine.arguments.contains($0) }
             claudeConnection = ClaudeConnectionModel(fixture: requested ?? (sparse ? .notConnected : .connected))
         }
         grokQuota = GrokQuotaMonitor(home: grokHome, enabled: previewRoot == nil)
@@ -175,12 +196,19 @@ import ServiceManagement
         live.comparisonChanged = { [weak self] in self?.refreshComparisons() }
         publish(snapshot)
         quotaGuard.update(guardInputs())
+        if previewRoot == nil {
+            accountRelevance.observe(.codex, discovered: CodexInstallation.executable() != nil)
+            accountRelevance.observe(.claude, discovered: claudeHome != nil)
+            accountRelevance.observe(.grok, discovered: HarnessDiscovery.grok() != nil)
+        }
+        observeAccountTools()
     }
     func quota(for tool: LiveTool) -> ToolQuotaState {
         if tool == .grok { return grokQuota.quota }
         if tool == .claude { return claudeQuota.quota }
         let account = live.currentID.flatMap { live.state.accounts[$0] }
-        return ToolQuotaState(readings: account?.quotas ?? [], samples: live.state.samples, unavailable: "Awaiting fresh Codex quota", accountLabel: account.map { $0.email + " · " + $0.plan.uppercased() })
+        return ToolQuotaState(readings: account?.quotas ?? [], samples: live.state.samples, unavailable: "Awaiting fresh Codex quota", accountLabel: account.map { $0.email + " · " + $0.plan.uppercased() },
+                              guardAccountID: live.currentID, guardFailed: live.error != nil)
     }
     var periodChoices: [(Int, String)] {
         var choices = [(0, "Today"), (6, "This week"), (2, "Last 7 days"), (3, "Last 30 days"), (1, "All history"), (4, "Custom dates")]
@@ -246,6 +274,14 @@ import ServiceManagement
         snapshot = result
         if result.error == nil { lastSuccessfulUsageRead = result.updated }
         if publishedRevision != sourceRevision {
+            for entry in result.entries {
+                switch HistoryTool.recorded(entry) {
+                case .codex: accountRelevance.observe(.codex, discovered: true)
+                case .claude: accountRelevance.observe(.claude, discovered: true)
+                case .grok: accountRelevance.observe(.grok, discovered: true)
+                case .other, .unknown: break
+                }
+            }
             availableTools = Array(Set(result.entries.map { $0.harness ?? "Unattributed" })).sorted()
             availableModels = Array(Set(result.entries.map(\.model))).sorted()
             availableAccounts = Dictionary(result.entries.compactMap { $0.account }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }).values.sorted { $0.label < $1.label }
@@ -268,6 +304,7 @@ import ServiceManagement
                 let claude = HarnessDiscovery.claudeCode(), openCode = HarnessDiscovery.openCode()
                 if self.scanner.configureSources(claudeHome: claude, openCodeHome: openCode) {
                     DispatchQueue.main.async {
+                        self.accountRelevance.observe(.claude, discovered: claude != nil)
                         self.activityFeed.configureClaude(home: claude)
                         self.sourceRootsChanged?(claude, openCode)
                     }
@@ -393,7 +430,7 @@ struct QuickLiveView: View {
         Group {
             VStack(alignment: .leading, spacing: 10) {
                 HStack { Text("Now").font(.headline); Spacer(); if monitor.busy { ProgressView().controlSize(.small) } }
-                let tools = LiveTool.active(codex: meter, claude: model.claudeMeter, grok: model.grokMeter)
+                let tools = model.accountTools
                 ForEach(tools) { tool in
                     Button {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
@@ -404,7 +441,7 @@ struct QuickLiveView: View {
                     }.buttonStyle(.plain)
                 }
                 if tools.isEmpty {
-                    Text("No tools working right now").foregroundStyle(.secondary)
+                    Text("No account sources detected yet. Open a supported tool to begin.").foregroundStyle(.secondary)
                 }
                 QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
                 ToolActivityErrors(model: model)
@@ -645,7 +682,7 @@ struct QuickLiveView: View {
             return
         }
         if CommandLine.arguments.contains("--preview-tools") {
-            do { try ProductPreview.render(to: nil) }
+            do { try ProductPreview.render(to: nil, compact: CommandLine.arguments.contains("--sample-compact")) }
             catch { print(error.localizedDescription); exit(1) }
             return
         }

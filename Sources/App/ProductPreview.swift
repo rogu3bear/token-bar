@@ -84,7 +84,11 @@ enum ProductPreview {
             row.harness = hour % 2 == 0 ? Harness.grok : "codex-desktop"
             snap.entries.append(row)
         }
+        // Synthetic additions are a new snapshot, not the scanner's old content identity.
+        snap.contentID = nil
         model.snapshot = snap
+        precondition(model.usageStore.compactUsage.timeline.points.contains { $0.tokens.total > 0 },
+                     "Recorded synthetic Today history must survive activity changes")
         if destination == nil || compact {
             model.tachometer.unit = .minute
             model.claudeMeter.unit = .hour
@@ -108,30 +112,115 @@ enum ProductPreview {
                 error: "Synthetic transcript read failed", referenceDate: now)
             model.claudeMeter.tick(now: now)
         }
+        if CommandLine.arguments.contains("--sample-zero") {
+            model.live.state.accounts["sample-account"]?.quotas[0].used = 100
+            model.claudeQuota.quota.readings[0].used = 100; model.grokQuota.quota.readings[0].used = 100
+        }
+        if CommandLine.arguments.contains("--sample-expired") {
+            model.live.state.accounts["sample-account"]?.quotas[0].reset = now
+            model.claudeQuota.quota.readings[0].reset = now; model.grokQuota.quota.readings[0].reset = now
+        }
+        var fixtureActivities = LiveTool.allCases.map { model.meter(for: $0).activity }
+        for (id, task) in fixtureActivities[0].turns {
+            fixtureActivities[0].measurements[id] = RateMeasurement(turn: task.turn, date: now, duration: 6, output: 128, model: "sample-model")
+        }
+        if CommandLine.arguments.contains("--sample-stale") {
+            for id in model.live.state.accounts.keys { model.live.state.accounts[id]?.quotas[0].date = now.addingTimeInterval(-7200) }
+            model.claudeQuota.quota.readings[0].date = now.addingTimeInterval(-7200)
+            model.grokQuota.quota.readings[0].date = now.addingTimeInterval(-7200)
+        }
+        if CommandLine.arguments.contains("--sample-no-accounts") {
+            model.live.currentID = nil; model.live.state.accounts = [:]; model.live.state.samples = []
+            model.claudeQuota.quota = ToolQuotaState(); model.grokQuota.quota = ToolQuotaState()
+            model.snapshot.entries = []
+            for tool in LiveTool.allCases {
+                model.meter(for: tool).activity = ActivitySnapshot(readAt: now, referenceDate: now)
+                model.meter(for: tool).tick(now: now)
+            }
+        }
+        if CommandLine.arguments.contains("--sample-failed") {
+            model.claudeQuota.quota = ToolQuotaState(unavailable: "Synthetic quota read failed", guardFailed: true)
+        }
+        if CommandLine.arguments.contains("--sample-codex-failed") {
+            model.live.error = "Synthetic Codex quota read failed"
+            precondition(model.quota(for: .codex).guardFailed)
+            precondition(AccountAllowancePresentation(quota: model.quota(for: .codex), now: now).reading == nil)
+            print("PASS: shipping Codex model failure invalidates allowance presentation")
+        }
+        if CommandLine.arguments.contains("--sample-switched-account") {
+            model.live.currentID = "sample-second"
+            model.live.state.accounts["sample-second"] = LiveAccount(id: "sample-second", email: "second@example.com", plan: "pro", observed: now, quotas: [quota])
+            precondition(model.quota(for: .codex).guardAccountID == "sample-second")
+            precondition(AccountAllowancePresentation(quota: model.quota(for: .codex), now: now).reading == nil)
+            print("PASS: shipping Codex model rejects old allowance under a switched account")
+        }
+        if CommandLine.arguments.contains("--sample-working-no-rate") {
+            model.tachometer.tick(now: now)
+            precondition(model.tachometer.runningCount > 0 && !model.tachometer.hasRate)
+            precondition(model.tachometer.rate == 0 && model.tachometer.rawRate == 0)
+        }
+        // Flush the model's observation callbacks before constructing shipping consumers.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        if !CommandLine.arguments.contains("--sample-no-accounts") {
+            precondition(model.accountTools == LiveTool.allCases, "Account allowances must outlive fixture activity")
+        } else { precondition(model.accountTools.isEmpty, "Empty fixture must not invent detected tools") }
         let previewWidth: CGFloat = CommandLine.arguments.firstIndex(of: "--sample-width").flatMap {
             CommandLine.arguments.indices.contains($0 + 1) ? Double(CommandLine.arguments[$0 + 1]) : nil
         }.map { CGFloat(min(1800, max(900, $0))) } ?? 1064
+        let previewHeight: CGFloat = CommandLine.arguments.firstIndex(of: "--sample-height").flatMap {
+            CommandLine.arguments.indices.contains($0 + 1) ? Double(CommandLine.arguments[$0 + 1]) : nil
+        }.map { CGFloat(min(1200, max(700, $0))) } ?? 900
         let view = AppearanceHost(preferences: model.appearance) {
-            Group {
-                if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
-                else { DetailRoot(model: model) }
-            }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : 900)
-                .background(Color(nsColor: .windowBackgroundColor))
+            VStack(spacing: 0) {
+                if destination == nil {
+                    HStack {
+                        Text("Synthetic allowance fixture").font(.caption)
+                        Button("Stop all tools") {
+                            let before = model.accountTools.map { AccountAllowancePresentation(quota: model.quota(for: $0), now: now).detail }
+                            for tool in LiveTool.allCases {
+                                model.meter(for: tool).activity = ActivitySnapshot(readAt: now, referenceDate: now)
+                                model.meter(for: tool).tick(now: now)
+                            }
+                            precondition(before == model.accountTools.map { AccountAllowancePresentation(quota: model.quota(for: $0), now: now).detail })
+                            print("PASS: active-to-idle preserves account allowance content at unchanged account and clock")
+                        }
+                        Button("Start tools") {
+                            for (tool, activity) in zip(LiveTool.allCases, fixtureActivities) {
+                                model.meter(for: tool).activity = activity
+                                model.meter(for: tool).tick(now: now)
+                            }
+                        }
+                    }.padding(8)
+                }
+                Group {
+                    if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
+                    else { DetailRoot(model: model) }
+                }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : previewHeight)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            }
         }.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } }
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : previewWidth, height: compact ? host.fittingSize.height : 900)
+        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : previewWidth, height: compact ? host.fittingSize.height : previewHeight + (destination == nil ? 44 : 0))
         if compact { print("Compact native fitting size: \(host.frame.size)") }
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let closer = ProductPreviewClose()
         if destination == nil { window.delegate = closer }
-        window.title = "Token Bar · Synthetic Codex and Claude preview"
+        window.title = "Token Bar · Synthetic allowance preview"
         defer { window.close() }
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.contentView = host
         if destination == nil {
+            // Reuse shipping navigation with only the disposable model; never install
+            // AppDelegate as NSApp.delegate or start its monitoring lifecycle.
+            let delegate = AppDelegate()
+            delegate.model = model; delegate.configureNavigationActions()
+            let controller = NSHostingController(rootView: view)
+            controller.sizingOptions = [.preferredContentSize]
+            window.contentViewController = controller
+            defer { delegate.detailWindow?.close(); delegate.settingsWindow?.close() }
             NSApp.setActivationPolicy(.regular); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-            NSApp.run(); return
+            withExtendedLifetime(delegate) { NSApp.run() }; return
         }
         guard let destination else { return }
         host.layoutSubtreeIfNeeded()

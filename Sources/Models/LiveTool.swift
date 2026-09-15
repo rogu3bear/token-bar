@@ -21,6 +21,60 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
     var label: String { self == .codex ? "Codex" : self == .claude ? "Claude" : "Grok" }
     var color: Color { ToolPalette.defaultColor(rawValue) }
 }
+
+/// Process-owned relevance, independent of the short-lived speed/activity window.
+/// Remembers tool identity only, never quota values or an account's identity.
+struct AccountToolRelevance {
+    private(set) var known: Set<LiveTool> = []
+    var tools: [LiveTool] { LiveTool.allCases.filter { known.contains($0) } }
+    mutating func observe(_ tool: LiveTool, discovered: Bool = false, account: Bool = false,
+                          quota: Bool = false, activity: Bool = false) {
+        if discovered || account || quota || activity { known.insert(tool) }
+    }
+}
+
+/// Both allowance surfaces use the same current-reading and disclosure contract.
+struct AccountAllowancePresentation {
+    let quota: ToolQuotaState
+    let now: Date
+    var matching: [QuotaReading] {
+        quota.readings.filter {
+            (quota.guardAccountID == nil || $0.accountID == quota.guardAccountID) &&
+            !$0.accountID.isEmpty && $0.used.isFinite && (0...100).contains($0.used) && $0.date <= now
+        }
+    }
+    var reading: QuotaReading? {
+        guard !quota.guardFailed else { return nil }
+        return Runway.priority(matching, samples: quota.samples, now: now, horizon: quota.horizon)
+    }
+    var estimate: Runway? { reading.map { Runway.estimate($0, samples: quota.samples, now: now, horizon: quota.horizon) } }
+    var remaining: String { CompactLiveCopy.remaining(estimate) }
+    var qualifier: String {
+        if let estimate { return estimate.remaining == 0 ? "Exhausted" : "Remaining" }
+        if quota.guardFailed { return "Read failed · unconfirmed" }
+        if matching.contains(where: { $0.reset <= now }) { return "Reset passed · unconfirmed" }
+        if !matching.isEmpty { return "Stale · unconfirmed" }
+        return "Unavailable"
+    }
+    var detail: String {
+        var parts = [String]()
+        if let reading, let estimate {
+            parts.append(estimate.remaining == 0 ? "Exhausted" : remaining + " remaining")
+            parts.append("Resets " + reading.reset.formatted(date: .abbreviated, time: .shortened))
+            parts.append("Quota read " + reading.date.formatted(date: .omitted, time: .standard) + Runway.ageLabel(reading, now: now))
+            if let zero = estimate.exhaustion { parts.append("Projected zero " + Runway.clockLabel(zero, now: now)) }
+            parts.append(estimate.message)
+        } else {
+            parts.append(qualifier + " · " + quota.unavailable)
+            if let last = matching.max(by: { $0.date < $1.date }) {
+                parts.append("Last quota read " + last.date.formatted(date: .abbreviated, time: .shortened))
+                parts.append("Reported reset " + last.reset.formatted(date: .abbreviated, time: .shortened))
+            }
+        }
+        if let label = quota.accountLabel { parts.append(label) }
+        return parts.joined(separator: " · ")
+    }
+}
 enum MenuBarTool: String, Codable, CaseIterable, Identifiable {
     case auto, codex, claude, grok
     var id: String { rawValue }
@@ -50,6 +104,11 @@ extension ActivitySnapshot {
 
 
 enum CompactLiveCopy {
+    static func activity(_ meter: Tachometer) -> String {
+        if meter.runningCount > 0 || meter.hasRate { return "Working" }
+        if meter.activity.readAt == nil || meter.activity.uncertain > 0 || meter.activity.error != nil { return "Unconfirmed" }
+        return "Idle"
+    }
     static func rate(_ available: Bool, amount: Double, unit: RateUnit) -> String {
         guard available else { return "—" }
         let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)

@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import plistlib
+import shlex
 from pathlib import Path
 import shutil
 import subprocess
@@ -17,7 +18,11 @@ import uuid
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("output", type=Path, help="New disposable .app path")
+parser.add_argument("--allowance", choices=["now", "popover"], help="Use shipping synthetic allowance views")
 args = parser.parse_args()
+preview_arguments = (["--preview-tools", "--sample-width", "900", "--sample-height", "700"]
+                     + (["--sample-compact"] if args.allowance == "popover" else [])) if args.allowance else [
+                         "--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "failed", "--sample-history"]
 root = Path(__file__).resolve().parent.parent
 source = root / "build/Token Bar.app"
 output = args.output.absolute()
@@ -36,8 +41,7 @@ launcher = output / "Contents/MacOS/PreviewLauncher"
 launcher.write_text('''#!/bin/sh
 set -eu
 preview_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$preview_dir/TokenBar" --preview-cost-navigation --preview-native-interaction --sample-state failed --sample-history
-''')
+exec "$preview_dir/TokenBar" ''' + shlex.join(preview_arguments) + "\n")
 launcher.chmod(0o755)
 # The copied Mach-O's signature bound the original Info.plist. Reseal this
 # disposable copy after changing the bundle identity, then sign its launcher.
@@ -59,7 +63,7 @@ receipt.write_text(json.dumps({
     "source": str(source), "bundle": str(output), "bundleIdentifier": identity,
     "sourceBinarySHA256": sha(binary), "fixtureBinarySHA256": sha(fixture_binary),
     "unsignedBinarySHA256": unsigned, "launcherSHA256": sha(launcher),
-    "arguments": ["--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "failed", "--sample-history"],
+    "arguments": preview_arguments,
     "launch": ["open", "-n", str(output)],
     "scope": "Synthetic fixture only; launch requires the supported GUI session context."
 }, indent=2) + "\n")

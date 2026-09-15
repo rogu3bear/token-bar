@@ -313,3 +313,36 @@ MainActor.assumeIsolated {
     }
     print("PASS: shared headers, metric availability and contribution selection retain stable geometry and actual fractions")
 }
+
+// Render the actual allowance row and popover face, including disclosed evidence.
+MainActor.assumeIsolated {
+    let now = PreviewFixture.date
+    let reading = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Sample", window: "primary", minutes: 300,
+                               used: 36, reset: now.addingTimeInterval(3600), date: now)
+    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account")
+    let idleMeter = Tachometer(defaults: defaults)
+    idleMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now)
+    @MainActor func capture<V: View>(_ name: String, _ content: V, width: CGFloat) -> CGFloat {
+        let host = NSHostingView(rootView: AppearanceHost(preferences: colors) { content.frame(width: width).padding(16) })
+        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host
+        host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        AppearanceRendering.capture(host, to: bitmap)
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/tests/allowance-" + name + ".png"))
+        let height = host.frame.height; window.close(); return height
+    }
+    for (mode, hex) in [("Dark", "D5F566"), ("Light", "D5F566"), ("Light", "2345AF")] {
+        colors.mode = mode; colors.hex = hex
+        let collapsed = capture("collapsed-" + mode + hex,
+            CompactToolRate(tool: .codex, meter: idleMeter, quota: quota, now: now), width: 408)
+        let expanded = capture("expanded-" + mode + hex,
+            CompactToolRate(tool: .codex, meter: idleMeter, quota: quota, now: now, expanded: true), width: 408)
+        assert(expanded > collapsed, "Disclosed reset/read/account evidence must occupy visible native space")
+        let accounts = capture("accounts-" + mode + hex,
+            AccountAllowanceSection(tools: [.codex, .claude], quota: { _ in quota }, now: now), width: 812)
+        assert(accounts < 140, "Collapsed allowances must leave room for live gauges at the minimum window")
+    }
+    print("PASS: shipping allowance rows and expanded popover evidence render with intrinsic sizing in dark/light/custom accent")
+}
