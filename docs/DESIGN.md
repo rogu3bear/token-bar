@@ -267,6 +267,8 @@ marketing state; fallback never changes saved preferences or adds another hue.
 Tool charts distinguish series through line styles, symbols and bar positions,
 not competing hues. MenuBarPresentation.combined is shared by the status item,
 Settings and marketing recordings.
+Accounts & plans omits the Spark allowance bucket (`codex_bengalfox`)
+from its quota cards, retaining all stored observations and account/plan history.
 Accounts & plans covers Codex; Claude's passive current quota has no account or
 plan history page. Synthetic previews inject disposable preferences and never
 write the production defaults or change the measurement calculation.

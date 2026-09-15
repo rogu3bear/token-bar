@@ -571,3 +571,22 @@ assert(CompactLiveCopy.activity(recoveringClaude) == "Working", "Working without
 recoveringClaude.activity = failedFeed.filtered(for: .claude); recoveringClaude.tick(now: now)
 assert(CompactLiveCopy.activity(recoveringClaude) == "Unconfirmed")
 print("PASS: compact activity distinguishes working without rate, idle and unconfirmed")
+
+// Accounts & plans hides only the provider's Spark bucket, without changing evidence.
+do {
+    let codex = QuotaReading(accountID: "sample", bucket: "codex", name: "Codex", window: "primary", minutes: 300,
+                             used: 36, reset: now.addingTimeInterval(3600), date: now)
+    var spark = codex; spark.bucket = "codex_bengalfox"; spark.name = "GPT-5.3-Codex-Spark"
+    var weekly = spark; weekly.window = "secondary"; weekly.minutes = 10080
+    var renamed = spark; renamed.name = "Provider renamed allowance"
+    var unrelated = codex; unrelated.bucket = "future_spark_bucket"; unrelated.name = "Sparkling future allowance"
+    let account = LiveAccount(id: "sample", email: "sample@example.com", plan: "pro", observed: now,
+                              quotas: [spark, codex, weekly, renamed, unrelated])
+    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+    let stored = try! encoder.encode(account)
+    assert(AccountQuotaPresentation.visible(account.quotas) == [codex, unrelated])
+    assert(AccountQuotaPresentation.visible([spark, weekly]).isEmpty)
+    assert(AccountQuotaPresentation.visible([]).isEmpty)
+    assert(try! encoder.encode(account) == stored, "Presentation must preserve stored quota evidence")
+    print("PASS: Accounts & plans omits exact Spark bucket in both windows, preserves unrelated allowances and raw observations")
+}

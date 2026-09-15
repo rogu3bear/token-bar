@@ -237,6 +237,14 @@ enum CostPreview {
             let observed = PreviewFixture.date.addingTimeInterval(state == "failed" ? -600 : 0)
             let quota = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Codex", window: "primary", minutes: 300, used: 36, reset: PreviewFixture.date.addingTimeInterval(3600), date: observed)
             model.live.state.accounts["synthetic-account"] = LiveAccount(id: "synthetic-account", email: "sample@example.com", plan: "pro", observed: observed, quotas: [quota])
+            if arguments.contains("--sample-spark-accounts") {
+                var spark = quota; spark.bucket = "codex_bengalfox"; spark.name = "GPT-5.3-Codex-Spark"
+                var weekly = spark; weekly.window = "secondary"; weekly.minutes = 10080
+                model.live.state.accounts["synthetic-account"]?.quotas += [spark, weekly]
+                spark.accountID = "synthetic-previous"; weekly.accountID = spark.accountID
+                model.live.state.accounts[spark.accountID] = LiveAccount(id: spark.accountID, email: "previous@example.com",
+                    plan: "plus", observed: observed.addingTimeInterval(-86400), quotas: [spark, weekly])
+            }
             if state != "failed" {
                 model.tachometer.activity.turns["sample"] = TaskActivity(turn: "sample", started: observed, observed: observed, running: true, kind: .chat, session: "sample")
                 model.tachometer.rawRate = 72; model.tachometer.rate = 72; model.tachometer.hasRate = true; model.tachometer.reportingCount = 1

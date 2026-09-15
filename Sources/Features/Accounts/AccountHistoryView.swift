@@ -25,6 +25,7 @@ struct SubscriptionView: View {
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(accounts) { account in
+                    let quotas = AccountQuotaPresentation.visible(account.quotas)
                     if account.id != accounts.first?.id { Divider() }
                     VStack(alignment: .leading, spacing: 18) {
                         HStack {
@@ -39,9 +40,9 @@ struct SubscriptionView: View {
                                 Text("Observed " + account.observed.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                        if account.quotas.isEmpty { Text("This account has no supported quota windows.").foregroundStyle(.secondary) }
-                        LazyVGrid(columns: account.quotas.count == 1 ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 320), spacing: 20)], alignment: .leading, spacing: 20) {
-                            ForEach(account.quotas) { quota in
+                        if quotas.isEmpty { Text("No quota windows to display for this account.").foregroundStyle(.secondary) }
+                        LazyVGrid(columns: quotas.count == 1 ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 320), spacing: 20)], alignment: .leading, spacing: 20) {
+                            ForEach(quotas) { quota in
                                 QuotaTrendCard(quota: quota, history: monitor.state.quotaHistory ?? monitor.state.samples, samples: monitor.state.samples,
                                     current: account.id == monitor.currentID)
                             }

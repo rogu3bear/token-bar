@@ -47,7 +47,7 @@ build_group() {
 }
 
 build_group usage      Tests/main.swift            "-swift-version 5 -lsqlite3" $CORE
-build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD
+build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD AccountQuotaPresentation.swift
 build_group quota-guard Tests/QuotaGuard/main.swift "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
 build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
