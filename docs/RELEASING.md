@@ -158,7 +158,7 @@ original source; later documentation commits do not move the release tag.
 
 Draft releases may hold development artifacts during preparation, but are not public downloads. An unsigned development package must never be described as a signed release or linked by the public download manifest.
 
-After release publication, update `site/public/release.json` with `available: true`, the exact GitHub asset URL, package SHA-256, and `notarized: true`. Deploy the site through the registered Cloudflare route and verify the public download resolves to the same bytes.
+After release publication, update `site/public/release.json` with `available: true`, the exact GitHub asset URL, package SHA-256, and `notarized: true`. Deploy the site with `cfctl` under `docs/DEPLOYMENT.md` and verify the public download resolves to the same bytes.
 
 The existing bundle identifier is retained to preserve upgrades and saved menu-bar settings. Package installation does not delete local usage history or alter the user's Codex installation.
 

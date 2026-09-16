@@ -14,16 +14,21 @@ ordinary pages remain static.
 - Static source: `site/public`.
 - Immutable upload directory: `build/site`, produced by `(cd site && bun install && bun run build)`. `build/site-artifact.json` binds every uploaded file by SHA-256.
 - Advanced-mode entry: `site/worker.js`, bundled into `build/site/_worker.js` with pinned esbuild. Preserve `ASSETS.fetch` fallback and clear 410/no-store responses for retired `/api/feedback` and `/api/config`, for every method. These paths read no body or provider binding and make no upstream call. Unknown API paths remain 404/no-store.
-- Upload the complete built directory through the registered Cloudflare Authority. The former mail/config modules and Pages Functions have been retired; no raw functions directory is needed.
+- Upload the complete built directory with `cfctl`, as described under Provider-owned configuration. The former mail/config modules and Pages Functions have been retired; no raw functions directory is needed.
 - Local acceptance: `(cd site && bun test)` for site changes; native checks apply only when native inputs change.
 - Local visual preview: `(cd site && bun run preview)`, static only, with byte-range video responses. Drafting requires no server configuration and works in this preview.
 
 ## Provider-owned configuration
 
-Production deployment remains maintainer-operated through the registered
-Cloudflare Authority. Bind the exact source commit and artifact hashes; there is
-no automatic deploy on source pushes. Contributors need no production credentials
-to build or preview the site.
+Production deployment is maintainer-operated from this repository through
+`cfctl`. `cfctl call wrangler.pages-deploy` binds `build/site`, project
+`token-bar`, production branch `main` and the exact source commit into a
+hash-bound plan covering every uploaded file. The maintainer approves that exact
+plan, it runs once, and cfctl verifies the returned deployment before the live
+checks below. There is no automatic deploy on source pushes, and no dashboard,
+raw Wrangler or other agent upload. Contributors need no production credentials
+to build or preview the site. The capability appears in the cfctl catalog only
+when `wrangler` is on `PATH` during `cfctl catalog sync`.
 
 No Turnstile, Resend, contact address, sender or origin-validation binding is
 required by this source. Existing provider resources or secrets are the operator's
