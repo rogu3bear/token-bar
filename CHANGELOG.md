@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.4 — Release candidate
+## 0.1.4 — Released 2026-09-15
 
 - Keep Claude Code allowance current: every 15 minutes Token Bar asks the installed Claude Code for usage, without a prompt or saved session, and reads only its account-matched cache. The status-line relay still supplies no quota.
 - Add optional Fable quota and Fable time-left menu-bar fields. Fable quota is the lowest remaining of Claude’s 5-hour, weekly and Fable weekly limits, named by the limit that binds; time left projects the first of them to run out from a time-weighted average of recent burn.
