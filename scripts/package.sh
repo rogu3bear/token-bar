@@ -22,15 +22,20 @@ cat > "$stage/components.plist" <<'PLIST'
 <plist version="1.0"><array><dict>
 <key>RootRelativeBundlePath</key><string>Token Bar.app</string>
 <key>BundleIsRelocatable</key><false/>
-<key>BundleIsVersionChecked</key><true/>
+<key>BundleIsVersionChecked</key><false/>
 <key>BundleHasStrictIdentifier</key><true/>
 <key>BundleOverwriteAction</key><string>upgrade</string>
 </dict></array></plist>
 PLIST
+# Version checking stays off above: Installer compares short versions first and
+# would skip replacing a legacy 2.x build. preinstall compares build numbers
+# instead, so it ships beside the scripts, read from the exact bundle packaged.
+ditto "$PWD/scripts/pkg" "$stage/scripts"
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$stage/root/Token Bar.app/Contents/Info.plist" > "$stage/scripts/build"
 # --scripts quits a running copy before the payload lands and re-registers
 # the installed bundle afterwards, so the system resolves this identifier to
 # /Applications rather than to a stale copy elsewhere.
-args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier local.star.CodexTokenBar --version "$version" --ownership recommended --scripts "$PWD/scripts/pkg")
+args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier local.star.CodexTokenBar --version "$version" --ownership recommended --scripts "$stage/scripts")
 if [[ -n "${INSTALLER_SIGNING_IDENTITY:-}" ]]; then args+=(--sign "$INSTALLER_SIGNING_IDENTITY" --timestamp); fi
 pkgbuild "${args[@]}" "$pkg"
 ./scripts/checksum.sh "$pkg"

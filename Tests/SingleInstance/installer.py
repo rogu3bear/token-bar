@@ -12,18 +12,31 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
         "/bin/ps": 'printf "%s\\n" "$TEST_PROCESS_PATH"',
         "/bin/kill": 'echo "$*" >> "$TEST_CALLS"; [ "$1" != "-0" ] || [ "$TEST_STILL_RUNNING" = "yes" ]',
         "/bin/sleep": 'exit 0',
+        "/usr/libexec/PlistBuddy": 'if [ -f "$TEST_INSTALLED_BUILD_FILE" ]; then cat "$TEST_INSTALLED_BUILD_FILE"; else exit 1; fi',
     }
     for index, (path, body) in enumerate(commands.items()):
         fixture = root / str(index)
         fixture.write_text("#!/bin/bash\n" + body + "\n")
         fixture.chmod(0o700)
         source = source.replace(path, str(fixture))
+    installed_plist = root / "Installed Info.plist"
+    source = source.replace("/Applications/Token Bar.app/Contents/Info.plist", str(installed_plist))
     script = root / "preinstall"
     script.write_text(source)
     calls = root / "calls"
-    def run(process, running="no", volume="/"):
+    installed_build = root / "installed-build"
+    def run(process, running="no", volume="/", installed=None, incoming="30105"):
         calls.write_text("")
-        env = dict(os.environ, TEST_PROCESS_PATH=process, TEST_CALLS=str(calls), TEST_STILL_RUNNING=running)
+        installed_plist.unlink(missing_ok=True); installed_build.unlink(missing_ok=True)
+        if installed is not None:
+            installed_plist.write_text("fixture")
+            installed_build.write_text(installed + "\n")
+        build = root / "build"
+        build.unlink(missing_ok=True)
+        if incoming is not None:
+            build.write_text(incoming + "\n")
+        env = dict(os.environ, TEST_PROCESS_PATH=process, TEST_CALLS=str(calls), TEST_STILL_RUNNING=running,
+                   TEST_INSTALLED_BUILD_FILE=str(installed_build))
         result = subprocess.run(["/bin/bash", str(script), "package", "/Applications", volume], env=env, capture_output=True, text=True)
         return result.returncode, calls.read_text(), result.stderr
     installed = "/Applications/Token Bar.app/Contents/MacOS/TokenBar"
@@ -35,4 +48,17 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
     assert code == 1 and "Quit Token Bar" in error and "-KILL" not in log, "Do not replace a running app or force-kill"
     code, log, _ = run(installed, volume="/Volumes/Other")
     assert code == 1 and not log, "Reject other volumes before touching processes"
+    code, log, _ = run(installed, installed="20208", incoming="30105")
+    assert code == 0 and log.startswith("-TERM 123\n"), "A legacy 2.x development build is replaced"
+    code, log, _ = run(installed, installed="30105", incoming="30105")
+    assert code == 0, "Reinstalling the same build repairs in place"
+    code, log, error = run(installed, installed="30106", incoming="30105")
+    assert code == 1 and "newer Token Bar" in error and "30106" in error and not log, "Refuse a downgrade loudly, before touching processes"
+    code, log, _ = run(installed, installed=None, incoming="30105")
+    assert code == 0, "A fresh install has nothing to compare"
+    code, log, _ = run(installed, installed="not-a-number", incoming="30105")
+    assert code == 0, "An unreadable installed build is treated as legacy, not as newer"
+    code, log, error = run(installed, installed="20208", incoming=None)
+    assert code == 1 and "build number" in error and not log, "A package without its build number fails closed"
 print("PASS: installer targets only Applications, spares other copies, fails on busy target and rejects other volumes")
+print("PASS: installer replaces legacy 2.x builds, reinstalls in place, and refuses a newer installed build loudly before stopping it")

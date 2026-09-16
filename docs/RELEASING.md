@@ -53,13 +53,29 @@ Inspect package contents with `pkgutil --expand-full` into a new scratch directo
 
 `VERSION` is the public semantic version. The public sequence begins at 0.1.0.
 `CFBundleVersion` uses a fixed epoch: 30000 + major × 10000 + minor × 100 + patch.
-Thus 0.1.0 becomes 30100, newer than the earlier development builds (202xx).
-Keep minor and patch components below 100 so build numbers remain distinct.
-The bundle identifier and local storage paths stay stable across this transition.
+Thus 0.1.0 becomes 30100, a higher build number than the earlier development
+builds (202xx). Keep minor and patch components below 100 so build numbers
+remain distinct. The bundle identifier and local storage paths stay stable
+across this transition.
+
+macOS Installer does not decide upgrades by build number. With bundle version
+checking on, it compares the short version first, so an installed 2.x
+development build counts as newer than any 0.1.x package: Installer skips the
+bundle, still reports success and writes a receipt, and the old app stays.
+Packages 0.1.0 through 0.1.4 behave this way over a 2.x build (reproduced from
+`/var/log/install.log` and a synthetic-bundle install). From 0.1.5 the component
+plist leaves version checking off, and `preinstall` compares build numbers
+itself: it replaces an older or legacy build, reinstalls the same build in
+place, and refuses a newer installed build with a visible error before stopping
+anything. `package.sh` stages the packaged bundle's exact `CFBundleVersion`
+beside the scripts for that comparison, and a package without it fails closed.
+Anyone on a 2.x build who installs 0.1.4 or earlier must first move the old
+`/Applications/Token Bar.app` to the Trash.
 
 The package installs only `/Applications/Token Bar.app`, explicitly sets
 BundleIsRelocatable to false in its component plist, and declares `upgrade-bundle`
-and `strict-identifier`. Expanded PackageInfo must not list a relocation bundle.
+and `strict-identifier`. Expanded PackageInfo must not list a relocation bundle,
+and its `bundle-version` element must be empty.
 Its `preinstall` sends TERM only to the executable at that exact installed path,
 waits up to ten seconds, and refuses to replace a still-running copy. It does
 not request Apple Events permission or terminate development copies by name.

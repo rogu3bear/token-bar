@@ -6,6 +6,25 @@ if [ "${3:-/}" != "/" ]; then
     echo "Token Bar must be installed on the running startup volume." >&2
     exit 1
 fi
+# The component plist leaves bundle version checking off: macOS Installer compares
+# short versions first, so a legacy 2.x development build would silently "win"
+# against 0.1.x and the install would report success without replacing it. Compare
+# build numbers here instead, and refuse a newer installed build out loud.
+incoming=$(/bin/cat "$(dirname "$0")/build" 2>/dev/null) || incoming=""
+case "$incoming" in
+    ''|*[!0-9]*)
+        echo "This installer is missing its build number. No files were replaced." >&2
+        exit 1 ;;
+esac
+installed_info="/Applications/Token Bar.app/Contents/Info.plist"
+if [ -f "$installed_info" ]; then
+    current=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$installed_info" 2>/dev/null) || current=0
+    case "$current" in ''|*[!0-9]*) current=0 ;; esac
+    if [ "$current" -gt "$incoming" ]; then
+        echo "A newer Token Bar (build $current) is already installed; this installer is build $incoming. No files were replaced." >&2
+        exit 1
+    fi
+fi
 target="/Applications/Token Bar.app/Contents/MacOS/TokenBar"
 for pid in $(/usr/bin/pgrep -x TokenBar 2>/dev/null || true); do
     command=$(/bin/ps -p "$pid" -o comm= 2>/dev/null) || continue

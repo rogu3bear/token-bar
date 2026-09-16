@@ -174,7 +174,8 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-sidecar-test-') as tem
     app = root / 'build/Token Bar.app/Contents'
     app.mkdir(parents=True)
     (app / 'Info.plist').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
-        '<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string></dict></plist>\n')
+        '<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string>'
+        '<key>CFBundleShortVersionString</key><string>9.8.7</string><key>CFBundleVersion</key><string>39807</string></dict></plist>\n')
     build = root / 'scripts/build.sh'
     build.write_text('#!/bin/bash\nexit 0\n')
     build.chmod(0o700)
@@ -186,7 +187,19 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-sidecar-test-') as tem
     assert '/' not in text and text.split()[1] == 'TokenBar-9.8.7-arm64.pkg', text
     assert subprocess.run(['shasum', '-a', '256', '-c', 'TokenBar-9.8.7-arm64.pkg.sha256'],
                           cwd=dist, capture_output=True).returncode == 0
+    # Installer compares short versions first, so bundle version checking must stay off
+    # (a legacy 2.x build would otherwise silently survive); preinstall reads the build instead.
+    import xml.etree.ElementTree as ET
+    expanded = root / 'expanded'
+    subprocess.run(['pkgutil', '--expand-full', str(dist / 'TokenBar-9.8.7-arm64.pkg'), str(expanded)], check=True, capture_output=True)
+    info = ET.parse(expanded / 'PackageInfo').getroot()
+    assert len(list(info.find('bundle-version'))) == 0, 'bundle version checking must be off'
+    assert [b.get('id') for b in info.find('upgrade-bundle')] == ['local.star.CodexTokenBar']
+    assert [b.get('id') for b in info.find('strict-identifier')] == ['local.star.CodexTokenBar']
+    assert (expanded / 'Scripts/build').read_text() == '39807\n', 'preinstall receives the packaged bundle build'
+    assert (expanded / 'Scripts/preinstall').read_bytes() == (owner.parent / 'pkg/preinstall').read_bytes()
 print('PASS: package.sh writes its sidecar through checksum.sh')
+print('PASS: packages disable Installer short-version checking and carry the exact bundle build for preinstall')
 
 # verify-release.sh is the pre-publication gate, so it must reject a sidecar a downloader cannot use.
 verifier = owner.parent / 'verify-release.sh'
