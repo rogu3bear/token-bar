@@ -27,9 +27,12 @@ if receipt.get('status') != 'Accepted':
     raise SystemExit('Notarization was not accepted. Preserve the receipt; do not publish.')
 PY
 xcrun stapler staple "$pkg"
+# Stapling rewrote the package, so package.sh's sidecar is now stale. Re-hash
+# before the remaining checks: one of them can fail for reasons that say nothing
+# about the package (stapler exit 68 is a network fault), and the guard above
+# refuses a rerun, so the preserved output must already be consistent.
+./scripts/checksum.sh "$pkg"
 xcrun stapler validate "$pkg"
 pkgutil --check-signature "$pkg"
 spctl --assess --type install --verbose=2 "$pkg"
-# The sidecar is published beside the installer; name only the basename so it verifies anywhere.
-(cd "$TOKENBAR_DIST_DIR" && shasum -a 256 "${pkg##*/}" > "${pkg##*/}.sha256")
 printf '%s\n' "Signed, notarized installer assembled. Run verify-release.sh against the exact source commit before publication."

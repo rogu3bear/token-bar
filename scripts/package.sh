@@ -33,6 +33,5 @@ PLIST
 args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier local.star.CodexTokenBar --version "$version" --ownership recommended --scripts "$PWD/scripts/pkg")
 if [[ -n "${INSTALLER_SIGNING_IDENTITY:-}" ]]; then args+=(--sign "$INSTALLER_SIGNING_IDENTITY" --timestamp); fi
 pkgbuild "${args[@]}" "$pkg"
-# The sidecar is published beside the installer; name only the basename so it verifies anywhere.
-(cd "$output_dir" && shasum -a 256 "${pkg##*/}" > "${pkg##*/}.sha256")
+./scripts/checksum.sh "$pkg"
 printf '%s\n' "Installer assembled. Public distribution still requires Developer ID signing and notarization."

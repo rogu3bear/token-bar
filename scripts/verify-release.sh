@@ -34,7 +34,27 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 echo "Verifying $(basename "$package") against ${resolved:0:12}"
 
-# 1. Distribution properties of the shipped package itself.
+# 1. The checksum sidecar published beside the installer, when one exists. A
+# private build path in that file fails `shasum -a 256 -c` for every downloader,
+# so it is checked before any expensive work. Absence is not a package defect;
+# it is an unmet publication requirement, and it is reported as one.
+sidecar="$package.sha256"
+if [ -f "$sidecar" ]; then
+    [ "$(wc -l < "$sidecar" | tr -d ' ')" = "1" ] || fail "checksum sidecar is not a single line: $(basename "$sidecar")"
+    line=$(cat "$sidecar")
+    recorded=${line%%[[:space:]]*}
+    named=${line#*[[:space:]]}
+    named=${named#"${named%%[![:space:]]*}"}
+    [ "$named" = "$(basename "$package")" ] \
+        || fail "checksum sidecar names '$named', not the installer basename '$(basename "$package")'. Regenerate it with scripts/checksum.sh"
+    [ "$recorded" = "$(shasum -a 256 "$package" | cut -d' ' -f1)" ] \
+        || fail "checksum sidecar does not match the package bytes. Regenerate it with scripts/checksum.sh"
+    echo "PASS: checksum sidecar names the installer basename and matches its bytes"
+else
+    echo "NOTE: no checksum sidecar beside this package; create one with scripts/checksum.sh before upload"
+fi
+
+# 2. Distribution properties of the shipped package itself.
 if pkgutil --check-signature "$package" 2>/dev/null | grep -q 'Status: signed by a developer certificate'; then
     echo "PASS: package carries a Developer ID installer signature"
 else
@@ -54,13 +74,13 @@ case "$staple_status" in
     *)  fail "package has no valid stapled notarization ticket (stapler exit $staple_status): $(printf '%s' "$staple_output" | tail -1)" ;;
 esac
 
-# 2. Expand the exact component payload; never choose an arbitrary executable.
+# 3. Expand the exact component payload; never choose an arbitrary executable.
 pkgutil --expand-full "$package" "$work/shipped" || fail "package could not be expanded"
 shipped="$work/shipped/Payload/Token Bar.app"
 [ -f "$shipped/Contents/MacOS/TokenBar" ] || fail "expected Token Bar executable is missing"
 codesign --verify --deep --strict "$shipped" || fail "shipped app signature is invalid"
 
-# 3. Rebuild the entire unsigned installer using the candidate's own scripts.
+# 4. Rebuild the entire unsigned installer using the candidate's own scripts.
 git archive "$resolved" | (mkdir -p "$work/src" && tar -x -C "$work/src") \
     || fail "commit could not be materialized"
 ( cd "$work/src" && env -u APP_SIGNING_IDENTITY -u INSTALLER_SIGNING_IDENTITY -u TOKENBAR_DIST_DIR ./scripts/package.sh ) > "$work/build.log" 2>&1 \
@@ -70,7 +90,7 @@ rebuilt_package="$work/src/dist/TokenBar-$version-arm64.pkg"
 pkgutil --expand-full "$rebuilt_package" "$work/rebuilt" || fail "rebuilt installer could not be expanded"
 rebuilt="$work/rebuilt/Payload/Token Bar.app"
 
-# 4. Remove signatures only from these disposable copies, then compare complete
+# 5. Remove signatures only from these disposable copies, then compare complete
 # payload files and installer semantics. A toolchain difference fails closed.
 codesign --remove-signature "$shipped" || fail "could not normalize shipped signature"
 codesign --remove-signature "$rebuilt" || fail "could not normalize rebuilt signature"

@@ -110,35 +110,113 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-output-test-') as temporary:
             marker.unlink()
 print('PASS: package/release preserve existing artifacts and dangling links before producers; fresh default/custom destinations proceed')
 
-# The checksum sidecar is uploaded beside the installer, so it must name only the basename.
+# The checksum sidecar is published beside the installer, so scripts/checksum.sh owns
+# one rule: name the basename, never a build path. Both producers call it.
+MINIMAL = {'PATH': '/usr/bin:/bin:/usr/sbin', 'LC_ALL': 'C'}
+checksum = owner.parent / 'checksum.sh'
 with tempfile.TemporaryDirectory(prefix='tokenbar-sidecar-test-') as temporary:
+    root = Path(temporary)
+    out = root / 'dist out'
+    out.mkdir()
+    package = out / 'TokenBar-9.8.7-arm64.pkg'
+    package.write_bytes(b'synthetic installer')
+    sidecar = Path(str(package) + '.sha256')
+
+    def written(cwd, argument, env=None):
+        result = subprocess.run([str(checksum), argument], cwd=cwd,
+                                env=dict(MINIMAL, TMPDIR=temporary, **(env or {})), capture_output=True)
+        assert result.returncode == 0, result.stderr
+        return sidecar.read_text()
+
+    for cwd, argument, env in [
+        (root, str(package), None),
+        # A relative output directory must not be redirected by the caller's CDPATH.
+        (root, 'dist out/TokenBar-9.8.7-arm64.pkg', {'CDPATH': str(root / 'decoy')}),
+    ]:
+        (root / 'decoy/dist out').mkdir(parents=True, exist_ok=True)
+        text = written(cwd, argument, env)
+        assert '/' not in text, text
+        assert text.split()[1] == package.name, text
+        check = subprocess.run(['shasum', '-a', '256', '-c', sidecar.name], cwd=out, capture_output=True)
+        assert check.returncode == 0, check.stderr
+        assert not (root / 'decoy/dist out' / sidecar.name).exists(), 'CDPATH redirected the sidecar'
+        sidecar.unlink()
+
+    # Stapling changes the package, so a caller re-hashes; the sidecar must follow.
+    written(root, str(package))
+    stale = sidecar.read_text()
+    package.write_bytes(b'synthetic installer, stapled')
+    assert subprocess.run(['shasum', '-a', '256', '-c', sidecar.name], cwd=out, capture_output=True).returncode == 1
+    written(root, str(package))
+    assert sidecar.read_text() != stale
+    assert subprocess.run(['shasum', '-a', '256', '-c', sidecar.name], cwd=out, capture_output=True).returncode == 0
+
+    # A failure must not leave an empty sidecar behind, and a missing package is an argument error.
+    sidecar.unlink()
+    for arguments, existing in ((['nowhere.pkg'], False), ([], False)):
+        result = subprocess.run([str(checksum)] + arguments, cwd=root,
+                                env=dict(MINIMAL, TMPDIR=temporary), capture_output=True)
+        assert result.returncode == 2, result.stdout + result.stderr
+    assert not sidecar.exists()
+    result = subprocess.run([str(checksum), str(package)], cwd=root,
+                            env={'PATH': str(root / 'empty'), 'TMPDIR': temporary}, capture_output=True)
+    assert result.returncode != 0 and not sidecar.exists(), 'a failed hash must leave no sidecar'
+print('PASS: checksum.sh writes a basename-only sidecar that verifies in place, survives CDPATH, re-hashes changed bytes and leaves nothing behind on failure')
+
+# package.sh must reach that owner, so the shipping path is the tested one.
+with tempfile.TemporaryDirectory(prefix='tokenbar-package-sidecar-test-') as temporary:
     root = Path(temporary)
     (root / 'scripts').mkdir()
     (root / 'VERSION').write_text('9.8.7\n')
     shutil.copy2(owner.parent / 'package.sh', root / 'scripts/package.sh')
+    shutil.copy2(checksum, root / 'scripts/checksum.sh')
     shutil.copytree(owner.parent / 'pkg', root / 'scripts/pkg')
     app = root / 'build/Token Bar.app/Contents'
-    (app / 'MacOS').mkdir(parents=True)
-    (app / 'MacOS/TokenBar').write_bytes(b'#!/bin/sh\nexit 0\n')
-    (app / 'MacOS/TokenBar').chmod(0o755)
+    app.mkdir(parents=True)
     (app / 'Info.plist').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
-        '<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string>'
-        '<key>CFBundleShortVersionString</key><string>9.8.7</string>'
-        '<key>CFBundleVersion</key><string>39807</string>'
-        '<key>CFBundleExecutable</key><string>TokenBar</string></dict></plist>\n')
+        '<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string></dict></plist>\n')
     build = root / 'scripts/build.sh'
     build.write_text('#!/bin/bash\nexit 0\n')
     build.chmod(0o700)
     dist = root / 'dist out'
-    env = {k: v for k, v in os.environ.items() if k != 'INSTALLER_SIGNING_IDENTITY'}
-    env['TOKENBAR_DIST_DIR'] = str(dist)
-    result = subprocess.run([str(root / 'scripts/package.sh')], env=env, capture_output=True)
+    result = subprocess.run([str(root / 'scripts/package.sh')], cwd=root, capture_output=True,
+                            env=dict(MINIMAL, TMPDIR=temporary, TOKENBAR_DIST_DIR=str(dist)))
     assert result.returncode == 0, result.stderr
-    sidecar = (dist / 'TokenBar-9.8.7-arm64.pkg.sha256').read_text()
-    assert '/' not in sidecar and sidecar.split()[1] == 'TokenBar-9.8.7-arm64.pkg', sidecar
-    check = subprocess.run(['shasum', '-a', '256', '-c', 'TokenBar-9.8.7-arm64.pkg.sha256'], cwd=dist, capture_output=True)
-    assert check.returncode == 0, check.stderr
-print('PASS: package checksum sidecar names only the installer basename and verifies from its own directory')
+    text = (dist / 'TokenBar-9.8.7-arm64.pkg.sha256').read_text()
+    assert '/' not in text and text.split()[1] == 'TokenBar-9.8.7-arm64.pkg', text
+    assert subprocess.run(['shasum', '-a', '256', '-c', 'TokenBar-9.8.7-arm64.pkg.sha256'],
+                          cwd=dist, capture_output=True).returncode == 0
+print('PASS: package.sh writes its sidecar through checksum.sh')
+
+# verify-release.sh is the pre-publication gate, so it must reject a sidecar a downloader cannot use.
+verifier = owner.parent / 'verify-release.sh'
+with tempfile.TemporaryDirectory(prefix='tokenbar-gate-test-') as temporary:
+    root = Path(temporary)
+    package = root / 'TokenBar-9.8.7-arm64.pkg'
+    package.write_bytes(b'synthetic installer')
+    sidecar = Path(str(package) + '.sha256')
+    digest = subprocess.run(['shasum', '-a', '256', package.name], cwd=root,
+                            capture_output=True, text=True).stdout.split()[0]
+    def gate():
+        return subprocess.run([str(verifier), 'HEAD', str(package)], capture_output=True, text=True)
+    for text, expected in [
+        (f'{digest}  {package}\n', 'not the installer basename'),
+        (f'{digest}  {package.name}\n{digest}  other\n', 'not a single line'),
+        (f'{"0" * 64}  {package.name}\n', 'does not match the package bytes'),
+    ]:
+        sidecar.write_text(text)
+        result = gate()
+        assert result.returncode == 1 and expected in result.stderr, (expected, result.stderr)
+        assert 'PASS: checksum sidecar' not in result.stdout
+    # A correct sidecar passes this gate; the synthetic package then fails the signature gate.
+    sidecar.write_text(f'{digest}  {package.name}\n')
+    result = gate()
+    assert 'PASS: checksum sidecar' in result.stdout and 'Developer ID installer certificate' in result.stderr
+    # Absence is reported, not silently accepted.
+    sidecar.unlink()
+    result = gate()
+    assert 'NOTE: no checksum sidecar' in result.stdout
+print('PASS: verify-release.sh rejects a path-bearing, malformed or stale sidecar before the signature gate and reports an absent one')
 
 # Invalid public versions must fail before a build epoch could make them look usable.
 with tempfile.TemporaryDirectory(prefix='tokenbar-version-test-') as temporary:

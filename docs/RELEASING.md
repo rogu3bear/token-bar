@@ -90,7 +90,8 @@ repository root. Absolute paths can change optimized runtime diagnostic
 instructions when archive directory lengths differ. Source discovery still
 owns membership; full executable comparison remains required.
 
-It rebuilds the unsigned installer using the commit's own scripts. Disposable
+It checks any checksum sidecar beside the package first, then rebuilds the
+unsigned installer using the commit's own scripts. Disposable
 expanded copies have their app signatures removed; complete executable bytes,
 payload paths and modes, resources, installer scripts and install metadata must
 match. Signature directories, signing-dependent installed sizes and the `__LINKEDIT`
@@ -108,14 +109,24 @@ should run. GitHub Releases is the primary public installer distribution path.
 Upload the notarized `.pkg` and its checksum. Keep notarization receipts, logs
 and account-specific evidence local.
 
-`package.sh` and `release.sh` write the checksum from inside the output
-directory, so it names only the installer basename and never a private build
-path; `Tests/SingleInstance/release.py` proves that. Confirm before upload,
-from the release output directory:
+The checksum must name only the installer basename, never a private build
+path: the file is published beside the installer, and a path in it fails
+`shasum -a 256 -c` for every downloader. `scripts/checksum.sh` is the single
+owner of that rule. `package.sh` calls it after `pkgbuild`, and `release.sh`
+calls it again immediately after stapling, because stapling rewrites the
+package. `verify-release.sh` fails when a sidecar beside the package names
+something else or does not match its bytes, and says so when none exists.
+`Tests/SingleInstance/release.py` covers `checksum.sh`, `package.sh` reaching
+it, and that gate.
+
+Confirm before upload, from the release output directory:
 
 ```sh
 shasum -a 256 -c TokenBar-0.1.4-arm64.pkg.sha256
 ```
+
+A package built before commit `24d4d0c` carries a sidecar naming an absolute
+path. Regenerate it with `./scripts/checksum.sh <package>`.
 
 Use the actual `VERSION` for later releases. A public tag remains bound to its
 original source; later documentation commits do not move the release tag.
