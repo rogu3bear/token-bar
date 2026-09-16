@@ -110,6 +110,36 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-output-test-') as temporary:
             marker.unlink()
 print('PASS: package/release preserve existing artifacts and dangling links before producers; fresh default/custom destinations proceed')
 
+# The checksum sidecar is uploaded beside the installer, so it must name only the basename.
+with tempfile.TemporaryDirectory(prefix='tokenbar-sidecar-test-') as temporary:
+    root = Path(temporary)
+    (root / 'scripts').mkdir()
+    (root / 'VERSION').write_text('9.8.7\n')
+    shutil.copy2(owner.parent / 'package.sh', root / 'scripts/package.sh')
+    shutil.copytree(owner.parent / 'pkg', root / 'scripts/pkg')
+    app = root / 'build/Token Bar.app/Contents'
+    (app / 'MacOS').mkdir(parents=True)
+    (app / 'MacOS/TokenBar').write_bytes(b'#!/bin/sh\nexit 0\n')
+    (app / 'MacOS/TokenBar').chmod(0o755)
+    (app / 'Info.plist').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
+        '<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string>'
+        '<key>CFBundleShortVersionString</key><string>9.8.7</string>'
+        '<key>CFBundleVersion</key><string>39807</string>'
+        '<key>CFBundleExecutable</key><string>TokenBar</string></dict></plist>\n')
+    build = root / 'scripts/build.sh'
+    build.write_text('#!/bin/bash\nexit 0\n')
+    build.chmod(0o700)
+    dist = root / 'dist out'
+    env = {k: v for k, v in os.environ.items() if k != 'INSTALLER_SIGNING_IDENTITY'}
+    env['TOKENBAR_DIST_DIR'] = str(dist)
+    result = subprocess.run([str(root / 'scripts/package.sh')], env=env, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    sidecar = (dist / 'TokenBar-9.8.7-arm64.pkg.sha256').read_text()
+    assert '/' not in sidecar and sidecar.split()[1] == 'TokenBar-9.8.7-arm64.pkg', sidecar
+    check = subprocess.run(['shasum', '-a', '256', '-c', 'TokenBar-9.8.7-arm64.pkg.sha256'], cwd=dist, capture_output=True)
+    assert check.returncode == 0, check.stderr
+print('PASS: package checksum sidecar names only the installer basename and verifies from its own directory')
+
 # Invalid public versions must fail before a build epoch could make them look usable.
 with tempfile.TemporaryDirectory(prefix='tokenbar-version-test-') as temporary:
     root = Path(temporary)

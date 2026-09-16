@@ -30,5 +30,6 @@ xcrun stapler staple "$pkg"
 xcrun stapler validate "$pkg"
 pkgutil --check-signature "$pkg"
 spctl --assess --type install --verbose=2 "$pkg"
-shasum -a 256 "$pkg" > "$pkg.sha256"
+# The sidecar is published beside the installer; name only the basename so it verifies anywhere.
+(cd "$TOKENBAR_DIST_DIR" && shasum -a 256 "${pkg##*/}" > "${pkg##*/}.sha256")
 printf '%s\n' "Signed, notarized installer assembled. Run verify-release.sh against the exact source commit before publication."

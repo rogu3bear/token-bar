@@ -108,11 +108,12 @@ should run. GitHub Releases is the primary public installer distribution path.
 Upload the notarized `.pkg` and its checksum. Keep notarization receipts, logs
 and account-specific evidence local.
 
-Before upload, ensure the checksum names only the installer basename, not a
-private build path. From the release output directory:
+`package.sh` and `release.sh` write the checksum from inside the output
+directory, so it names only the installer basename and never a private build
+path; `Tests/SingleInstance/release.py` proves that. Confirm before upload,
+from the release output directory:
 
 ```sh
-shasum -a 256 TokenBar-0.1.4-arm64.pkg > TokenBar-0.1.4-arm64.pkg.sha256
 shasum -a 256 -c TokenBar-0.1.4-arm64.pkg.sha256
 ```
 
