@@ -11,10 +11,14 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         if let grok, grok.hasRate || grok.runningCount > 0 { tools.append(.grok) }
         return tools
     }
-    /// The status item keeps a neutral Codex starting state when idle; live panels do not.
+    /// Compact Auto follows working tools only. Idle no longer invents a Codex placeholder.
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
-        let tools = active(codex: codex, claude: claude, grok: grok)
-        return tools.isEmpty ? [.codex] : tools
+        active(codex: codex, claude: claude, grok: grok)
+    }
+    /// Popover rows: working tools, plus unused Claude whose remaining is a measured zero.
+    static func compact(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
+        let working = Set(active(codex: codex, claude: claude, grok: grok))
+        return allCases.filter { working.contains($0) || ($0 == .claude && remaining($0) == 0) }
     }
     func color(in palette: ToolPalette) -> Color { palette.color(rawValue, fallback: color) }
     var id: String { rawValue }

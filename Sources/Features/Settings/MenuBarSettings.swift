@@ -63,7 +63,13 @@ struct MenuBarPresentation {
         let auto = (settings.tool ?? .auto) == .auto
         let selected = (settings.tool ?? .auto).resolve(codex: codex, claude: claude, grok: grok)
         func meter(_ tool: LiveTool) -> Tachometer { tool == .grok ? grok : tool == .claude ? claude : codex }
-        let tools = auto ? LiveTool.visible(codex: codex, claude: claude, grok: grok) : [selected]
+        let working = LiveTool.active(codex: codex, claude: claude, grok: grok)
+        let tools = auto ? working : [selected]
+        func remainingZero(_ tool: LiveTool) -> Bool {
+            let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
+            guard let reading = Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon) else { return false }
+            return Runway.estimate(reading, samples: state.samples, now: now, horizon: state.horizon).remaining == 0
+        }
         func appendQuota(_ result: NSMutableAttributedString, tools: [LiveTool]) {
             guard settings.enabled.contains(.quota) else { return }
             for tool in tools {
@@ -72,6 +78,19 @@ struct MenuBarPresentation {
                 result.append(NSAttributedString(string: settings.separator + text,
                     attributes: [.foregroundColor: NSColor(tool.color(in: palette)), .font: NSFont.systemFont(ofSize: 12)]))
             }
+        }
+        if auto && working.isEmpty {
+            var quiet = settings
+            quiet.enabled.subtract([.rate, .dial, .activity, .zero, .fable, .fablePace])
+            // Claude at a measured-zero remaining is the one named idle-Auto exception, not a list to grow.
+            if remainingZero(.claude) {
+                return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now,
+                                  accent: NSColor(LiveTool.claude.color(in: palette)),
+                                  tool: .claude, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+            }
+            quiet.enabled.remove(.quota)
+            return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
+                              claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
         }
         if tools.count <= 1 {
             let tool = tools.first ?? selected
@@ -82,20 +101,8 @@ struct MenuBarPresentation {
                 speed.enabled.remove(.quota)
                 speed.enabled.remove(.zero)
             }
-            let result = NSMutableAttributedString(attributedString: attributed(speed, meter: meter(tool), monitor: monitor, now: now,
-                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText))
-            if grokAuto && !grokHasQuota {
-                let labeled = [LiveTool.codex, .claude].filter { hasQuotaReading($0, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) }
-                appendQuota(result, tools: labeled)
-                if settings.enabled.contains(.zero), labeled.count == 1, let qtool = labeled.first {
-                    let zero = values(settings, meter: meter(qtool), monitor: monitor, now: now, tool: qtool, claudeQuota: claudeQuota, grokQuota: grokQuota)[.zero] ?? ""
-                    if !zero.hasSuffix("—") {
-                        result.append(NSAttributedString(string: settings.separator + zero,
-                            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular), .foregroundColor: NSColor.labelColor]))
-                    }
-                }
-            }
-            return result
+            return attributed(speed, meter: meter(tool), monitor: monitor, now: now,
+                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
         }
         let total = Tachometer()
         total.unit = meter(selected).unit
@@ -153,9 +160,17 @@ struct MenuBarPresentation {
             .rate: rate + " tok/" + unit.rawValue,
             .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
             .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue,
-            .fable: fable.map { String(format: "Fable %.0f%% · ", $0.remaining) + $0.binding } ?? "Fable quota unavailable",
-            // Beside the Fable figure the projection needs no name; an enabled figure already states an unknown budget.
-            .fablePace: pace.map { paceName + $0.menuText } ?? (settings.enabled.contains(.fable) ? "" : "Fable time left unavailable")
+            .fable: {
+                guard let fable, fable.remaining > 0 else { return "" }
+                return String(format: "Fable %.0f%% · ", fable.remaining) + fable.binding
+            }(),
+            .fablePace: {
+                guard let pace else { return "" }
+                switch pace {
+                case .exhausted, .idle: return ""
+                case .learning, .resetsFirst, .left: return paceName + pace.menuText
+                }
+            }()
         ]
     }
     static func title(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> String {
@@ -171,7 +186,7 @@ struct MenuBarPresentation {
         }
         for part in settings.order where settings.enabled.contains(part) {
             if part == .risk && riskText == nil { continue }
-            if part == .fablePace && (values[part] ?? "").isEmpty { continue }
+            if (part == .fablePace || part == .fable) && (values[part] ?? "").isEmpty { continue }
             if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
             if part == .risk {
                 result.append(NSAttributedString(string: riskText ?? "", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
@@ -231,7 +246,7 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Text("Codex, Claude and Grok. Auto follows active speed. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota is unavailable.").font(.caption).foregroundStyle(.secondary)
+                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet when nothing is running, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota is omitted rather than shown as unavailable copy.").font(.caption).foregroundStyle(.secondary)
                 Picker("Rate units", selection: $preferences.configuration.unit) {
                     Text("Follow selected tool").tag("dashboard")
                     Text("Tokens / second").tag("s")
@@ -267,7 +282,7 @@ struct MenuBarSettingsView: View {
                                 Text("Space").tag("  ")
                             }.pickerStyle(.segmented)
                         }
-                        Text("The dial follows the dashboard’s automatic range. Quota remaining is the prioritized subscription quota, not a token balance. Fable quota is the lowest remaining of Claude’s 5-hour, weekly and Fable weekly limits, named by the limit that binds, and is unavailable when any of them is missing or stale. Fable time left projects when the first of those limits runs out at the average burn of recent hours, weighted toward recent use; it needs 30 minutes of readings. c = chats, a = agents. Unconfirmed activity stays labeled. With every field off, the app icon remains available. A shorter selection leaves more room for other menu-bar apps.")
+                        Text("The dial follows the dashboard’s automatic range. Quota remaining is the prioritized subscription quota, not a token balance. Fable quota is the lowest remaining of Claude’s 5-hour, weekly and Fable weekly limits, named by the limit that binds, and is omitted when remaining is a measured zero or when any of them is missing or stale. Fable time left projects when the first of those limits runs out at the average burn of recent hours, weighted toward recent use; it needs 30 minutes of readings. c = chats, a = agents. Unconfirmed activity stays labeled. With every field off, the app icon remains available. A shorter selection leaves more room for other menu-bar apps.")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.top, 12)
                 }

@@ -433,18 +433,23 @@ struct QuickLiveView: View {
         Group {
             VStack(alignment: .leading, spacing: 10) {
                 HStack { Text("Now").font(.headline); Spacer(); if monitor.busy { ProgressView().controlSize(.small) } }
-                let tools = model.accountTools
+                let now = model.referenceDate ?? model.clock.now
+                let tools = LiveTool.compact(codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter) { tool in
+                    AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
+                }
                 ForEach(tools) { tool in
                     Button {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                             expanded = expanded == tool ? nil : tool
                         }
                     } label: {
-                        CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: model.quota(for: tool), now: model.referenceDate ?? model.clock.now, expanded: expanded == tool)
+                        CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: model.quota(for: tool), now: now, expanded: expanded == tool)
                     }.buttonStyle(.plain)
                 }
                 if tools.isEmpty {
-                    Text("No account sources detected yet. Open a supported tool to begin.").foregroundStyle(.secondary)
+                    Text(model.accountTools.isEmpty
+                         ? "No account sources detected yet. Open a supported tool to begin."
+                         : "No tools working right now").foregroundStyle(.secondary)
                 }
                 QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
                 ToolActivityErrors(model: model)
