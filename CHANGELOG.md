@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep the menu bar quiet when nothing is running. Auto no longer invents an idle Codex readout, omits unused remaining (including unused Fable remaining and time left, and unused Codex or Grok zeros) and a measured Fable zero, and keeps Codex off the bar until it has a measured rate or is running. The dropdown still shows Claude at 0% when that remaining is a measured zero. `docs/DESIGN.md` now states that occupancy rule as a closed glance grammar: Claude-at-zero is the one named idle exception, not a pattern for the next tool.
+
 ## 0.1.7 — Released 2026-09-16
 
 - Name History, Accounts and Settings owners in source so DestinationHost matches dashboard titles. The dashboard still uses the capsule destinations; this is not a scene rewrite.

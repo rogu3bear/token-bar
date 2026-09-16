@@ -139,19 +139,49 @@ provider quotas for visibility checks; `--sample-idle` checks the no-active stat
 `--sample-claude-error` checks that an inactive provider’s read failure remains
 visible as an error notice without reserving an active tool panel.
 
+## Glance grammar
+
+The status item is a closed instrument. A new tool, quota scheme, or menu-bar
+field has to pass these rules; a true-for-one-provider exception is not a
+pattern. Claude at a measured-zero remaining is the one named idle-Auto
+exception.
+
+1. Auto is quiet unless a tool is working (fresh rate or currently observed
+   running task). Idle Auto keeps the status item to the app icon.
+2. The one idle exception: unused Claude whose remaining is a measured zero.
+   Unused Codex or Grok zeros stay off Auto and the popover. Unused remaining
+   above zero stays off Auto and the popover for every tool.
+3. When Auto has working tools, occupancy follows activity and measured rate
+   only. Exhausted Claude may still appear in the popover; it does not join a
+   working Auto line as a second occupant.
+4. Total adds available output rates in one displayed unit and labels partial
+   reporting. It never adds remaining percents or a combined exhaustion time.
+5. Fable quota, Fable time left, and the Quota Guard warning remain opt-in
+   fields, off by default. They cannot un-quiet Auto or restore an idle Codex
+   readout. A measured Fable zero or missing budget is omitted rather than shown
+   as “Fable 0%” or unavailable copy.
+6. The default line stays dial, output rate, and quota. Restore defaults does
+   not grow that set. Existing visibility, order, compactness and unit
+   preferences survive.
+
+`MenuBarPresentation.combined` is the single occupancy owner for the status item
+and the settings preview. `LiveTool.compact` owns popover rows. A new
+quiet-exception that is not rule 2 requires changing this section and a MenuBar
+test that names the tool.
+
 ## Independent tool speeds
 
-Right now shows tools with a fresh rate or currently observed running task.
+Auto occupancy follows Glance grammar. Right now shows tools with a fresh rate or currently observed running task.
 Inactive quota readings and stale unconfirmed tasks do not reserve speed panels; relevant account allowances remain visible.
 Tools join with stable identity and a restrained transition; when nothing is active,
-the dashboard says that no tools are working and popover rows distinguish Idle from Unconfirmed. The status item
-retains its Codex starting state. Each tool owns its units,
+the dashboard says that no tools are working and popover rows distinguish Idle from Unconfirmed. Idle Auto keeps the status item to the app icon, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off Auto. Codex appears in Auto only while it is running or has a measured rate. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
-Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover uses the same relevance rule for compact named rates, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
+Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools and unused Claude whose remaining is a measured zero, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
 speed is labeled as another tool or silently pooled into it.
 
 Menu bar settings offer Codex, Claude, Grok, and Auto. Auto shows a named
-single tool or Total when several tools are active. Total adds available output
+single tool or Total when several tools are active, and stays quiet when none
+are running except Claude at a measured-zero remaining. Total adds available output
 rates in one displayed unit and labels partial reporting; it never adds quota
 percentages or projects a combined exhaustion time. Each remaining allowance
 keeps its tool identity and the shared accent. A single-tool menu-bar readout
@@ -175,8 +205,8 @@ Dividers separate tools without adding card surfaces. The compact gauge leaves t
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
 fits its content rather than reserving a fixed height, follows the saved
 appearance, and uses the same saved application accent as Now. The quick
-popover shows each relevant tool as name, rate, and remaining percent. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
-its account-bound local usage cache, which the installed Claude Code refreshes every 15 minutes at Token Bar's request; missing or stale readings stay unavailable. The optional Fable quota field, off by default, names the binding limit among Claude's current 5-hour, weekly and Fable weekly readings; it compares those percentages and never adds them. An optional time-left field follows it in smaller secondary text (“≈2h 40m left”). Each limit's burn is a time-weighted average of up to four hours of readings with a one-hour half-life, restarting at a reset, so bursts and uneven refresh timing do not swing the projection. Until 30 minutes of readings exist, or when no limit would run out before its reset, it says learning pace, no recent use or resets first rather than a guessed time. Completion removes a task's rate; stale or insufficient counter
+popover shows each working tool, and unused Claude whose remaining is a measured zero, as name, rate, and remaining percent. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Unused remaining above zero stays off Auto and the popover. Unused Codex or Grok zeros stay off Auto and the popover. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
+its account-bound local usage cache, which the installed Claude Code refreshes every 15 minutes at Token Bar's request; missing or stale readings stay unavailable. The optional Fable quota field, off by default, names the binding limit among Claude's current 5-hour, weekly and Fable weekly readings; it compares those percentages and never adds them. A measured Fable zero or missing budget is omitted from the status item rather than shown as “Fable 0%” or unavailable copy. An optional time-left field follows it in smaller secondary text (“≈2h 40m left”). Each limit's burn is a time-weighted average of up to four hours of readings with a one-hour half-life, restarting at a reset, so bursts and uneven refresh timing do not swing the projection. Until 30 minutes of readings exist, or when no limit would run out before its reset, it says learning pace, no recent use or resets first rather than a guessed time. Completion removes a task's rate; stale or insufficient counter
 reports show an em dash, never a guessed zero.
 
 Claude speed uses timestamped output-counter increases within a message and
