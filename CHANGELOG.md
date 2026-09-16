@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 — Release candidate
+
+- Replace an installed 2.x development build. macOS Installer compared short versions first, so 0.1.x packages reported a successful install while leaving the older 2.x app in place. The installer now compares build numbers itself, and refuses a newer installed build with a visible message instead of silently skipping.
+
 ## 0.1.4 — Released 2026-09-15
 
 - Keep Claude Code allowance current: every 15 minutes Token Bar asks the installed Claude Code for usage, without a prompt or saved session, and reads only its account-matched cache. The status-line relay still supplies no quota.

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the v0.1.4 source. Known limitations are listed separately;
+> Describes the v0.1.5 candidate source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
