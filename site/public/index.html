@@ -10,8 +10,8 @@
     />
     <meta name="theme-color" content="#0b0d0e" />
     <link rel="icon" href="/token-bar-icon.png" type="image/png" />
-    <link rel="stylesheet" href="/style.css?v=013-release" />
-    <script src="/demo.js?v=013-release" type="module"></script>
+    <link rel="stylesheet" href="/style.css?v=018-seats" />
+    <script src="/demo.js?v=018-seats" type="module"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -36,8 +36,8 @@
         <h1>Your AI usage.<br /><span>At a glance.</span></h1>
         <p class="intro">
           See which tools are working, how fast they produce output, and what
-          allowance remains. Your usage history stays on your Mac, ready when
-          you want a closer look.
+          allowance remains. The menu bar stays quiet when nothing is running.
+          Your usage history stays on your Mac, ready when you want a closer look.
         </p>
         <div class="actions">
           <a
@@ -66,9 +66,9 @@
           </div>
           <div class="menu-viewport" tabindex="0" role="region" aria-label="Enlarged menu-bar preview">
             <div class="recording-frame native-menu">
-              <img src="/menu-bar-demo.png?v=013-release" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
+              <img src="/menu-bar-demo.png?v=018-seats" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
               <video id="menu-recording" controls muted playsinline preload="metadata"
-                poster="/menu-bar-demo.png?v=013-release" src="/menu-bar-demo.mp4?v=013-release"
+                poster="/menu-bar-demo.png?v=018-seats" src="/menu-bar-demo.mp4?v=018-seats"
                 aria-label="Native menu-bar recording with synthetic token measurements">
                 Your browser cannot play this recording.
               </video>
@@ -80,9 +80,9 @@
           <p>Each tool’s activity, rate and gauge stay together.</p>
         </div>
         <div class="native-preview recording-frame">
-          <img src="/dashboard-demo.png?v=013-release" width="1064" height="800" alt="Native Token Bar dashboard showing sample Codex activity before Claude joins" />
-          <video id="dashboard-recording" data-loop-start="45.3" controls muted playsinline preload="metadata"
-            poster="/dashboard-demo.png?v=013-release" src="/dashboard-demo.mp4?v=013-release"
+          <img src="/dashboard-demo.png?v=018-seats" width="1064" height="800" alt="Native Token Bar dashboard showing sample Codex activity before Claude joins" />
+          <video id="dashboard-recording" data-start="3.5" data-loop-start="45.3" controls muted playsinline preload="metadata"
+            poster="/dashboard-demo.png?v=018-seats" src="/dashboard-demo.mp4?v=018-seats"
             aria-label="Native Token Bar dashboard recording with synthetic token measurements">
             Your browser cannot play this recording.
           </video>
@@ -95,12 +95,12 @@
           </div>
         </div>
         <div class="surface-heading dashboard-heading">
-          <h3>A quick look, even while idle</h3>
-          <p>Account allowance stays visible independently of live speed.</p>
+          <h3>Quiet when nothing is running</h3>
+          <p>Unused tools stay off the popover. Account allowances remain on Now.</p>
         </div>
         <div class="popover-preview">
-          <img src="/popover-idle.png?v=013-release" width="440" height="440" loading="lazy" alt="Token Bar popover with Codex, Claude and Grok idle, their separate remaining allowances, and saved Today history" />
-          <p class="recording-note">Open the popover for current activity and saved usage. Quota Guard shows available evidence; no warning does not guarantee remaining capacity. Notifications are optional and off by default.</p>
+          <img src="/popover-idle.png?v=018-seats" width="440" height="291" loading="lazy" alt="Token Bar popover while idle: no unused tools listed, Quota Guard, and saved Today history" />
+          <p class="recording-note">Open the popover for current activity and saved usage. Unused remaining stays off this list; Now still shows supported account allowances. Quota Guard shows available evidence; no warning does not guarantee remaining capacity. Notifications are optional and off by default.</p>
         </div>
       </section>
       <section class="details wrap" id="how">
@@ -111,11 +111,11 @@
         <div class="feature-list">
           <article><span class="index mono">01</span><div>
             <h3>What is running?</h3>
-            <p>Active tools join the menu bar as they work. See observed chats and agents alongside estimated output speed, with tok/s or tok/m right beside the number.</p>
+            <p>Active tools join the menu bar as they work. When nothing is running, Auto stays on the app icon. See observed chats and agents alongside estimated output speed, with tok/s or tok/m right beside the number.</p>
           </div></article>
           <article><span class="index mono">02</span><div>
             <h3>What allowance remains?</h3>
-            <p>Keep supported account allowances visible even when tools are idle. Quota Guard identifies fresh, account-bound risks; stale and unavailable readings stay explicit. Forecasts use account observations, independently of output speed.</p>
+            <p>Now keeps supported account allowances visible even when tools are idle. Unused remaining stays off Auto and the popover. Quota Guard identifies fresh, account-bound risks; stale and unavailable readings stay explicit. Forecasts use account observations, independently of output speed.</p>
           </div></article>
           <article><span class="index mono">03</span><div>
             <h3>Where did the usage go?</h3>

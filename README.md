@@ -10,6 +10,10 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar native dashboard showing estimated Codex output speed and account allowance](site/public/dashboard-demo.png)
 
+**Idle popover**
+
+![Token Bar popover while idle: no unused tools listed, Quota Guard, and saved Today history](site/public/popover-idle.png)
+
 *Native Token Bar previews with synthetic sample data.*
 
 Token Bar brings together local activity, estimated output speed, account
@@ -23,9 +27,11 @@ saved measurements on your Mac and updates them as new records arrive.
 ## At a glance
 
 - **See what is working.** Active tools appear in the menu bar and dashboard,
-  with estimated output rates labeled in tok/s, tok/m or tok/h.
-- **Keep account allowance in view.** Supported account readings show remaining
-  quota, reset times and an estimated time to exhaustion when enough observations exist.
+  with estimated output rates labeled in tok/s, tok/m or tok/h. When nothing is
+  running, Auto stays quiet: unused tools stay off the menu bar and popover.
+- **Keep account allowance in view.** Supported account readings stay on Now,
+  with remaining quota, reset times and an estimated time to exhaustion when
+  enough observations exist. Unused remaining does not occupy Auto.
 - **Explore saved history.** Filter by tool, task, model, project, account or day;
   export the matching records to CSV.
 - **Pick up where you left off.** Collected data persists between launches.

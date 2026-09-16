@@ -47,3 +47,6 @@ test('all four pages share the complete accessible footer and obsolete CAPTCHA a
   }
   assert.doesNotMatch(await read('_headers'), /challenges.cloudflare.com/);
 });
+test('dashboard recording names the poster start so first play cannot flash t=0', async () => {
+  assert.match(await read('index.html'), /id="dashboard-recording"[^>]*data-start="3.5"/);
+});

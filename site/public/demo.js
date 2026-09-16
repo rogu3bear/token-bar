@@ -74,9 +74,12 @@ async function start(restart = false) {
   playing = true;
   controls();
   try {
+    const loopTime = Number(dashboard.dataset.loopStart) || 0;
+    const startTime = Number(dashboard.dataset.start);
     if (restart || dashboard.ended) {
-      const time = Number(dashboard.dataset.loopStart) || 0;
-      await Promise.all(recordings.map(video => seek(video, time)));
+      await Promise.all(recordings.map(video => seek(video, loopTime)));
+    } else if (Number.isFinite(startTime) && dashboard.currentTime === 0) {
+      await Promise.all(recordings.map(video => seek(video, startTime)));
     }
     if (attempt !== generation || !mayPlay()) return;
     await Promise.all(recordings.map(async video => {

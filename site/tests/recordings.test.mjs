@@ -3,34 +3,47 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
+function listen(events, key, fn) {
+  const list = events.get(key) || [];
+  list.push(fn);
+  events.set(key, list);
+}
+function unlisten(events, key, fn) {
+  const list = (events.get(key) || []).filter(listener => listener !== fn);
+  if (list.length) events.set(key, list); else events.delete(key);
+}
+function emit(events, key) {
+  for (const fn of [...(events.get(key) || [])]) fn();
+}
+
 async function setup(reduced = false) {
   const elements = new Map(), events = new Map();
   const get = id => {
     if (!elements.has(id)) elements.set(id, {
-      textContent: '', paused: true, currentTime: 0, readyState: 1, dataset: { loopStart: '45.3' },
+      textContent: '', paused: true, currentTime: 0, readyState: 1, dataset: { loopStart: '45.3', start: '3.5' },
       classList: { values: new Set(['visually-hidden']),
         add(value) { this.values.add(value); }, remove(value) { this.values.delete(value); },
         contains(value) { return this.values.has(value); } },
       pause() { this.paused = true; }, async play() { this.paused = false; },
-      addEventListener: (name, fn) => events.set(id + ':' + name, fn),
-      removeEventListener: (name, fn) => { if (events.get(id + ':' + name) === fn) events.delete(id + ':' + name); },
+      addEventListener: (name, fn) => listen(events, id + ':' + name, fn),
+      removeEventListener: (name, fn) => unlisten(events, id + ':' + name, fn),
     });
     return elements.get(id);
   };
   const document = { hidden: false, querySelector: get,
-    addEventListener: (name, fn) => events.set(name, fn) };
-  const media = { matches: reduced, addEventListener: (_, fn) => events.set('motion', fn) };
+    addEventListener: (name, fn) => listen(events, name, fn) };
+  const media = { matches: reduced, addEventListener: (_, fn) => listen(events, 'motion', fn) };
   const timers = new Map();
   let observer;
   runInNewContext(await readFile(new URL('../public/demo.js', import.meta.url), 'utf8'), {
     document, matchMedia: () => media, fetch: async () => ({ ok: false }),
-    window: { addEventListener: (name, fn) => events.set(name, fn) },
+    window: { addEventListener: (name, fn) => listen(events, name, fn) },
     IntersectionObserver: class { constructor(fn) { observer = fn; } observe() {} },
     setTimeout: fn => { timers.set(1, fn); return 1; }, clearTimeout: id => timers.delete(id),
   });
   const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
   return { get, document, media, timers, flush,
-    fire: async name => { events.get(name)(); await flush(); },
+    fire: async name => { emit(events, name); await flush(); },
     visible: async value => { observer([{ target: get('#dashboard-recording'), isIntersecting: value }]); await flush(); },
     repeat: async () => { const fn = timers.get(1); timers.delete(1); fn(); await flush(); },
   };
@@ -41,6 +54,8 @@ test('visible recordings start without a click and loop only their settled secti
   assert.ok(dashboard.paused && menu.paused);
   await d.visible(true);
   assert.ok(!dashboard.paused && !menu.paused);
+  assert.equal(dashboard.currentTime, 3.5);
+  assert.equal(menu.currentTime, 3.5);
   dashboard.currentTime = 4; menu.currentTime = 3;
   await d.fire('#dashboard-recording:timeupdate');
   assert.equal(menu.currentTime, 4);
