@@ -42,7 +42,7 @@ enum ProductMotionPreview {
         model.claudeMeter.unit = .minute
 
         let dashboard = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
-            DetailRoot(model: model)
+            DashboardRoot(model: model)
                 .frame(width: 1064, height: 800, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.environment(\.colorScheme, .dark))
@@ -140,7 +140,7 @@ enum ProductMotionPreview {
             }
             rows.append(["frame": frame, "seconds": elapsed, "codexQuotaRemaining": 100 - quota.used, "claudeQuotaRemaining": 100 - claudeQuota.used, "codexProjectedZero": Runway.estimate(quota, samples: model.live.state.samples, now: tickDate).exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "claudeProjectedZero": Runway.estimate(claudeQuota, samples: model.claudeQuota.quota.samples, now: tickDate).exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "codexOutputTokensPerSecond": model.tachometer.rawRate, "claudeOutputTokensPerSecond": model.claudeMeter.rawRate, "codexAvailable": model.tachometer.hasRate, "claudeAvailable": model.claudeMeter.hasRate, "menuTool": model.menuTool.rawValue, "visibleTools": LiveTool.visible(codex: model.tachometer, claude: model.claudeMeter).map(\.rawValue)])
         }
-        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "DetailRoot / LiveToolPanels / ToolSpeedCard / RPMGauge", "menu": "MenuBarPresentation.combined", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
+        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "DashboardRoot / LiveToolPanels / ToolSpeedCard / RPMGauge", "menu": "MenuBarPresentation.combined", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
         try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("capture.json"))
         print("Evaluated \(frames) synthetic motion samples; native raster capture: \(!receiptsOnly); output: \(directory.path)")

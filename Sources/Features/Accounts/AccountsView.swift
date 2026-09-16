@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-struct SubscriptionView: View {
+struct AccountsView: View {
     @Bindable var model: UsageModel
     @Bindable var monitor: LiveMonitor
     @Bindable var signIns: SignInTimeline

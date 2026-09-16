@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-struct DetailView: View {
+struct HistoryView: View {
     @Bindable var model: UsageModel
     @Environment(\.appAccent) private var accent
     @Environment(\.toolPalette) private var palette

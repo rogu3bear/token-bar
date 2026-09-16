@@ -99,7 +99,7 @@ enum QuotaGuardPreview {
         let view = AppearanceHost(preferences: model.appearance, clock: model.clock) {
             Group {
                 if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
-                else { DetailRoot(model: model, initialDestination: settings ? .menuBar : .now) }
+                else { DashboardRoot(model: model, initialDestination: settings ? .menuBar : .now) }
             }.frame(width: compact ? 440 : width, height: compact ? nil : height)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.previewStill()

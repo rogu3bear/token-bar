@@ -28,7 +28,8 @@ not application state or UI code.
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
-| `*View.swift`, `MenuBarSettings`, `Appearance`, `DashboardNavigation` | seven dashboard sections, popover, settings | `UserDefaults` preferences |
+| `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `InsightsView`, `DashboardNavigation` | five product destinations plus capsule chrome | query state via `UsageModel` |
+| `MenuBarSettingsView`, `AppearanceSettingsView` | Settings owner: menu-bar fields and appearance. They remain capsule destinations, not a third SwiftUI scene | `UserDefaults` preferences |
 | `site/public/feedback*.js`, `site/worker.js` | local report drafting; advanced-mode static fallback and retired API responses | browser local storage for the draft |
 
 ## Sources of truth

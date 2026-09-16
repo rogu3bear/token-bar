@@ -613,7 +613,7 @@ struct QuickLiveView: View {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 800),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
             window.title = "Token Bar — Dashboard"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model, dashboardSelection] in DetailRoot(model: model, selection: dashboardSelection) })
+            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model, dashboardSelection] in DashboardRoot(model: model, selection: dashboardSelection) })
             window.contentMinSize = NSSize(width: 900, height: 700)
             if model.allowsSystemSettings { window.setFrameAutosaveName("UsageDetails") }
             window.isReleasedWhenClosed = false

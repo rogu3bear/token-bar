@@ -214,7 +214,7 @@ enum ProductPreview {
                 }
                 Group {
                     if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
-                    else { DetailRoot(model: model) }
+                    else { DashboardRoot(model: model) }
                 }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : previewHeight)
                     .background(Color(nsColor: .windowBackgroundColor))
             }

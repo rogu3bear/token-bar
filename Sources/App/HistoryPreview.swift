@@ -58,7 +58,7 @@ enum HistoryPreview {
         model.snapshot.updated = PreviewFixture.date
         precondition(model.report.timeline.points.count == 5, "The new minute must extend the line")
         let host = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
-            DetailRoot(model: model, initialDestination: .history).frame(width: 1064, height: 1200)
+            DashboardRoot(model: model, initialDestination: .history).frame(width: 1064, height: 1200)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.previewStill())
         host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1200)

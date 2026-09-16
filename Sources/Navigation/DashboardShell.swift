@@ -8,7 +8,7 @@ final class DashboardSelection: ObservableObject {
 /// The persistent dashboard shell. It holds the selection and the chrome above
 /// the changing region, and deliberately does not observe `UsageModel`: model
 /// churn must redraw the destination, not the navigation.
-struct DetailRoot: View {
+struct DashboardRoot: View {
     let model: UsageModel
     @StateObject private var selection: DashboardSelection
     init(model: UsageModel, initialDestination: Destination = .now, selection: DashboardSelection? = nil) {
@@ -39,9 +39,9 @@ struct DestinationHost: View {
         Group {
         switch destination {
         case .now: LiveOverview(meter: model.tachometer, model: model, monitor: model.live)
-        case .history: DetailView(model: model)
+        case .history: HistoryView(model: model)
         case .cost: CostView(model: model)
-        case .accounts: SubscriptionView(model: model, monitor: model.live, signIns: model.signIns)
+        case .accounts: AccountsView(model: model, monitor: model.live, signIns: model.signIns)
         case .insights: InsightsView(model: model.insights, home: model.scanner.home, usage: model, trends: model.usageInsights)
         case .menuBar: MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard)
         case .appearance: AppearanceSettingsView(preferences: model.appearance)

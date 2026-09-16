@@ -107,7 +107,7 @@ enum CostPreview {
         }
         let page: Destination = CommandLine.arguments.contains("--sample-history") ? .history : navigation ? .now : .cost
         let view = AppearanceHost(preferences: model.appearance) {
-            DetailRoot(model: model, initialDestination: page).frame(minWidth: 900, minHeight: 700)
+            DashboardRoot(model: model, initialDestination: page).frame(minWidth: 900, minHeight: 700)
                 .background(Color(nsColor: .windowBackgroundColor))
         }
         let host = NSHostingView(rootView: view.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } })
@@ -174,7 +174,7 @@ enum CostPreview {
                 for reduced in [NSWorkspace.shared.accessibilityDisplayShouldReduceMotion] {
                     for page in Destination.allCases {
                         let host = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
-                            DetailRoot(model: model, initialDestination: page).frame(width: size.width, height: size.height)
+                            DashboardRoot(model: model, initialDestination: page).frame(width: size.width, height: size.height)
                                 .background(Color(nsColor: .windowBackgroundColor))
                         }.previewStill())
                         host.frame = NSRect(origin: .zero, size: size)
