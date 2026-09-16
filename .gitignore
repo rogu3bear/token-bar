@@ -49,6 +49,7 @@ CLAUDE.md
 .agents/
 .agent/
 .claude/
+.cursor/
 .idea/
 .vscode/
 private/
