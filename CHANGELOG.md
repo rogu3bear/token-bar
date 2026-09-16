@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.6 — Release candidate
+## 0.1.6 — Released 2026-09-16
 
 - Keep the menu-bar line readable while values change. The status item crossfaded every update, and when a number changed its digit count the whole line shifted, so for a moment it drew two offset copies of itself; with the Fable fields enabled this read as the line rolling to a different value. Text now crossfades only when the old and new lines align exactly, and otherwise switches at once while the speed dial still moves smoothly.
 

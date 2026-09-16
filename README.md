@@ -16,7 +16,7 @@ Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
 saved measurements on your Mac and updates them as new records arrive.
 
-**v0.1.5 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
+**v0.1.6 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
 
 [Website](https://token-bar-9v8.pages.dev) · [Releases](https://github.com/rogu3bear/token-bar/releases) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
@@ -42,18 +42,18 @@ mean an entire tool has stopped.
 
 ## Get started
 
-[Download Token Bar 0.1.5 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.5/TokenBar-0.1.5-arm64.pkg)
+[Download Token Bar 0.1.6 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.6/TokenBar-0.1.6-arm64.pkg)
 
 The installer is signed with Developer ID and notarized by Apple. Open the
 `.pkg` and follow the macOS installer; it installs **Token Bar.app** in
 `/Applications`. Then open Token Bar from Applications. No build tools or reboot
 are required. Requires Apple silicon and macOS 14 or later.
 
-[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.5)
+[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.6)
 
 GitHub Releases hosts the direct macOS installer. A separate GitHub Packages
 OCI artifact, `ghcr.io/rogu3bear/token-bar:0.1.0`, contains the initial 0.1.0
-installer, its checksum and a short README. The current 0.1.5 installer is
+installer, its checksum and a short README. The current 0.1.6 installer is
 available through GitHub Releases. The OCI artifact is a distribution archive,
 not a runnable container. Its listing remains private as of September 13, 2026; use the public
 Release download above. [Distribution and verification details](docs/RELEASING.md).
