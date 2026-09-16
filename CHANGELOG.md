@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.7 — Release candidate
+## 0.1.7 — Released 2026-09-16
 
 - Name History, Accounts and Settings owners in source so DestinationHost matches dashboard titles. The dashboard still uses the capsule destinations; this is not a scene rewrite.
 - Declare CFBundlePackageType APPL so Launch Services treats the bundle as an application. The app already launched without it; this fills the omitted application package type.
@@ -56,7 +56,7 @@ These changes shipped in 0.1.2; there was no separate public 0.1.1 release.
 The public version sequence starts at 0.1.0. A Developer ID signed and
 Apple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).
 An OCI archive with the identical installer was uploaded to GitHub Packages at
-launch; that listing is private and is not the current 0.1.6 installer. The
+launch; that listing is private and is not the current 0.1.7 installer. The
 public website and README used the direct v0.1 Release asset at launch.
 Installation needs no build tools or reboot.
 Claude after-turn account allowance refresh remains unavailable; the
