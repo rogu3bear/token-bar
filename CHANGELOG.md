@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.7 — Release candidate
+
+- Name History, Accounts and Settings owners in source so DestinationHost matches dashboard titles. The dashboard still uses the capsule destinations; this is not a scene rewrite.
+- Declare CFBundlePackageType APPL so Launch Services treats the bundle as an application. The app already launched without it; this fills the omitted application package type.
+
 ## 0.1.6 — Released 2026-09-16
 
 - Keep the menu-bar line readable while values change. The status item crossfaded every update, and when a number changed its digit count the whole line shifted, so for a moment it drew two offset copies of itself; with the Fable fields enabled this read as the line rolling to a different value. Text now crossfades only when the old and new lines align exactly, and otherwise switches at once while the speed dial still moves smoothly.

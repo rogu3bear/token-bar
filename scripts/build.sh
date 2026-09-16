@@ -51,12 +51,18 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <key>CFBundleIconFile</key><string>TokenBar</string>
 <key>CFBundleVersion</key><string>$build_number</string>
 <key>CFBundleShortVersionString</key><string>$version</string>
+<key>CFBundlePackageType</key><string>APPL</string>
 <key>LSUIElement</key><true/>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSHumanReadableCopyright</key><string>Copyright 2026 Token Bar contributors. MIT license.</string>
 </dict></plist>
 PLIST
+package_type=$(/usr/libexec/PlistBuddy -c 'Print :CFBundlePackageType' "$app/Contents/Info.plist" 2>/dev/null || true)
+if [ "$package_type" != APPL ]; then
+  echo "build.sh: CFBundlePackageType must be APPL, got '${package_type:-missing}'" >&2
+  exit 1
+fi
 if [[ -n "${APP_SIGNING_IDENTITY:-}" ]]; then
   codesign --force --options runtime --timestamp --sign "$APP_SIGNING_IDENTITY" "$app"
 else
