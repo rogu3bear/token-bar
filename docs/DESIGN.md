@@ -86,7 +86,9 @@ A preview ahead of the public installer names its native version and says it
 is not yet the public download. The website presents these recordings with
 one pause/resume control and a short sample-data disclosure. It does not claim to show the visitor's usage. Quota
 is independent of output rate. Motion starts automatically when either native recording is visible and repeats
-through its settled working section; the entrance plays once. It pauses offscreen and in hidden tabs,
+through its settled working section; the entrance plays once. First play seeks to the poster timestamp
+(`data-start` 3.5s, native frame 105) rather than decoding from t=0, so the still and the first motion
+frame stay the same Codex-only Now. It pauses offscreen and in hidden tabs,
 respects an explicit pause until resumed, and stays still under reduced-motion
 preferences. Controls are quiet secondary actions; sample disclosure stays visible.
 
