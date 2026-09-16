@@ -10,7 +10,7 @@ Use a focused branch and synthetic fixtures. Install site dependencies with
 `(cd site && bun install)` before the first site build. Native code changes need
 the affected `./scripts/test.sh <group>` checks and `./scripts/build.sh`; site
 behavior needs `(cd site && bun test && bun run build)`. A release runs all
-thirteen native groups and the site tests. Documentation-only changes need
+fourteen native groups and the site tests. Documentation-only changes need
 source/command/link verification and the public-tree check, not an unrelated
 native rebuild. Include what changed, why, checks actually run and untested
 behavior. This repository uses local CI; do not add GitHub Actions workflows.

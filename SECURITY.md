@@ -38,7 +38,7 @@ compares the complete unsigned package:
 ./scripts/verify-release.sh <source-commit> <package.pkg>
 ```
 
-Use the release tag's commit, not a later documentation commit. An OCI copy in
-GitHub Packages must contain identical installer bytes; a registry digest alone
-does not establish Apple signing or notarization. See [the release guide](docs/RELEASING.md)
+Use the release tag's commit, not a later documentation commit. GitHub Releases
+is the installer distribution path. A registry digest does not establish Apple
+signing or notarization. See [the release guide](docs/RELEASING.md)
 for the separate trust checks and current distribution status.

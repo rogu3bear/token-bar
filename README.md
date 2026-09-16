@@ -51,12 +51,8 @@ are required. Requires Apple silicon and macOS 14 or later.
 
 [Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.6)
 
-GitHub Releases hosts the direct macOS installer. A separate GitHub Packages
-OCI artifact, `ghcr.io/rogu3bear/token-bar:0.1.0`, contains the initial 0.1.0
-installer, its checksum and a short README. The current 0.1.6 installer is
-available through GitHub Releases. The OCI artifact is a distribution archive,
-not a runnable container. Its listing remains private as of September 13, 2026; use the public
-Release download above. [Distribution and verification details](docs/RELEASING.md).
+GitHub Releases hosts the macOS installer. The current download is the
+notarized v0.1.6 package above. [Distribution and verification details](docs/RELEASING.md).
 
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.

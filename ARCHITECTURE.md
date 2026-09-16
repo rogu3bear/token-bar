@@ -43,7 +43,6 @@ not application state or UI code.
 | Preferences | `UserDefaults` keys `appearance.*`, `menuBarConfiguration.v1`, `dashboard.rateUnit.<tool>` | tool units, menu bar title, theme | `Tests/Appearance`, `Tests/MenuBar` |
 | Version | `VERSION` | Info.plist, package name, `release.json` | `scripts/build.sh` |
 | Public download | Notarized GitHub Release asset; `site/public/release.json` binds its URL/hash | landing page button | `scripts/verify-release.sh`, `site/tests/site.test.mjs` |
-| GitHub Packages copy | OCI artifact containing the same installer and checksum | repository Packages listing; visibility is independent | registry export and extracted installer SHA-256; `docs/RELEASING.md` |
 | Harness and project | `session_meta.originator` and `cwd`, normalized by `Project` | harness and project reports | `Tests/Dimensions` |
 | Claude Code usage | `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`, with `projects/**/*.jsonl` message snapshots plus verified increments; a missing explicit root stays unavailable | tool and project reports | `Tests/Harnesses` |
 | OpenCode usage | `opencode.db` `message` table, read-only | tool, provider and project reports | `Tests/Harnesses` |

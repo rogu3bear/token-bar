@@ -153,40 +153,12 @@ After release publication, update `site/public/release.json` with `available: tr
 
 The existing bundle identifier is retained to preserve upgrades and saved menu-bar settings. Package installation does not delete local usage history or alter the user's Codex installation.
 
-## GitHub Packages distribution
+## GitHub Packages
 
-The separate [Packages listing](https://github.com/users/rogu3bear/packages/container/package/token-bar)
-uses `ghcr.io/rogu3bear/token-bar:0.1.0`. It archives the initial 0.1.0 release,
-not the current 0.1.6 installer. It contains
-`TokenBar-0.1.0-arm64.pkg`, its basename-only `.sha256`, and `README.txt`.
-This is an OCI distribution artifact, not a runnable macOS container. The
-installer inside is byte-identical to the v0.1 Release asset.
-
-As verified September 13, 2026, the package is uploaded and linked to the public
-repository, but its own visibility remains **private**. Do not describe it as an
-anonymous download. Package visibility is independent of the linked repository;
-a maintainer changes it under Package settings → Change visibility. The public
-Release download remains available regardless of registry visibility. See
-[GitHub's visibility rules](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
-
-Maintainer publication uses an authenticated OCI client with `write:packages`.
-Retain an existing version if its digest already matches; reconcile any uncertain
-upload before retrying. Include source, version, revision, license and a description
-identifying the installer archive. Never add credentials or local operating records
-to its layer. Link it with
-`org.opencontainers.image.source=https://github.com/rogu3bear/token-bar`.
-After publication, verify the registry digest, repository and visibility, then
-export and compare the extracted installer with the Release checksum. Public
-availability requires repeating the download anonymously.
-
-An authorized registry user can extract it with the `crane` OCI client:
-
-```sh
-crane export ghcr.io/rogu3bear/token-bar:0.1.0 token-bar.tar
-tar -xOf token-bar.tar TokenBar-0.1.0-arm64.pkg > TokenBar-0.1.0-arm64.pkg
-tar -xOf token-bar.tar TokenBar-0.1.0-arm64.pkg.sha256 > TokenBar-0.1.0-arm64.pkg.sha256
-shasum -a 256 -c TokenBar-0.1.0-arm64.pkg.sha256
-```
-
-Authenticate first while the listing is private. For ordinary macOS installation,
-use the direct Release asset instead of installing registry tooling.
+GitHub Releases is the only installer distribution path. A private OCI archive
+`ghcr.io/rogu3bear/token-bar:0.1.0` was uploaded at the initial public release.
+It is not the current 0.1.6 installer, not an anonymous download, and not a
+runnable container. Do not publish a new Packages copy; do not treat a registry
+digest as Apple signing or notarization. Delete the leftover listing with a
+token that has `delete:packages` (this checkout's `gh` token has
+`write:packages` only).

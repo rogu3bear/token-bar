@@ -57,7 +57,6 @@ headers/footer links and any enabled installer by hash. Verify local draft
 retention, prefill encoding/template fields, length/copy fallbacks, and retired
 API 410/no-store behavior separately. No email delivery check applies.
 
-GitHub Packages remains an additional installer archive with independent
-visibility; it is not the website's download origin. Keep `release.json` bound
-to the notarized Release asset. Documentation-only changes outside `site/` need
-no site rebuild or deployment when published inputs are unchanged.
+Keep `release.json` bound to the notarized GitHub Release asset. GitHub
+Packages is not a current download origin. Documentation-only changes outside
+`site/` need no site rebuild or deployment when published inputs are unchanged.
