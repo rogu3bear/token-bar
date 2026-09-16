@@ -67,8 +67,12 @@ app's real rendering and motion; a web reconstruction is not sufficient.
 `ToolSpeedCard`, and `RPMGauge`, plus the actual `MenuBarPresentation.combined`
 formatter, using isolated synthetic `RateMeasurement` inputs passed through
 `Tachometer.apply`. SwiftUI owns the dashboard dial interpolation and numeric
-transitions in `RPMGauge` and `RollingRate`. The separate `MenuBarAnimator`
-owns the menu-bar number crossfades and dial interpolation. The capture
+transitions in `RPMGauge` and `RollingRate`. The separate `MenuBarValueAnimator`
+owns the menu-bar number crossfades and dial interpolation. The status item has
+variable length, so text crossfades only between glyph-aligned lines (same
+length, only digits changed, same rendered width); a change that shifts what
+follows swaps the text at once while the dial still interpolates, so the menu
+bar never shows two misaligned copies of the line. The capture
 never starts monitoring or reads production history/preferences. Its
 `capture.json` records sample values and frame timestamps. Encode frames at
 those timestamps with FFmpeg; do not invent or smooth a different display.

@@ -62,7 +62,8 @@ struct MenuBarDial {
 }
 
 /// Shared by the real status button and native previews. Only the dial position is
-/// interpolated; text and accessibility always retain an actual reported value.
+/// interpolated; text and accessibility always retain an actual reported value. Text
+/// crossfades only between glyph-aligned lines; any other change swaps it at once.
 final class MenuBarValueAnimator {
     private var target: NSAttributedString?
     private(set) var displayed: NSAttributedString?
@@ -92,6 +93,18 @@ final class MenuBarValueAnimator {
         }
         return result
     }
+    /// A crossfade blends two snapshots in place, so it reads as one line only when every glyph keeps
+    /// its position: same length, only digits changed, same rendered width. A digit-count change,
+    /// different words or proportional digits shift what follows, and blending would draw it twice.
+    static func alignsForCrossfade(_ from: NSAttributedString, _ to: NSAttributedString) -> Bool {
+        let old = Array(from.string.utf16), new = Array(to.string.utf16)
+        guard old.count == new.count else { return false }
+        let digits = UInt16(0x30)...UInt16(0x39)
+        for (a, b) in zip(old, new) where a != b {
+            guard digits.contains(a), digits.contains(b) else { return false }
+        }
+        return abs(from.size().width - to.size().width) < 0.5
+    }
     func cancel() {
         timer?.invalidate(); timer = nil; isAnimating = false
     }
@@ -102,15 +115,21 @@ final class MenuBarValueAnimator {
         let from = displayed
         cancel()
         target = value
+        // Core Animation files every CATransition under kCATransition, whatever key it is added with.
         guard let from, !reduceMotion, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            view.layer?.removeAnimation(forKey: "TokenBar.valueChange")
+            view.layer?.removeAnimation(forKey: kCATransition)
             displayed = value; apply(value); return
         }
         view.wantsLayer = true
-        let fade = CATransition()
-        fade.type = .fade; fade.duration = 0.3
-        fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        view.layer?.add(fade, forKey: "TokenBar.valueChange")
+        if Self.alignsForCrossfade(from, value) {
+            let fade = CATransition()
+            fade.type = .fade; fade.duration = 0.3
+            fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            view.layer?.add(fade, forKey: kCATransition)
+        } else {
+            // The variable-length status item changes width, so blending would draw the line twice.
+            view.layer?.removeAnimation(forKey: kCATransition)
+        }
         let start = ProcessInfo.processInfo.systemUptime
         displayed = Self.frame(from: from, to: value, progress: 0)
         apply(displayed!)
@@ -124,7 +143,7 @@ final class MenuBarValueAnimator {
             let frame = finished ? value : Self.frame(from: from, to: value, progress: eased)
             self.displayed = frame; apply(frame)
             if finished {
-                view.layer?.removeAnimation(forKey: "TokenBar.valueChange")
+                view.layer?.removeAnimation(forKey: kCATransition)
                 self.cancel()
             }
         }

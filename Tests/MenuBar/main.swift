@@ -467,6 +467,43 @@ assert(recoveringClaude.activity.error == nil && recoveringClaude.hasRate && rec
 assert(LiveTool.active(codex: idleCodex, claude: recoveringClaude) == [.claude])
 print("PASS: Claude error-only state remains independent of active selection and clears on fresh recovery")
 
+// A crossfade blends two snapshots in place. It reads as one line only when every glyph keeps its
+// position; a variable-length status item that changes width must swap instantly instead.
+do {
+    let digits = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+    func line(_ position: Double, _ text: String, font: NSFont? = nil) -> NSAttributedString {
+        let value = NSMutableAttributedString(attributedString: MenuBarDial.attributed(value: position, minimum: 0, maximum: 1, available: true, accent: .labelColor, identity: "claude"))
+        value.append(NSAttributedString(string: text, attributes: [.font: font ?? digits]))
+        return value
+    }
+    let tail = "  2% remaining  Fable 0% · Fable week"
+    let steady = line(0.4, "~98 tok/s" + tail)
+    assert(MenuBarValueAnimator.alignsForCrossfade(steady, line(0.5, "~97 tok/s" + tail)), "Same-width digit changes keep the crossfade")
+    assert(!MenuBarValueAnimator.alignsForCrossfade(steady, line(0.5, "~104 tok/s" + tail)), "A digit-count change shifts everything after it")
+    assert(!MenuBarValueAnimator.alignsForCrossfade(line(0.4, "~98 tok/s  2% remaining"), line(0.4, "~98 tok/s  9% remaining  Zero 12:40")), "A longer line never crossfades")
+    assert(!MenuBarValueAnimator.alignsForCrossfade(line(0.4, "Fable 0% · 5h"), line(0.4, "Fable 0% · wk")), "Changed words never crossfade, even at equal length")
+    let proportional = NSFont.systemFont(ofSize: 12)
+    assert(!MenuBarValueAnimator.alignsForCrossfade(line(0.4, "Claude 11%", font: proportional), line(0.4, "Claude 88%", font: proportional)), "Proportional digits that change width do not crossfade")
+    _ = NSApplication.shared
+    let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    // Core Animation files every CATransition under kCATransition, whatever key it was added with.
+    let shifting = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 22))
+    let animator = MenuBarValueAnimator()
+    animator.update(steady, in: shifting, reduceMotion: false) { _ in }
+    animator.update(line(0.6, "~104 tok/s" + tail), in: shifting, reduceMotion: false) { _ in }
+    assert(shifting.layer != nil && shifting.layer?.animation(forKey: kCATransition) == nil, "A width change must not blend two misaligned lines")
+    assert(reduced || animator.isAnimating, "The dial still moves when the text swaps instantly")
+    animator.cancel()
+    if !reduced {
+        let aligned = NSView(frame: shifting.frame)
+        let crossfading = MenuBarValueAnimator()
+        crossfading.update(steady, in: aligned, reduceMotion: false) { _ in }
+        crossfading.update(line(0.6, "~97 tok/s" + tail), in: aligned, reduceMotion: false) { _ in }
+        assert(aligned.layer?.animation(forKey: kCATransition) != nil, "Glyph-aligned digit changes keep the designed crossfade")
+        crossfading.cancel()
+    }
+    print("PASS: menu-bar crossfade only between glyph-aligned lines; width or word changes swap instantly while the dial still moves")
+}
 // Animation changes presentation only, including when units and selected tools change.
 do {
     func presentation(_ position: Double, _ text: String, id: String = "codex", available: Bool = true) -> NSAttributedString {
