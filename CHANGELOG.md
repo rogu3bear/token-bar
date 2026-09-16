@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.5 — Release candidate
+## 0.1.5 — Released 2026-09-16
 
 - Replace an installed 2.x development build. macOS Installer compared short versions first, so 0.1.x packages reported a successful install while leaving the older 2.x app in place. The installer now compares build numbers itself, and refuses a newer installed build with a visible message instead of silently skipping.
 
