@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep Now columns aligned with working tools. Auto already stayed quiet and the popover already omitted unused remaining; Now still minted an empty Claude chair from a connection with no reading, so one Codex dial sat between two names. While any tool is working, Now shows exactly those tools. Measured remainings stay when nothing is working. Connection without a reading is not a seat.
+
 ## 0.1.8 — Released 2026-09-16
 
 - Keep the menu bar quiet when nothing is running. Auto no longer invents an idle Codex readout, omits unused remaining (including unused Fable remaining and unused Codex or Grok zeros) and a measured Fable zero, and keeps Codex off the bar until it has a measured rate or is running. The dropdown still shows Claude at 0% when that remaining is a measured zero. Fable time left still says no recent use on an explicit or working Claude line. An enabled Quota Guard warning may appear on idle Auto as warning text, not occupancy. `docs/DESIGN.md` states that occupancy rule as a closed glance grammar: Claude-at-zero is the one named idle exception, not a pattern for the next tool.

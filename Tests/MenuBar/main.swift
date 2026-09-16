@@ -426,6 +426,20 @@ assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok
 assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 40 }) == [.codex])
 print("PASS: idle Auto names a measured-zero Claude remaining and keeps unused Codex and Fable off the bar")
 print("PASS: unused remaining cannot occupy Auto; Claude-at-zero is an idle exception, not a working-line occupant")
+assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex],
+       "Working Now does not give idle Claude a column")
+assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .codex ? 64 : nil }) == [.codex],
+       "Connected Claude with no reading is not a Now seat")
+assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : 64 }) == [.codex],
+       "Claude-at-zero is not a second Now column beside working Codex")
+let workingClaudeNow = Tachometer()
+workingClaudeNow.hasRate = true; workingClaudeNow.rawRate = 8; workingClaudeNow.rate = 8
+assert(LiveTool.nowOccupied(codex: workingCodex, claude: workingClaudeNow, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex, .claude])
+assert(LiveTool.nowOccupied(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : ($0 == .codex ? 64 : nil) }) == [.codex, .claude],
+       "Idle Now keeps measured remainings, including Claude at zero")
+assert(LiveTool.nowOccupied(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in nil }).isEmpty,
+       "Idle Now does not mint seats from connection without a reading")
+print("PASS: Now seats are working tools, or idle measured remainings, never an empty chair")
 assert(unusedRemaining.string == "◈", "Idle Auto without the Claude-zero exception is the app icon: \(unusedRemaining.string)")
 assert(AccountAllowancePresentation(quota: claudeSpentState, now: now).measuredZero)
 assert(!AccountAllowancePresentation(quota: claudePlentyState, now: now).measuredZero)

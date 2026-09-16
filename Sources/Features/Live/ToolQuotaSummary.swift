@@ -92,13 +92,17 @@ struct AccountAllowanceSection: View {
     var quota: (LiveTool) -> ToolQuotaState
     var now: Date
     var connection: ClaudeConnectionModel? = nil
+    var sourcesKnown = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Account allowances").font(.headline)
             if tools.isEmpty {
-                Text("No account sources detected yet. Open a supported tool to begin.")
-                    .font(.callout).foregroundStyle(.secondary)
+                if !sourcesKnown {
+                    Text("Account allowances").font(.headline)
+                    Text("No account sources detected yet. Open a supported tool to begin.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             } else {
+                Text("Account allowances").font(.headline)
                 HStack(alignment: .top, spacing: 24) {
                     ForEach(tools) { tool in
                         AccountAllowanceDisclosure(tool: tool, quota: quota(tool), now: now,

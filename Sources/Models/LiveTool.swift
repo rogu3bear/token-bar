@@ -20,6 +20,13 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         let working = Set(active(codex: codex, claude: claude, grok: grok))
         return allCases.filter { working.contains($0) || ($0 == .claude && remaining($0) == 0) }
     }
+    /// Now columns: working tools while any are working; measured remainings only when idle.
+    /// Connection or discovery without a reading does not mint a seat.
+    static func nowOccupied(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
+        let working = active(codex: codex, claude: claude, grok: grok)
+        if !working.isEmpty { return working }
+        return allCases.filter { remaining($0) != nil }
+    }
     func color(in palette: ToolPalette) -> Color { palette.color(rawValue, fallback: color) }
     var id: String { rawValue }
     var label: String { self == .codex ? "Codex" : self == .claude ? "Claude" : "Grok" }

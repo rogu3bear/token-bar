@@ -169,14 +169,14 @@ exception.
 
 `MenuBarPresentation.combined` is the single occupancy owner for the status item
 and the settings preview. `LiveTool.compact` owns popover rows.
-`AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
-both. A new quiet-exception that is not rule 2 requires changing this section
+`LiveTool.nowOccupied` owns Now columns. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
+Auto and the popover. A new quiet-exception that is not rule 2 requires changing this section
 and a MenuBar test that names the tool.
 
 ## Independent tool speeds
 
 Auto occupancy follows Glance grammar. Right now shows tools with a fresh rate or currently observed running task.
-Inactive quota readings and stale unconfirmed tasks do not reserve speed panels; relevant account allowances remain visible.
+Inactive quota readings and stale unconfirmed tasks do not reserve speed panels. Unused remaining does not occupy a working Now column.
 Tools join with stable identity and a restrained transition; when nothing is active,
 the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unused idle Codex and Grok rows are not listed. Idle Auto keeps the status item to the app icon, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off Auto. Codex appears in Auto only while it is running or has a measured rate. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
@@ -197,13 +197,13 @@ it does not reset saved configuration. The dropdown groups each tool's speed
 with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
 Existing visibility, order, compactness and unit preferences survive.
 Now places a compact Account allowances section before the larger live gauges.
-Known tools keep a stable allowance disclosure through idle, stale and failed
-reads. Relevance comes from verified discovery, configured connections, recorded
+Now occupancy uses `LiveTool.nowOccupied`: while any tool is working, columns are exactly those working tools, so remaining and the dial share identity and x-position. An idle neighbor, including Claude at a measured zero and a connected Claude with no reading, does not get an empty chair beside a working gauge. When nothing is working, measured remainings stay as idle columns; connection, discovery, and unavailable readings do not mint a seat. Known tools keep a stable allowance disclosure through idle, stale and failed
+reads on Accounts and All allowances. Relevance comes from verified discovery, configured connections, recorded
 usage, account identity, quota or observed activity, never a default path or an
 initial monitor error. Remembered relevance retains tool identity only, not quota
 payloads. OpenCode has no account allowance row.
 Each active tool's speed and activity share one aligned gauge column. Stopping a
-tool removes its speed panel but keeps its relevant account allowance. The
+tool removes its speed panel. Its remaining returns to Now when nothing is working, if that remaining is still measured; it does not keep an idle chair beside a neighbor that is still working. The
 210-point compact gauge preserves room for the independent account section.
 Dividers separate tools without adding card surfaces. The compact gauge leaves the main readings visible at the
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover

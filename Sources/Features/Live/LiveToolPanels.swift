@@ -10,14 +10,18 @@ struct LiveToolPanels: View {
     @Environment(\.presentationClock) private var clock
     var body: some View {
         Group {
+            let now = model.referenceDate ?? clock.now
+            let remaining: (LiveTool) -> Double? = { tool in
+                AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
+            }
             let tools = LiveTool.active(codex: codex, claude: claude, grok: model.grokMeter)
+            let seats = LiveTool.nowOccupied(codex: codex, claude: claude, grok: model.grokMeter, remaining: remaining)
             VStack(alignment: .leading, spacing: 16) {
-            AccountAllowanceSection(tools: model.accountTools, quota: { model.quota(for: $0) },
-                                    now: model.referenceDate ?? clock.now, connection: model.claudeConnection)
+            AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },
+                                    now: now, connection: model.claudeConnection,
+                                    sourcesKnown: !model.accountTools.isEmpty)
             if tools.isEmpty {
-                if !model.accountTools.isEmpty {
-                    Text("No tools working right now").foregroundStyle(.secondary).padding(16)
-                }
+                Text("No tools working right now").foregroundStyle(.secondary).padding(16)
             } else {
                 ProviderColumnsLayout(columns: tools.count) {
                     ForEach(tools) { tool in
