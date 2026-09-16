@@ -266,8 +266,9 @@ boundaries. A first snapshot is still only a baseline; decreases and long gaps
 do not create an estimated rate. `MenuBarPresentation.combined` owns automatic
 multi-tool presentation for both the status item and settings preview. It sums
 available output rates, never provider allowances, and keeps idle Auto quiet
-except Claude at a measured-zero remaining. Opt-in Fable and Quota Guard fields
-cannot restore an idle Codex readout. `UsageModel.quota(for:)`
+except Claude at a measured-zero remaining. Opt-in Fable fields cannot restore
+an idle Codex readout. An enabled Quota Guard warning is risk text, not
+occupancy. `UsageModel.quota(for:)`
 uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to Codex quota.
 
 ## Persistence and lazy work

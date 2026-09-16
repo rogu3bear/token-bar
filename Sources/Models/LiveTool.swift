@@ -11,7 +11,7 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         if let grok, grok.hasRate || grok.runningCount > 0 { tools.append(.grok) }
         return tools
     }
-    /// Compact Auto follows working tools only. Idle no longer invents a Codex placeholder.
+    /// Occupancy alias of `active`. Idle no longer invents a Codex placeholder.
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         active(codex: codex, claude: claude, grok: grok)
     }
@@ -52,6 +52,8 @@ struct AccountAllowancePresentation {
         return Runway.priority(matching, samples: quota.samples, now: now, horizon: quota.horizon)
     }
     var estimate: Runway? { reading.map { Runway.estimate($0, samples: quota.samples, now: now, horizon: quota.horizon) } }
+    /// Occupancy exception: remaining is a measured zero, not missing.
+    var measuredZero: Bool { estimate.map { $0.remaining == 0 } ?? false }
     var remaining: String { CompactLiveCopy.remaining(estimate) }
     var qualifier: String {
         if let estimate { return estimate.remaining == 0 ? "Exhausted" : "Remaining" }

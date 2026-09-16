@@ -426,6 +426,17 @@ assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok
 assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 40 }) == [.codex])
 print("PASS: idle Auto names a measured-zero Claude remaining and keeps unused Codex and Fable off the bar")
 print("PASS: unused remaining cannot occupy Auto; Claude-at-zero is an idle exception, not a working-line occupant")
+assert(unusedRemaining.string == "◈", "Idle Auto without the Claude-zero exception is the app icon: \(unusedRemaining.string)")
+assert(AccountAllowancePresentation(quota: claudeSpentState, now: now).measuredZero)
+assert(!AccountAllowancePresentation(quota: claudePlentyState, now: now).measuredZero)
+var riskBar = MenuBarConfiguration(); riskBar.enabled = [.dial, .rate, .quota, .risk]
+let idleRisk = MenuBarPresentation.combined(riskBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(),
+    riskText: "Codex weekly 8% · Low allowance")
+assert(idleRisk.string.contains("Codex weekly 8% · Low allowance"), idleRisk.string)
+assert(!idleRisk.string.contains("tok/") && !idleRisk.string.contains("Speed dial") && !idleRisk.string.contains("remaining"),
+       "Quota Guard warning is not an idle Codex instrument line: \(idleRisk.string)")
+print("PASS: idle Auto warning field is risk text, not occupancy")
 let exhausted = Runway.estimate(QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 100, reset: now.addingTimeInterval(3600), date: now), samples: [], now: now)
 assert(CompactLiveCopy.rate(true, amount: 7680, unit: .minute) == "~7.7k tok/m")
 assert(CompactLiveCopy.rate(false, amount: 0, unit: .second) == "—")
@@ -924,6 +935,13 @@ do {
     paceMenu.enabled = [.fablePace]
     assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: heavy)[.fablePace] == "Fable ≈50m left")
     assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow)[.fablePace] == "")
+    let idlePace = paced(session: [20, 20, 20], week: [5, 5, 5], fable: [5, 5, 5])
+    assert(ClaudeQuotaSource.fablePace(idlePace, now: cacheNow) == .idle)
+    assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: idlePace)[.fablePace] == "Fable no recent use")
+    let learningPace = paced(session: [20, 25], week: [5, 6], fable: [5, 6])
+    assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: learningPace)[.fablePace] == "Fable learning pace")
+    let resetsPace = paced(session: [20, 21, 22], week: [5, 5.1, 5.2], fable: [5, 5.1, 5.2])
+    assert(MenuBarPresentation.values(paceMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: resetsPace)[.fablePace] == "Fable resets first")
 
     // The monitor keeps recent readings per signed-in account, including through a stale cache.
     let historyRoot = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-fable-pace-\(UUID().uuidString)")

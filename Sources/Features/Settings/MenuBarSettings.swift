@@ -66,9 +66,10 @@ struct MenuBarPresentation {
         let working = LiveTool.active(codex: codex, claude: claude, grok: grok)
         let tools = auto ? working : [selected]
         func remainingZero(_ tool: LiveTool) -> Bool {
-            let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
-            guard let reading = Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon) else { return false }
-            return Runway.estimate(reading, samples: state.samples, now: now, horizon: state.horizon).remaining == 0
+            AccountAllowancePresentation(
+                quota: quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota),
+                now: now
+            ).measuredZero
         }
         func appendQuota(_ result: NSMutableAttributedString, tools: [LiveTool]) {
             guard settings.enabled.contains(.quota) else { return }
@@ -167,8 +168,8 @@ struct MenuBarPresentation {
             .fablePace: {
                 guard let pace else { return "" }
                 switch pace {
-                case .exhausted, .idle: return ""
-                case .learning, .resetsFirst, .left: return paceName + pace.menuText
+                case .exhausted: return ""
+                case .idle, .learning, .resetsFirst, .left: return paceName + pace.menuText
                 }
             }()
         ]
@@ -246,7 +247,7 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet when nothing is running, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota is omitted rather than shown as unavailable copy.").font(.caption).foregroundStyle(.secondary)
+                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet when nothing is running, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
                 Picker("Rate units", selection: $preferences.configuration.unit) {
                     Text("Follow selected tool").tag("dashboard")
                     Text("Tokens / second").tag("s")
