@@ -243,3 +243,71 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-version-test-') as temporary:
         assert result.returncode == 1 and b'VERSION must be' in result.stderr
         assert not (root / 'build').exists(), 'Invalid version must fail before build output'
 print('PASS: public build epoch rejects malformed and colliding version components before building')
+
+# build.sh writes Info.plist after compile. Local CI must still reach that plist
+# without linking the app: stub the compiler and codesign, keep the real script.
+def prepare_bundle_tree(root, version='9.8.7'):
+    (root / 'scripts').mkdir()
+    (root / 'Sources').mkdir()
+    (root / 'Assets').mkdir()
+    (root / 'bin').mkdir()
+    (root / 'VERSION').write_text(version + '\n')
+    (root / 'Sources/Stub.swift').write_text('enum Stub {}\n')
+    (root / 'Assets/TokenBar.icns').write_bytes(b'icns')
+    relay = root / 'Assets/claude-statusline-relay.sh'
+    relay.write_text('#!/bin/sh\n')
+    relay.chmod(0o755)
+    xcrun = root / 'bin/xcrun'
+    xcrun.write_text('''#!/bin/bash
+if [ "$1" = swiftc ] && [ "$2" = --version ]; then
+  echo 'Apple Swift version 6.0'
+  exit 0
+fi
+if [ "$1" = swiftc ]; then
+  out=""
+  prev=""
+  for arg in "$@"; do
+    if [ "$prev" = "-o" ]; then out="$arg"; fi
+    prev="$arg"
+  done
+  mkdir -p "$(dirname "$out")"
+  printf '#!/bin/sh\\n' > "$out"
+  chmod 755 "$out"
+  exit 0
+fi
+exit 1
+''')
+    xcrun.chmod(0o700)
+    codesign = root / 'bin/codesign'
+    codesign.write_text('#!/bin/bash\nexit 0\n')
+    codesign.chmod(0o700)
+    shutil.copy2(owner.parent / 'build.sh', root / 'scripts/build.sh')
+    shutil.copy2(owner.parent / 'sources.sh', root / 'scripts/sources.sh')
+    return {'PATH': str(root / 'bin') + ':/usr/bin:/bin', 'TMPDIR': str(root), 'LC_ALL': 'C'}
+
+def run_build(root, env):
+    return subprocess.run(['bash', str(root / 'scripts/build.sh')], cwd=root, env=env, capture_output=True)
+
+with tempfile.TemporaryDirectory(prefix='tokenbar-appl-missing-test-') as temporary:
+    root = Path(temporary)
+    env = prepare_bundle_tree(root)
+    script = root / 'scripts/build.sh'
+    script.write_text(script.read_text().replace(
+        '<key>CFBundlePackageType</key><string>APPL</string>\n', ''))
+    result = run_build(root, env)
+    assert result.returncode == 1 and b'CFBundlePackageType must be APPL' in result.stderr, result.stderr
+    assert not (root / 'build/Token Bar.app').exists(), 'A bundle without APPL must not be published'
+
+with tempfile.TemporaryDirectory(prefix='tokenbar-appl-test-') as temporary:
+    root = Path(temporary)
+    env = prepare_bundle_tree(root)
+    result = run_build(root, env)
+    assert result.returncode == 0, result.stderr
+    plist = root / 'build/Token Bar.app/Contents/Info.plist'
+    def plist_value(key):
+        return subprocess.check_output(
+            ['/usr/libexec/PlistBuddy', '-c', 'Print :' + key, str(plist)], text=True).strip()
+    assert plist_value('CFBundlePackageType') == 'APPL'
+    assert plist_value('CFBundleShortVersionString') == '9.8.7'
+    assert plist_value('CFBundleVersion') == '120807'
+print('PASS: shipping Info.plist is APPL and a missing package type fails closed before signing')
