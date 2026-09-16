@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.8 — Release candidate
+## 0.1.8 — Released 2026-09-16
 
 - Keep the menu bar quiet when nothing is running. Auto no longer invents an idle Codex readout, omits unused remaining (including unused Fable remaining and unused Codex or Grok zeros) and a measured Fable zero, and keeps Codex off the bar until it has a measured rate or is running. The dropdown still shows Claude at 0% when that remaining is a measured zero. Fable time left still says no recent use on an explicit or working Claude line. An enabled Quota Guard warning may appear on idle Auto as warning text, not occupancy. `docs/DESIGN.md` states that occupancy rule as a closed glance grammar: Claude-at-zero is the one named idle exception, not a pattern for the next tool.
 
@@ -60,7 +60,7 @@ These changes shipped in 0.1.2; there was no separate public 0.1.1 release.
 The public version sequence starts at 0.1.0. A Developer ID signed and
 Apple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).
 An OCI archive with the identical installer was uploaded to GitHub Packages at
-launch; that listing is private and is not the current 0.1.7 installer. The
+launch; that listing is private and is not the current 0.1.8 installer. The
 public website and README used the direct v0.1 Release asset at launch.
 Installation needs no build tools or reboot.
 Claude after-turn account allowance refresh remains unavailable; the

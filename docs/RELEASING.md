@@ -1,7 +1,7 @@
 # macOS release
 
-The current public release is **v0.1.7**, with application version **0.1.7** and build
-**30107**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1.7/TokenBar-0.1.7-arm64.pkg)
+The current public release is **v0.1.8**, with application version **0.1.8** and build
+**30108**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1.8/TokenBar-0.1.8-arm64.pkg)
 for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer,
 then open Token Bar from Applications. No build tools or reboot are required.
 The installer preserves existing usage history and preferences.
@@ -10,23 +10,13 @@ The app and installer are separately signed: Developer ID Application for the
 app, Developer ID Installer for the `.pkg`. Maintainers store notarization
 credentials in Keychain; users need none of these to install.
 
-## Preparing the successor
-
-The source candidate is **0.1.8**, build **30108**. It keeps Auto quiet unless a
-tool is working, freezes glance grammar in `docs/DESIGN.md`, and treats Claude
-at a measured-zero remaining as the one idle named exception. It is not a
-public download until its exact source-bound installer passes signing,
-notarization, source binding and the authorized publication step. The public
-links above, the README download and the site release manifest remain on 0.1.7
-until that publication is verified.
-
 ## Current release binding
 
-The v0.1.7 tag is bound to source commit
-`b93352d104f5b7dca7709b7d6e059010181bea2f`. The signed, notarized package
+The v0.1.8 tag is bound to source commit
+`798d2ff9db5f814312464c01e3f5623e3b4fd6d0`. The signed, notarized package
 reproduces from that commit through `scripts/verify-release.sh`. Its anonymous
-GitHub download was verified on September 16, 2026: 3,958,088 bytes, SHA-256
-`9d69a2d671f14a63691bc2fdb9dfe0beecb61a11d0d6be753ae993c8c52cc537`.
+GitHub download was verified on September 16, 2026: 3,956,623 bytes, SHA-256
+`cb2d3f1d8d4c90b81a6ce768db0ac10810e09c06eb6a3fb2f434b41212b32743`.
 Later site and documentation commits do not move the native release tag.
 
 ## One-time credential setup
@@ -148,7 +138,7 @@ it, and that gate.
 Confirm before upload, from the release output directory:
 
 ```sh
-shasum -a 256 -c TokenBar-0.1.7-arm64.pkg.sha256
+shasum -a 256 -c TokenBar-0.1.8-arm64.pkg.sha256
 ```
 
 A package built before commit `24d4d0c` carries a sidecar naming an absolute
@@ -167,7 +157,7 @@ The existing bundle identifier is retained to preserve upgrades and saved menu-b
 
 GitHub Releases is the only installer distribution path. A private OCI archive
 `ghcr.io/rogu3bear/token-bar:0.1.0` was uploaded at the initial public release.
-It is not the current 0.1.7 installer, not an anonymous download, and not a
+It is not the current 0.1.8 installer, not an anonymous download, and not a
 runnable container. Do not publish a new Packages copy; do not treat a registry
 digest as Apple signing or notarization. Delete the leftover listing with a
 token that has `delete:packages` (this checkout's `gh` token has

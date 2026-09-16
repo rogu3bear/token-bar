@@ -16,7 +16,7 @@ Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
 saved measurements on your Mac and updates them as new records arrive.
 
-**v0.1.7 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
+**v0.1.8 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
 
 [Website](https://token-bar-9v8.pages.dev) · [Releases](https://github.com/rogu3bear/token-bar/releases) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
@@ -42,17 +42,17 @@ mean an entire tool has stopped.
 
 ## Get started
 
-[Download Token Bar 0.1.7 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.7/TokenBar-0.1.7-arm64.pkg)
+[Download Token Bar 0.1.8 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.8/TokenBar-0.1.8-arm64.pkg)
 
 The installer is signed with Developer ID and notarized by Apple. Open the
 `.pkg` and follow the macOS installer; it installs **Token Bar.app** in
 `/Applications`. Then open Token Bar from Applications. No build tools or reboot
 are required. Requires Apple silicon and macOS 14 or later.
 
-[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.7)
+[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.8)
 
 GitHub Releases hosts the macOS installer. The current download is the
-notarized v0.1.7 package above. [Distribution and verification details](docs/RELEASING.md).
+notarized v0.1.8 package above. [Distribution and verification details](docs/RELEASING.md).
 
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.
