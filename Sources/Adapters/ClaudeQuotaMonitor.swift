@@ -36,8 +36,9 @@ enum ClaudeQuotaSource {
         "claude:" + SHA256.hash(data: Data(uuid.utf8)).map { String(format: "%02x", $0) }.joined()
     }
     static func reading(accountID: String, window: String, minutes: Int, used: Double, reset: Date?, date: Date, now: Date) -> QuotaReading? {
-        guard used.isFinite, (0...100).contains(used), let reset, reset > now,
+        guard used.isFinite, (0...100).contains(used),
               date <= now, now.timeIntervalSince(date) < horizon else { return nil }
+        if let reset, reset <= now { return nil }
         return QuotaReading(accountID: accountID, bucket: bucket, name: name, window: window, minutes: minutes, used: used, reset: reset, date: date)
     }
     static var relayHelp: String {
@@ -59,7 +60,7 @@ enum ClaudeQuotaSource {
 }
 struct ClaudeQuotaCache: Decodable {
     struct Account: Decodable { var accountUuid: String }
-    struct Window: Decodable { var utilization: Double; var resets_at: String }
+    struct Window: Decodable { var utilization: Double; var resets_at: String? }
     /// One row of Claude Code's `limits[]`; only model-scoped weekly rows are read.
     struct Limit: Decodable {
         struct Scope: Decodable {
@@ -78,8 +79,8 @@ struct ClaudeQuotaCache: Decodable {
         private enum CodingKeys: String, CodingKey { case five_hour, seven_day, limits }
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            five_hour = try container.decodeIfPresent(Window.self, forKey: .five_hour)
-            seven_day = try container.decodeIfPresent(Window.self, forKey: .seven_day)
+            five_hour = try? container.decodeIfPresent(Window.self, forKey: .five_hour)
+            seven_day = try? container.decodeIfPresent(Window.self, forKey: .seven_day)
             // A malformed or future limits list drops only the model-scoped readings.
             limits = try? container.decodeIfPresent([Limit].self, forKey: .limits)
         }

@@ -144,21 +144,21 @@ struct QuotaGuardDisk: Codable {
         prune(now: now)
         guard allowNotifications, ready, persistenceError == nil else { return }
         for decision in decisions {
-            guard let reading = decision.reading, decision.remaining != nil,
+            guard let reading = decision.reading, let reset = reading.reset, decision.remaining != nil,
                   decision.evidence == .current || decision.evidence == .insufficient else { continue }
             var retired: [String] = []
             var episode = disk.episodes[decision.id]
             if let old = episode {
                 guard reading.date > old.lastObservation else { continue }
                 // Compare with a stable anchor, not the previous jittered reset.
-                if abs(reading.reset.timeIntervalSince(old.reset)) > QuotaGuardPolicy.resetJitter {
-                    guard reading.date >= old.reset, reading.reset > old.reset else { continue }
+                if abs(reset.timeIntervalSince(old.reset)) > QuotaGuardPolicy.resetJitter {
+                    guard reading.date >= old.reset, reset > old.reset else { continue }
                     if let id = old.requestID { retired.append(id) }
                     episode = nil
                 }
             }
             guard episode != nil || disk.episodes.count < QuotaGuardPolicy.capacity else { continue }
-            var next = episode ?? QuotaEpisode(reset: reading.reset, lastObservation: .distantPast)
+            var next = episode ?? QuotaEpisode(reset: reset, lastObservation: .distantPast)
             let gap = reading.date.timeIntervalSince(next.lastObservation)
             if gap > QuotaGuardPolicy.maximumGap { next.forecastCount = 0; next.recoveryCount = 0 }
             next.lastObservation = reading.date
@@ -200,14 +200,14 @@ struct QuotaGuardDisk: Codable {
                 _ = self.save()
                 // A switch/snooze/off action while submission was pending must cancel its result.
                 let current = self.inputs.flatMap { QuotaGuardEvaluator.evaluate($0, now: self.clock(), policy: self.settings.policy) }
-                guard self.settings.notifications, current.contains(where: { $0.id == decision.id && $0.risk != .none && self.samePeriod($0, reset: reading.reset) }),
+                guard self.settings.notifications, current.contains(where: { $0.id == decision.id && $0.risk != .none && self.samePeriod($0, reset: reset) }),
                       !self.isSnoozed(decision, now: self.clock()) else { self.adapter?.remove([requestID]); return }
                 if success { self.reconcile() }
             }
         }
     }
     private func samePeriod(_ decision: QuotaGuardDecision, reset: Date) -> Bool {
-        decision.reading.map { abs($0.reset.timeIntervalSince(reset)) <= QuotaGuardPolicy.resetJitter } == true
+        decision.reading.flatMap { reading in reading.reset.map { abs($0.timeIntervalSince(reset)) <= QuotaGuardPolicy.resetJitter } } == true
     }
     private func accountKey(_ decision: QuotaGuardDecision) -> String {
         let anchor = disk.episodes[decision.id].flatMap { samePeriod(decision, reset: $0.reset) ? $0.reset : nil } ?? decision.reading?.reset ?? .distantPast

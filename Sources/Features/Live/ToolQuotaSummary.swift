@@ -35,7 +35,7 @@ struct ToolQuotaSummary: View {
                         Text("Quota read " + reading.date.formatted(date: .omitted, time: .standard) + Runway.ageLabel(reading, now: now))
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("\(tool.label) · \(reading.minutes >= 1440 ? "\(reading.minutes / 1440)-day" : "\(reading.minutes / 60)-hour") window · resets " + reading.reset.formatted(date: .abbreviated, time: .shortened))
+                    Text("\(tool.label) · \(reading.minutes >= 1440 ? "\(reading.minutes / 1440)-day" : "\(reading.minutes / 60)-hour") window" + (reading.reset.map { " · resets " + $0.formatted(date: .abbreviated, time: .shortened) } ?? " · reset unavailable"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if detailsOnly, let zero = estimate?.exhaustion {
@@ -139,7 +139,7 @@ struct AccountAllowanceDisclosure: View {
                     Text(allowance.qualifier).font(.caption).foregroundStyle(.secondary)
                 }
                 if let reading = allowance.reading {
-                    Text("\(reading.minutes >= 1440 ? "\(reading.minutes / 1440)-day" : "\(reading.minutes / 60)-hour") · resets " + reading.reset.formatted(.dateTime.month(.abbreviated).day().hour().minute()))
+                    Text("\(reading.minutes >= 1440 ? "\(reading.minutes / 1440)-day" : "\(reading.minutes / 60)-hour")" + (reading.reset.map { " · resets " + $0.formatted(.dateTime.month(.abbreviated).day().hour().minute()) } ?? " · reset unavailable"))
                         .font(.caption).foregroundStyle(.secondary)
                     Text("Read " + reading.date.formatted(date: .omitted, time: .standard) + Runway.ageLabel(reading, now: now))
                         .font(.caption).foregroundStyle(.secondary)
