@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Default accent follows the macOS control accent and System appearance. A saved custom hex is unchanged; marketing stills still use Dark/Lime.
-- Idle Auto names measured Codex and Claude remaining in the menu bar and popover. Speed stays off when nothing is running; unused Codex and Grok zeros stay off.
+- Idle Auto names measured Codex and Claude remaining in the menu bar and popover. Speed stays off when nothing is running; unused Codex and Grok zeros stay off. Idle popover remaining is the large figure; Idle stays caption.
 - Method copy no longer treats a two-minute-old Claude reading as unavailable. Claude stays current for 30 minutes and shows its age after two minutes.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
