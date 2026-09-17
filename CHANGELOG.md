@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.9 — Release candidate
+## 0.1.9 — Released 2026-09-16
 
 - Keep Now columns aligned with working tools. Auto already stayed quiet and the popover already omitted unused remaining; Now still minted an empty Claude chair from a connection with no reading, so one Codex dial sat between two names. While any tool is working, Now shows exactly those tools. Measured remainings stay when nothing is working. Connection without a reading is not a seat.
 
@@ -64,7 +64,7 @@ These changes shipped in 0.1.2; there was no separate public 0.1.1 release.
 The public version sequence starts at 0.1.0. A Developer ID signed and
 Apple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).
 An OCI archive with the identical installer was uploaded to GitHub Packages at
-launch; that listing is private and is not the current 0.1.8 installer. The
+launch; that listing is private and is not the current 0.1.9 installer. The
 public website and README used the direct v0.1 Release asset at launch.
 Installation needs no build tools or reboot.
 Claude after-turn account allowance refresh remains unavailable; the
