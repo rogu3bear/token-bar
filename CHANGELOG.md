@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.9 — Release candidate
 
 - Keep Now columns aligned with working tools. Auto already stayed quiet and the popover already omitted unused remaining; Now still minted an empty Claude chair from a connection with no reading, so one Codex dial sat between two names. While any tool is working, Now shows exactly those tools. Measured remainings stay when nothing is working. Connection without a reading is not a seat.
 
