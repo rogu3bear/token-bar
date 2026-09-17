@@ -606,9 +606,11 @@ quota-burn claim is inferred without an appropriate comparable local baseline.
 
 Each live tool leads with activity and a numeric estimated output rate with its
 native s/m/h control, followed by reporting coverage and the report timestamp.
-Remaining quota and projected zero use full-width rows at the same 29-point
-numeric size as the rate, above the dial. The quota reading timestamp, reset,
-projection limitations and account/estimate details remain explicit.
+Remaining lives in that tool's provider column with the rate and dial, not on a
+full-bleed row above the gauges. The rate stays the large figure. Projected zero,
+the quota reading timestamp, reset, projection limitations and account/estimate
+details remain evidence in the same column, not a second hero number or a
+full-width quota row.
 
 The tachometer remains a substantial 190-point-high instrument. Its dashboard
 arc is six points thick; it supplements the numeric decisions instead of
