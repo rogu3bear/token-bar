@@ -33,7 +33,7 @@ extension ClaudeQuotaSource {
         for limit in fableLimits(quota) {
             // Any missing, stale, reset or other-account input leaves the budget unknown.
             guard let reading = limit.reading, reading.accountID == account, reading.used.isFinite, (0...100).contains(reading.used),
-                  reading.reset > now, reading.date <= now, now.timeIntervalSince(reading.date) < quota.horizon else { return nil }
+                  let reset = reading.reset, reset > now, reading.date <= now, now.timeIntervalSince(reading.date) < quota.horizon else { return nil }
             if 100 - reading.used < (budget?.remaining ?? .infinity) {
                 budget = FableBudget(remaining: 100 - reading.used, binding: limit.binding)
             }
@@ -52,7 +52,7 @@ extension ClaudeQuotaSource {
             guard rate > 0 else { continue }
             burning = true
             let exhaustion = latest.date.addingTimeInterval((100 - latest.used) / rate)
-            if exhaustion < latest.reset && exhaustion < (earliest?.date ?? .distantFuture) { earliest = (exhaustion, limit.binding) }
+            if let reset = latest.reset, exhaustion < reset && exhaustion < (earliest?.date ?? .distantFuture) { earliest = (exhaustion, limit.binding) }
         }
         if let earliest { return .left(max(0, earliest.date.timeIntervalSince(now)), binding: earliest.binding) }
         return burning ? .resetsFirst : .idle
@@ -67,7 +67,7 @@ extension ClaudeQuotaSource {
         // Resets within a minute of each other are one period despite reporting jitter.
         var start = 0
         for index in series.indices.dropFirst()
-        where series[index].used < series[index - 1].used || abs(series[index].reset.timeIntervalSince(series[index - 1].reset)) > 60 {
+        where series[index].used < series[index - 1].used || abs((series[index].reset ?? .distantPast).timeIntervalSince(series[index - 1].reset ?? .distantPast)) > 60 {
             start = index
         }
         let period = series[start...]

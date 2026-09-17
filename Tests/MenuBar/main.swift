@@ -120,6 +120,41 @@ assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(660)) ==
 assert(ClaudeQuotaSource.relayHelp.contains("claude-statusline-relay.sh") && ClaudeQuotaSource.relayHelp.contains("statusLine"))
 let mixed = Runway.estimate(freshClaude[0], samples: monitor.state.samples + [freshClaude[0]], now: cacheNow)
 assert(mixed.exhaustion == nil, "Codex observations cannot supply Claude's burn slope")
+func cacheUtilization(fiveHour: [String: Any]?, sevenDay: [String: Any]?, account: String = "a", age: Double = 0) throws -> Data {
+    var utilization: [String: Any] = [:]
+    if let fiveHour { utilization["five_hour"] = fiveHour }
+    if let sevenDay { utilization["seven_day"] = sevenDay }
+    return try JSONSerialization.data(withJSONObject: [
+        "oauthAccount": ["accountUuid": account],
+        "cachedUsageUtilization": [
+            "accountUuid": account,
+            "fetchedAtMs": cacheNow.addingTimeInterval(-age).timeIntervalSince1970 * 1000,
+            "utilization": utilization
+        ]
+    ])
+}
+let weekStamp = ISO8601DateFormatter().string(from: cacheNow.addingTimeInterval(6 * 86400))
+let siblingSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(
+    fiveHour: ["utilization": 40.0, "resets_at": NSNull()],
+    sevenDay: ["utilization": 100.0, "resets_at": weekStamp]
+)).readings(now: cacheNow)
+assert(siblingSpent.contains { $0.window == "seven_day" && $0.used == 100 },
+       "A null five-hour reset must not fail the weekly window")
+let siblingQuota = ToolQuotaState(readings: siblingSpent, samples: siblingSpent, horizon: ClaudeQuotaSource.horizon)
+let siblingAllowance = AccountAllowancePresentation(quota: siblingQuota, now: cacheNow)
+assert(siblingAllowance.measuredZero && siblingAllowance.estimate?.remaining == 0)
+let sessionSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(
+    fiveHour: ["utilization": 100.0, "resets_at": NSNull()],
+    sevenDay: nil
+)).readings(now: cacheNow)
+assert(sessionSpent.count == 1 && sessionSpent[0].window == "five_hour" && sessionSpent[0].used == 100 && sessionSpent[0].reset == nil)
+let sessionQuota = ToolQuotaState(readings: sessionSpent, samples: sessionSpent, horizon: ClaudeQuotaSource.horizon)
+let sessionAllowance = AccountAllowancePresentation(quota: sessionQuota, now: cacheNow)
+assert(sessionAllowance.measuredZero && sessionAllowance.estimate?.remaining == 0)
+assert(sessionAllowance.estimate?.exhaustion == nil, "A missing reset is not a projected-zero clock")
+assert(sessionAllowance.detail.contains("unavailable") || sessionAllowance.reading?.reset == nil)
+let missingUsed = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(fiveHour: ["resets_at": weekStamp], sevenDay: nil))
+assert(missingUsed.readings(now: cacheNow).isEmpty, "Missing utilization stays unavailable, not a measured zero")
 print("PASS: Claude cache account binding, timestamp freshness, bounds, real zero, independent runway and selected-tool quota")
 
 // Status-line relay has no originating account identity and is never quota evidence.
@@ -733,7 +768,7 @@ do {
     let bound = try claudeState(try claudeLimitsCache())
     assert(bound.readings.map(\.window) == ["five_hour", "seven_day"], "Scoped windows never join the prioritized Claude allowance or Quota Guard")
     assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == 10080)
-    assert(abs(bound.scoped[0].reset.timeIntervalSince(cacheNow.addingTimeInterval(6 * 86400))) < 0.01, "Microsecond reset stamps parse")
+    assert(abs(bound.scoped[0].reset!.timeIntervalSince(cacheNow.addingTimeInterval(6 * 86400))) < 0.01, "Microsecond reset stamps parse")
     // Assertions evaluate lazily and cannot throw, so fixtures are decoded first.
     let weekBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 20))
     let fableBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 75))

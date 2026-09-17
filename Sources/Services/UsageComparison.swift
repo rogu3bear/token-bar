@@ -56,7 +56,7 @@ struct MeteringComparison {
         for index in 1..<readings.count {
             let first = readings[index - 1], last = readings[index]
             let duration = last.date.timeIntervalSince(first.date)
-            guard duration > 0, duration <= 600, first.reset == last.reset, first.reset > last.date,
+            guard duration > 0, duration <= 600, first.reset == last.reset, first.reset.map({ $0 > last.date }) == true,
                   first.minutes == last.minutes, first.name == last.name,
                   first.used.isFinite, last.used.isFinite, (0...100).contains(first.used), (0...100).contains(last.used), last.used >= first.used else {
                 result.excludedIntervals += 1; continue

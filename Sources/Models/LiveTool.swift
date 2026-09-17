@@ -65,7 +65,7 @@ struct AccountAllowancePresentation {
     var qualifier: String {
         if let estimate { return estimate.remaining == 0 ? "Exhausted" : "Remaining" }
         if quota.guardFailed { return "Read failed · unconfirmed" }
-        if matching.contains(where: { $0.reset <= now }) { return "Reset passed · unconfirmed" }
+        if matching.contains(where: { $0.reset.map { $0 <= now } == true }) { return "Reset passed · unconfirmed" }
         if !matching.isEmpty { return "Stale · unconfirmed" }
         return "Unavailable"
     }
@@ -73,7 +73,11 @@ struct AccountAllowancePresentation {
         var parts = [String]()
         if let reading, let estimate {
             parts.append(estimate.remaining == 0 ? "Exhausted" : remaining + " remaining")
-            parts.append("Resets " + reading.reset.formatted(date: .abbreviated, time: .shortened))
+            if let reset = reading.reset {
+                parts.append("Resets " + reset.formatted(date: .abbreviated, time: .shortened))
+            } else {
+                parts.append("Reset unavailable")
+            }
             parts.append("Quota read " + reading.date.formatted(date: .omitted, time: .standard) + Runway.ageLabel(reading, now: now))
             if let zero = estimate.exhaustion { parts.append("Projected zero " + Runway.clockLabel(zero, now: now)) }
             parts.append(estimate.message)
@@ -81,7 +85,9 @@ struct AccountAllowancePresentation {
             parts.append(qualifier + " · " + quota.unavailable)
             if let last = matching.max(by: { $0.date < $1.date }) {
                 parts.append("Last quota read " + last.date.formatted(date: .abbreviated, time: .shortened))
-                parts.append("Reported reset " + last.reset.formatted(date: .abbreviated, time: .shortened))
+                if let reset = last.reset {
+                    parts.append("Reported reset " + reset.formatted(date: .abbreviated, time: .shortened))
+                }
             }
         }
         if let label = quota.accountLabel { parts.append(label) }
@@ -135,7 +141,7 @@ enum CompactLiveCopy {
             var parts: [String] = []
             if estimate.remaining == 0 { parts.append("Exhausted") }
             if let zero = estimate.exhaustion { parts.append(Runway.clockLabel(zero, now: now)) }
-            if let reading { parts.append(reading.reset.formatted(date: .abbreviated, time: .omitted)) }
+            if let reading, let reset = reading.reset { parts.append(reset.formatted(date: .abbreviated, time: .omitted)) }
             return parts.isEmpty ? CompactLiveCopy.remaining(estimate) : parts.joined(separator: " · ")
         }
         return "Unavailable"

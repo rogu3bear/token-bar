@@ -98,7 +98,7 @@ struct QuotaTrendCard: View {
                         .foregroundStyle(accent).symbolSize(10)
                 }.chartYScale(domain: 0...100).chartLegend(.hidden).frame(height: 130)
             } else { Text("History begins with this reading. More samples will appear automatically.").font(.callout).foregroundStyle(.secondary).frame(minHeight: 90) }
-            Text("Reset " + quota.reset.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+            Text(quota.reset.map { "Reset " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Reset unavailable").font(.caption).foregroundStyle(.secondary)
             if current {
                 let estimate = Runway.estimate(quota, samples: samples, now: evaluationDate ?? Date())
                 Text(estimate.message).font(.caption).foregroundStyle(.secondary)

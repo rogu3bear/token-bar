@@ -10,7 +10,7 @@ struct QuotaReading: Codable, Identifiable, Equatable {
     var window: String
     var minutes: Int
     var used: Double
-    var reset: Date
+    var reset: Date?
     var date: Date
     var id: String { accountID + "|" + bucket + "|" + window }
 }
@@ -68,10 +68,18 @@ struct Runway {
     }
     static func estimate(_ latest: QuotaReading, samples: [QuotaReading], now: Date, horizon: TimeInterval = defaultHorizon) -> Runway {
         let remaining = max(0, 100 - latest.used)
-        guard now.timeIntervalSince(latest.date) < horizon, latest.reset > now else {
+        guard now.timeIntervalSince(latest.date) < horizon else {
             return Runway(remaining: remaining, message: "Waiting for a fresh quota reading")
         }
-        if remaining == 0 { return Runway(remaining: 0, exhaustion: now, message: "Quota exhausted") }
+        if let reset = latest.reset, reset <= now {
+            return Runway(remaining: remaining, message: "Waiting for a fresh quota reading")
+        }
+        if remaining == 0 {
+            return Runway(remaining: 0, exhaustion: latest.reset == nil ? nil : now, message: "Quota exhausted")
+        }
+        guard let reset = latest.reset else {
+            return Runway(remaining: remaining, message: "Reset unavailable")
+        }
         let relevant = samples.filter { $0.id == latest.id && $0.reset == latest.reset && $0.date >= now.addingTimeInterval(-1800) && $0.date <= latest.date }.sorted { $0.date < $1.date }
         // A quota decrease can be a manual reset or adjustment. Discard the old slope.
         var boundary = 0
@@ -84,7 +92,7 @@ struct Runway {
         guard spent > 0 else { return Runway(remaining: remaining, percentPerHour: 0, message: "No quota drop observed in this interval") }
         let perSecond = spent / latest.date.timeIntervalSince(first.date)
         let exhaustion = latest.date.addingTimeInterval(remaining / perSecond)
-        if exhaustion >= latest.reset {
+        if exhaustion >= reset {
             return Runway(remaining: remaining, percentPerHour: perSecond * 3600, message: "Resets before projected exhaustion")
         }
         return Runway(remaining: remaining, percentPerHour: perSecond * 3600, exhaustion: exhaustion, message: "Estimate from recent quota burn")
@@ -250,7 +258,7 @@ struct Runway {
 
 extension Runway {
     static func priority(_ quotas: [QuotaReading], samples: [QuotaReading], now: Date, horizon: TimeInterval = defaultHorizon) -> QuotaReading? {
-        let current = quotas.filter { $0.reset > now && now.timeIntervalSince($0.date) < horizon }
+        let current = quotas.filter { now.timeIntervalSince($0.date) < horizon && ($0.reset.map { $0 > now } ?? true) }
         return current.sorted { a, b in
             let left = estimate(a, samples: samples, now: now, horizon: horizon).exhaustion
             let right = estimate(b, samples: samples, now: now, horizon: horizon).exhaustion

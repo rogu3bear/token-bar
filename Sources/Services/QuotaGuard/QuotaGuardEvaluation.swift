@@ -104,18 +104,22 @@ enum QuotaGuardEvaluator {
             }
             guard policy.valid, now.timeIntervalSince1970.isFinite, reading.used.isFinite,
                   (0...100).contains(reading.used), reading.minutes > 0,
-                  reading.date.timeIntervalSince1970.isFinite, reading.reset.timeIntervalSince1970.isFinite else { return reject(.invalid, .invalidValue) }
+                  reading.date.timeIntervalSince1970.isFinite else { return reject(.invalid, .invalidValue) }
             guard !input.relay else { return reject(.unavailable, .unsupportedSource) }
             guard !reading.bucket.isEmpty, !reading.window.isEmpty else { return reject(.invalid, .invalidValue) }
             guard !reading.accountID.isEmpty, input.accountID == reading.accountID else { return reject(.invalid, .identityMismatch) }
             guard !input.failed else { return reject(.unavailable, .providerError) }
             guard input.authenticated else { return reject(.insufficient, .restored) }
             guard reading.date <= now else { return reject(.invalid, .future) }
-            guard reading.reset > now else { return reject(.unavailable, .expiredReset) }
+            if let reset = reading.reset {
+                guard reset.timeIntervalSince1970.isFinite else { return reject(.invalid, .invalidValue) }
+                guard reset > now else { return reject(.unavailable, .expiredReset) }
+            }
             guard input.horizon.isFinite, input.horizon > 0,
                   now.timeIntervalSince(reading.date) < min(input.horizon, QuotaGuardPolicy.freshness) else { return reject(.stale, .stale) }
             d.remaining = 100 - reading.used
             if reading.used == 100 { d.risk = .observedExhaustion; return d }
+            if reading.reset == nil { return d }
             if d.remaining! <= policy.lowPercent { d.risk = .low }
             func sameAllowance(_ value: QuotaReading) -> Bool {
                 value.accountID == reading.accountID && value.bucket == reading.bucket && value.window == reading.window
@@ -128,7 +132,7 @@ enum QuotaGuardEvaluator {
             var reason: QuotaReason = .learning
             for sample in history + [reading] {
                 guard sample.used.isFinite, (0...100).contains(sample.used), sample.date.timeIntervalSince1970.isFinite,
-                      sample.reset.timeIntervalSince1970.isFinite, sample.date <= reading.date else {
+                      sample.reset != nil, sample.date <= reading.date else {
                     segment = []; reason = .invalidValue; continue
                 }
                 guard sample.reset == reading.reset else { segment = []; reason = .adjustment; continue }
@@ -151,7 +155,7 @@ enum QuotaGuardEvaluator {
                                          horizon: min(input.horizon, QuotaGuardPolicy.freshness))
             d.reason = runway.percentPerHour == 0 ? .flat : .fresh
             d.forecast = runway.exhaustion
-            if let forecast = d.forecast, forecast < reading.reset,
+            if let forecast = d.forecast, let reset = reading.reset, forecast < reset,
                forecast.timeIntervalSince(now) <= policy.leadMinutes * 60 { d.risk = .projectedExhaustion }
             return d
         }
