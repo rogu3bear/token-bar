@@ -425,3 +425,45 @@ MainActor.assumeIsolated {
     }
     print("PASS: native provider columns center intrinsic headers/footers on their own gauge, share asymmetric row heights, and retain tool identity across 3→2→1→3")
 }
+
+MainActor.assumeIsolated {
+    let now = PreviewFixture.date
+    let reading = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Sample", window: "primary", minutes: 300,
+                               used: 36, reset: now.addingTimeInterval(3600), date: now)
+    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account")
+    for width: CGFloat in [796, 1096] {
+        for tools: [LiveTool] in [[.codex], [.codex, .claude]] {
+            let probes = ProviderLayoutProbes()
+            let host = NSHostingView(rootView: NowOccupancyStack(working: tools, remaining: { tool in
+                AccountAllowanceDisclosure(tool: tool, quota: quota, now: now)
+                    .background(ProviderLayoutProbe(key: tool.label + "-remaining", probes: probes))
+            }, header: { tool in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tool.label).font(.title2)
+                    Text("Estimated output tokens per second")
+                }.background(ProviderLayoutProbe(key: tool.label + "-header", probes: probes))
+            }, gauge: { tool in
+                Color.clear.frame(height: 210).background(ProviderLayoutProbe(key: tool.label + "-gauge", probes: probes))
+            }, footer: { tool in
+                Text("sample-model").frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ProviderLayoutProbe(key: tool.label + "-footer", probes: probes))
+            }).frame(width: width))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 900), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.contentView = host
+            defer { window.contentView = nil; window.close() }
+            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            host.layoutSubtreeIfNeeded()
+            for tool in tools {
+                let remaining = probes.frame(tool.label + "-remaining")
+                let header = probes.frame(tool.label + "-header")
+                let gauge = probes.frame(tool.label + "-gauge")
+                assert(abs(remaining.midX - gauge.midX) < 1, "\(tool.label) remaining must share the gauge column center, not a full-bleed row")
+                assert(abs(header.midX - gauge.midX) < 1)
+                assert(remaining.width <= header.width + 1, "\(tool.label) remaining cannot span the dashboard while the speed header occupies one column")
+            }
+        }
+    }
+    print("PASS: Now remaining occupies the same provider column as its speed header and gauge")
+}

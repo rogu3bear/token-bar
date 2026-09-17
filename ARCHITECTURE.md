@@ -269,7 +269,8 @@ available output rates, never provider allowances, and keeps idle Auto quiet
 except Claude at a measured-zero remaining. Opt-in Fable fields cannot restore
 an idle Codex readout. An enabled Quota Guard warning is risk text, not
 occupancy. `LiveTool.nowOccupied` owns Now columns: working tools while any
-are working, measured remainings when idle. `UsageModel.quota(for:)`
+are working, measured remainings when idle. Remaining sits in the same column as
+that tool's rate and dial. `UsageModel.quota(for:)`
 uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to Codex quota.
 
 ## Persistence and lazy work

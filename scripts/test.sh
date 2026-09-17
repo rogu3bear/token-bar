@@ -53,7 +53,7 @@ build_group quota-guard Tests/QuotaGuard/main.swift "-swift-version 5 -lsqlite3"
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
 build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
 build_group feedback   Tests/Feedback/main.swift   ""                           Feedback.swift CodexInstallation.swift
-build_group appearance Tests/Appearance/main.swift "-swift-version 5 -lsqlite3" $CORE ProviderColumnsLayout.swift FirstRunWelcome.swift PreviewFixture.swift UsageMetric.swift UsageTimelineChart.swift TokenFormatting.swift CompactToolRate.swift ToolQuotaSummary.swift ClaudeConnectionControl.swift
+build_group appearance Tests/Appearance/main.swift "-swift-version 5 -lsqlite3" $CORE ProviderColumnsLayout.swift NowOccupancyStack.swift FirstRunWelcome.swift PreviewFixture.swift UsageMetric.swift UsageTimelineChart.swift TokenFormatting.swift CompactToolRate.swift ToolQuotaSummary.swift ClaudeConnectionControl.swift
 build_group cost       Tests/Cost/main.swift       "-swift-version 5 -lsqlite3" $CORE
 build_group accuracy   Tests/Accuracy/main.swift   "-swift-version 5 -lsqlite3" $CORE
 build_group grok       Tests/Grok/main.swift       "-swift-version 5 -lsqlite3" $CORE

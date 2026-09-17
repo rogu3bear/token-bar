@@ -17,34 +17,35 @@ struct LiveToolPanels: View {
             let tools = LiveTool.active(codex: codex, claude: claude, grok: model.grokMeter)
             let seats = LiveTool.nowOccupied(codex: codex, claude: claude, grok: model.grokMeter, remaining: remaining)
             VStack(alignment: .leading, spacing: 16) {
-            AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },
-                                    now: now, connection: model.claudeConnection,
-                                    sourcesKnown: !model.accountTools.isEmpty)
             if tools.isEmpty {
-                Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },
+                                        now: now, connection: model.claudeConnection,
+                                        sourcesKnown: !model.accountTools.isEmpty)
+                if seats.isEmpty {
+                    Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                }
             } else {
-                ProviderColumnsLayout(columns: tools.count) {
-                    ForEach(tools) { tool in
-                        ToolSpeedHeader(tool: tool, rateSize: tools.count > 2 ? 29 : 34, meter: model.meter(for: tool))
-                    }
-                    ForEach(tools) { tool in
-                        let meter = model.meter(for: tool)
-                        RPMGauge(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
-                                 measured: meter.rawRate, hasRate: meter.hasRate, unit: Binding(get: { meter.unit }, set: { meter.unit = $0 }),
-                                 compactLayout: true, showsReadout: false)
-                            .frame(height: 210)
-                    }
-                    ForEach(tools) { _ in Divider() }
-                    ForEach(tools) { tool in
-                        VStack(alignment: .leading) {
-                            Text(model.meter(for: tool).models.joined(separator: ", "))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            if let error = model.meter(for: tool).activity.error { ErrorNotice(message: error) }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityElement(children: .contain)
-                            .accessibilityLabel(tool.label + " model and activity details")
-                    }
-                }.overlay {
+                NowOccupancyStack(working: tools, remaining: { tool in
+                    AccountAllowanceDisclosure(tool: tool, quota: model.quota(for: tool), now: now,
+                                               connection: tool == .claude ? model.claudeConnection : nil,
+                                               showsIdentity: false)
+                }, header: { tool in
+                    ToolSpeedHeader(tool: tool, rateSize: tools.count > 2 ? 29 : 34, meter: model.meter(for: tool))
+                }, gauge: { tool in
+                    let meter = model.meter(for: tool)
+                    RPMGauge(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
+                             measured: meter.rawRate, hasRate: meter.hasRate, unit: Binding(get: { meter.unit }, set: { meter.unit = $0 }),
+                             compactLayout: true, showsReadout: false)
+                        .frame(height: 210)
+                }, footer: { tool in
+                    VStack(alignment: .leading) {
+                        Text(model.meter(for: tool).models.joined(separator: ", "))
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        if let error = model.meter(for: tool).activity.error { ErrorNotice(message: error) }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel(tool.label + " model and activity details")
+                }).overlay {
                     GeometryReader { geometry in
                         ForEach(ProviderColumnsLayout(columns: tools.count).separatorPositions(width: geometry.size.width), id: \.self) { x in
                             Path { path in

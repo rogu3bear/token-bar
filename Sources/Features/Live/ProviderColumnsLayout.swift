@@ -6,6 +6,12 @@ struct ProviderColumnsLayout: Layout {
     var columns: Int
     var horizontalSpacing: CGFloat = 48
     var verticalSpacing: CGFloat = 12
+    /// Identity rows stacked above the gauge (remaining, then speed header).
+    var leadingIntrinsicRows: Int = 1
+    /// Model/error detail under the gauge uses the speed header's measure.
+    var trailingIntrinsicRows: Int = 1
+    /// Row that owns the column's text width; remaining and footer copy it.
+    var headerRow: Int = 0
     private func columnWidth(_ width: CGFloat) -> CGFloat {
         max(0, (width - horizontalSpacing * CGFloat(columns - 1)) / CGFloat(columns))
     }
@@ -13,12 +19,21 @@ struct ProviderColumnsLayout: Layout {
         let cell = columnWidth(width)
         return (1..<columns).map { CGFloat($0) * (cell + horizontalSpacing) - horizontalSpacing / 2 }
     }
+    private func rowCount(_ subviews: Subviews) -> Int {
+        columns == 0 ? 0 : (subviews.count + columns - 1) / columns
+    }
+    private func isIntrinsic(row: Int, rows: Int) -> Bool {
+        row < leadingIntrinsicRows || rows - 1 - row < trailingIntrinsicRows
+    }
     private func contentWidth(_ cell: CGFloat, index: Int, subviews: Subviews) -> CGFloat {
-        // Headers have an intrinsic text/control width; keep the whole group on
-        // the same horizontal center as its dial instead of stretching it left.
-        // Row-major children: header, gauge, divider, model/error detail.
-        guard index < columns || index >= columns * 3 else { return cell }
-        let header = subviews[index % columns]
+        // Identity rows keep an intrinsic text/control width on the same
+        // horizontal center as the dial instead of stretching left.
+        let rows = rowCount(subviews)
+        let row = index / max(columns, 1)
+        guard isIntrinsic(row: row, rows: rows) else { return cell }
+        let column = index % max(columns, 1)
+        let headerIndex = min(headerRow * columns + column, subviews.count - 1)
+        let header = subviews[headerIndex]
         let proposed = min(cell, header.sizeThatFits(.unspecified).width)
         return min(cell, header.sizeThatFits(ProposedViewSize(width: proposed, height: nil)).width)
     }

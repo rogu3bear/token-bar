@@ -198,15 +198,15 @@ composition rule across all field selections, orders and compactness settings;
 it does not reset saved configuration. The dropdown groups each tool's speed
 with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
 Existing visibility, order, compactness and unit preferences survive.
-Now places a compact Account allowances section before the larger live gauges.
+Now places remaining in the same provider column as that tool's rate and dial.
 Now occupancy uses `LiveTool.nowOccupied`: while any tool is working, columns are exactly those working tools, so remaining and the dial share identity and x-position. An idle neighbor, including Claude at a measured zero and a connected Claude with no reading, does not get an empty chair beside a working gauge. When nothing is working, measured remainings stay as idle columns; connection, discovery, and unavailable readings do not mint a seat. Known tools keep a stable allowance disclosure through idle, stale and failed
 reads on Accounts and All allowances. Relevance comes from verified discovery, configured connections, recorded
 usage, account identity, quota or observed activity, never a default path or an
 initial monitor error. Remembered relevance retains tool identity only, not quota
 payloads. OpenCode has no account allowance row.
-Each active tool's speed and activity share one aligned gauge column. Stopping a
+Each active tool's remaining, speed and activity share one aligned gauge column. Stopping a
 tool removes its speed panel. Its remaining returns to Now when nothing is working, if that remaining is still measured; it does not keep an idle chair beside a neighbor that is still working. The
-210-point compact gauge preserves room for the independent account section.
+210-point compact gauge preserves room for remaining in the same column.
 Dividers separate tools without adding card surfaces. The compact gauge leaves the main readings visible at the
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
 fits its content rather than reserving a fixed height, follows the saved
@@ -680,15 +680,15 @@ differences separately when `--motion-raster` is requested.
 ### Now provider alignment
 
 Now uses equal-width active-provider columns with shared row heights for the
-speed header, gauge, separator and model/error detail. ProviderColumnsLayout
-centers each intrinsic header group on its own gauge; model/error detail uses
+remaining, speed header, gauge, separator and model/error detail. ProviderColumnsLayout
+centers each intrinsic header group on its own gauge; remaining and model/error detail use
 that same text width and center. Internal text stays leading aligned. This keeps
-the identity, rate and status attached to the dial as the active set changes
+the identity, remaining, rate and status attached to the dial as the active set changes
 between one, two and three tools. Asymmetric unavailable/error text grows the
 shared row without moving one gauge out of alignment with the others.
 
 The center dividers span the columns. Inactive tools reserve no speed area;
-account allowances remain in their independent section. Rate digits retain their
+remaining sits in the working tool's column, not a full-bleed row above the dials. Rate digits retain their
 complete height and actual units. ForEach uses the tool identity in every row,
 so surviving tools keep their own controls and gauge when another tool stops.
 Accessibility groups name each tool and contain its speed controls and details.
@@ -702,8 +702,8 @@ list of all supported allowances, including stale and unavailable evidence.
 No inactive speed panels or separate dashboard destination are added. Warning
 text names the tool, allowance window and bucket. The collapsed warning remains
 brief; All allowances and View quota expose reset/source times and full evidence.
-The shared provider layout places each existing RPM gauge immediately after its
-speed header, ahead of detailed allowance rows. Gauges remain visible in the
+The shared provider layout places remaining, then the speed header, then the
+RPM gauge, ahead of detailed allowance disclosure. Gauges remain visible in the
 initial 900×700 dashboard with one, two or three active tools; an explicit
 expansion can use the existing page scroll. Native primary/secondary labels support Light and Dark with any accent.
 

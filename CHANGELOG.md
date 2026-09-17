@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
+
 ## 0.1.9 — Released 2026-09-16
 
 - Keep Now columns aligned with working tools. Auto already stayed quiet and the popover already omitted unused remaining; Now still minted an empty Claude chair from a connection with no reading, so one Codex dial sat between two names. While any tool is working, Now shows exactly those tools. Measured remainings stay when nothing is working. Connection without a reading is not a seat.

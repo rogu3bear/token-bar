@@ -119,6 +119,7 @@ struct AccountAllowanceDisclosure: View {
     var quota: ToolQuotaState
     var now: Date
     var connection: ClaudeConnectionModel? = nil
+    var showsIdentity = true
     @State private var expanded = false
     var body: some View {
         let allowance = AccountAllowancePresentation(quota: quota, now: now)
@@ -128,8 +129,9 @@ struct AccountAllowanceDisclosure: View {
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(tool.label).font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 4)
+                    if showsIdentity {
+                        Text(tool.label).font(.subheadline.weight(.semibold))
+                    }
                     Text(allowance.remaining).font(.title3.weight(.semibold)).monospacedDigit()
                     if allowance.estimate != nil { Text("remaining").font(.caption).foregroundStyle(.secondary) }
                 }
@@ -143,6 +145,6 @@ struct AccountAllowanceDisclosure: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.accessibilityElement(children: .combine)
-        }.frame(maxWidth: .infinity, alignment: .topLeading)
+        }
     }
 }
