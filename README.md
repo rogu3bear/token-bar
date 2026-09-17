@@ -12,7 +12,7 @@ See your AI usage from the macOS menu bar.
 
 **Idle popover**
 
-![Token Bar popover while idle: no unused tools listed, Quota Guard, and saved Today history](site/public/popover-idle.png)
+![Token Bar popover while idle: named remaining, Quota Guard, and saved Today history](site/public/popover-idle.png)
 
 *Native Token Bar previews with synthetic sample data.*
 
@@ -28,10 +28,12 @@ saved measurements on your Mac and updates them as new records arrive.
 
 - **See what is working.** Active tools appear in the menu bar and dashboard,
   with estimated output rates labeled in tok/s, tok/m or tok/h. When nothing is
-  running, Auto stays quiet: unused tools stay off the menu bar and popover.
-- **Keep account allowance in view.** Supported account readings stay on Now,
-  with remaining quota, reset times and an estimated time to exhaustion when
-  enough observations exist. Unused remaining does not occupy Auto.
+  running, Auto stays quiet about speed: unused zeros stay off the menu bar and
+  popover.
+- **Keep account allowance in view.** Supported Codex and Claude remaining stays
+  on the menu bar and on Now, with reset times and an estimated time to
+  exhaustion when enough observations exist. Unused Codex and Grok zeros stay
+  off Auto.
 - **Explore saved history.** Filter by tool, task, model, project, account or day;
   export the matching records to CSV.
 - **Pick up where you left off.** Collected data persists between launches.

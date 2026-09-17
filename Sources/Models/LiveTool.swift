@@ -15,9 +15,22 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         active(codex: codex, claude: claude, grok: grok)
     }
-    /// Popover rows: working tools, plus unused Claude whose remaining is a measured zero.
+    /// Named remaining while nothing is working. Unused Codex/Grok zeros stay off;
+    /// Claude remaining is named even at a measured zero.
+    static func idleNamed(remaining: (LiveTool) -> Double?) -> [LiveTool] {
+        allCases.filter { tool in
+            guard let value = remaining(tool) else { return false }
+            switch tool {
+            case .claude: return true
+            case .codex: return value > 0
+            case .grok: return false
+            }
+        }
+    }
+    /// Popover rows: working tools, idle named remainings, and unused Claude at a measured zero.
     static func compact(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
         let working = Set(active(codex: codex, claude: claude, grok: grok))
+        if working.isEmpty { return idleNamed(remaining: remaining) }
         return allCases.filter { working.contains($0) || ($0 == .claude && remaining($0) == 0) }
     }
     /// Now columns: working tools while any are working; measured remainings only when idle.
