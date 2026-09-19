@@ -3,6 +3,16 @@ import SwiftUI
 
 func check(_ condition: @autoclosure () -> Bool, _ message: String) { precondition(condition(), message) }
 
+check(EventIdentity.hash("a") == "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+      "Event identity is lowercase SHA-256 hex")
+check(EventIdentity.hash("a").count == EventIdentity.hexLength,
+      "Malformed-identity checks use the same hex length")
+check(EventIdentity.hash("a") == EventIdentity.hash(Data("a".utf8)),
+      "Text and data hash the same bytes")
+check(EventIdentity.hash("a") != EventIdentity.hash("b"),
+      "Distinct events stay distinct")
+print("PASS: event identity is one lowercase SHA-256 hex face")
+
 let good = String(repeating: "a", count: 64)
 func entry(input: Int = 100, cached: Int = 10, output: Int = 20, reasoning: Int = 5,
            cacheWrite: Int? = nil, date: Date = Date(), project: String? = "/Users/x/dev/alpha",
