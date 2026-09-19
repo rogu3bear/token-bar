@@ -31,11 +31,17 @@ PLIST
 # would skip replacing a legacy 2.x build. preinstall compares build numbers
 # instead, so it ships beside the scripts, read from the exact bundle packaged.
 ditto "$PWD/scripts/pkg" "$stage/scripts"
-/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$stage/root/Token Bar.app/Contents/Info.plist" > "$stage/scripts/build"
+plist="$stage/root/Token Bar.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist" > "$stage/scripts/build"
+identifier=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist")
+if [[ -z "$identifier" ]]; then
+    echo "package.sh: CFBundleIdentifier missing from the built bundle. No installer was assembled." >&2
+    exit 1
+fi
 # --scripts quits a running copy before the payload lands and re-registers
 # the installed bundle afterwards, so the system resolves this identifier to
 # /Applications rather than to a stale copy elsewhere.
-args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier local.star.CodexTokenBar --version "$version" --ownership recommended --scripts "$stage/scripts")
+args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier "$identifier" --version "$version" --ownership recommended --scripts "$stage/scripts")
 if [[ -n "${INSTALLER_SIGNING_IDENTITY:-}" ]]; then args+=(--sign "$INSTALLER_SIGNING_IDENTITY" --timestamp); fi
 pkgbuild "${args[@]}" "$pkg"
 ./scripts/checksum.sh "$pkg"
