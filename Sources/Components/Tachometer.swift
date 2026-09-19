@@ -146,6 +146,17 @@ struct AnimatedRateDial: View, Animatable {
     var maximum: Double
     var unit: RateUnit
     var showsLabels = true
+    /// SwiftUI degrees: counterclockwise from 8 o'clock through 12 to 4 o'clock.
+    static let startDegrees = 150.0
+    static let sweepDegrees = 240.0
+    static let tickDivisions = 40
+    static var endDegrees: Double { startDegrees + sweepDegrees }
+    static func degrees(at fraction: Double) -> Double {
+        startDegrees + fraction * sweepDegrees
+    }
+    static func tickDegrees(_ tick: Int) -> Double {
+        startDegrees + Double(tick) * (sweepDegrees / Double(tickDivisions))
+    }
     var animatableData: AnimatablePair<Double, AnimatablePair<Double, Double>> {
         get { AnimatablePair(fraction, AnimatablePair(minimum, maximum)) }
         set { fraction = newValue.first; minimum = newValue.second.first; maximum = newValue.second.second }
@@ -159,24 +170,24 @@ struct AnimatedRateDial: View, Animatable {
                     return CGPoint(x: center.x + cos(angle) * distance, y: center.y + sin(angle) * distance)
                 }
                 var rail = Path()
-                rail.addArc(center: center, radius: radius, startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false)
+                rail.addArc(center: center, radius: radius, startAngle: .degrees(Self.startDegrees), endAngle: .degrees(Self.endDegrees), clockwise: false)
                 context.stroke(rail, with: .color(.primary.opacity(0.09)), style: StrokeStyle(lineWidth: showsLabels ? 14 : 6, lineCap: .round))
                 var active = Path()
-                active.addArc(center: center, radius: radius, startAngle: .degrees(150), endAngle: .degrees(150 + fraction * 240), clockwise: false)
+                active.addArc(center: center, radius: radius, startAngle: .degrees(Self.startDegrees), endAngle: .degrees(Self.degrees(at: fraction)), clockwise: false)
                 context.stroke(active, with: .color(accent), style: StrokeStyle(lineWidth: showsLabels ? 14 : 6, lineCap: .round))
-                for tick in stride(from: 0, through: 40, by: showsLabels ? 2 : 10) {
-                    let angle = 150 + Double(tick) * 6
+                for tick in stride(from: 0, through: Self.tickDivisions, by: showsLabels ? 2 : 10) {
+                    let angle = Self.tickDegrees(tick)
                     let major = tick % 10 == 0
                     var line = Path()
                     line.move(to: point(angle, radius - 17)); line.addLine(to: point(angle, radius - (major ? 33 : 25)))
                     context.stroke(line, with: .color(.primary.opacity(major ? 0.75 : 0.25)), lineWidth: major ? 2 : 1)
                     if major && showsLabels {
-                        let amount = (minimum + (maximum - minimum) * Double(tick) / 40) * unit.multiplier
+                        let amount = (minimum + (maximum - minimum) * Double(tick) / Double(Self.tickDivisions)) * unit.multiplier
                         let label = amount >= 1_000_000 ? String(format: "%.1fM", amount / 1_000_000) : amount >= 1000 ? String(format: "%.1fK", amount / 1000) : String(format: "%.0f", amount)
                         context.draw(Text(label).font(.system(size: 13, weight: .medium, design: .rounded)).foregroundColor(.secondary), at: point(angle, radius - 52))
                     }
                 }
-                let angle = 150 + fraction * 240
+                let angle = Self.degrees(at: fraction)
                 let tip = point(angle, radius - 41)
                 let left = point(angle + 90, 4), right = point(angle - 90, 4), tail = point(angle + 180, 18)
                 var needle = Path(); needle.move(to: tip); needle.addLine(to: left); needle.addLine(to: tail); needle.addLine(to: right); needle.closeSubpath()
