@@ -225,7 +225,7 @@ struct QuotaGuardDisk: Codable {
     }
     func menuText(selection: MenuBarTool?) -> String? {
         let warning = decisions.first { $0.risk != .none && (selection == nil || selection == .auto || selection?.rawValue == $0.tool.rawValue) }
-        return warning.map { $0.tool.label + " " + $0.windowLabel + " " + String(format: "%.0f%%", $0.remaining ?? 0) + " · " + $0.riskLabel }
+        return warning.map { $0.tool.label + " " + $0.windowLabel + ($0.remaining.map { String(format: " %.0f%%", $0) } ?? "") + " · " + $0.riskLabel }
     }
     func view(_ decision: QuotaGuardDecision) { selected = decision; reveal?() }
     var selectedEvidence: QuotaGuardDecision? {

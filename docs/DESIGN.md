@@ -77,7 +77,9 @@ never starts monitoring or reads production history/preferences. Its
 `capture.json` records sample values and frame timestamps. Encode frames at
 those timestamps with FFmpeg; do not invent or smooth a different display.
 The genuine still render remains available through `--render-preview`.
-The motion fixture starts with Codex alone and supplies Claude activity and
+`--render-motion-preview --sample-idle` captures one idle status-item remaining
+still through the same `MenuBarPresentation.combined` owner; it does not replace
+the working Codex-only poster. The motion fixture starts with Codex alone and supplies Claude activity and
 quota together when Claude joins. Its Codex-only frame 105 is the still poster;
 the settled loop retains both tools. Speed readouts place the selected `tok/s`,
 `tok/m`, or `tok/h` beside the number as well as offering the unit selector.
@@ -145,17 +147,20 @@ visible as an error notice without reserving an active tool panel.
 
 The status item is a closed instrument. A new tool, quota scheme, or menu-bar
 field has to pass these rules; a true-for-one-provider exception is not a
-pattern. Claude at a measured-zero remaining is the one named idle-Auto
-exception.
+pattern. Quiet means no fake speed: idle Auto does not show rate, dial, or
+activity. Remaining you still have is the instrument.
 
-1. Auto is quiet unless a tool is working (fresh rate or currently observed
-   running task). Idle Auto keeps the status item to the app icon.
-2. The one idle exception: unused Claude whose remaining is a measured zero.
-   Unused Codex or Grok zeros stay off Auto and the popover. Unused remaining
-   above zero stays off Auto and the popover for every tool.
+1. Auto is quiet about speed unless a tool is working (fresh rate or currently
+   observed running task). Idle Auto does not mint a speed line.
+2. Idle Auto names measured Codex and Claude remaining, including Claude at a
+   measured zero. Unused Codex or Grok zeros stay off Auto and the popover.
+   Idle Grok remaining stays off Auto. Unavailable readings do not mint a name.
+   Two named remainings concatenate each tool’s single-tool remaining face.
+   Idle Auto does not use Total or the working mixed quota labels.
 3. When Auto has working tools, occupancy follows activity and measured rate
    only. Exhausted Claude may still appear in the popover; it does not join a
-   working Auto line as a second occupant.
+   working Auto line as a second occupant. Idle remaining does not sit beside a
+   working neighbor.
 4. Total adds available output rates in one displayed unit and labels partial
    reporting. It never adds remaining percents or a combined exhaustion time.
 5. Fable quota and Fable time left remain opt-in fields, off by default. They
@@ -163,16 +168,17 @@ exception.
    rather than shown as “Fable 0%” or unavailable copy. Time-left still says
    learning pace, no recent use, or resets first rather than a guessed time.
    An enabled Quota Guard warning may appear on idle Auto as warning text; it
-   is not tool occupancy. Rate, dial, quota, Fable, and projected zero stay
-   off. It must not restore an idle Codex instrument line.
+   is not tool occupancy. Rate, dial, Fable, and projected zero stay off. It
+   must not restore an idle Codex speed line.
 6. The default line stays dial, output rate, and quota. Restore defaults does
    not grow that set. Existing visibility, order, compactness and unit
    preferences survive.
 
 `MenuBarPresentation.combined` is the single occupancy owner for the status item
-and the settings preview. `LiveTool.compact` owns popover rows.
+and the settings preview. `LiveTool.idleNamed` owns idle remaining names.
+`LiveTool.compact` owns popover rows.
 `LiveTool.nowOccupied` owns Now columns. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
-Auto and the popover. A new quiet-exception that is not rule 2 requires changing this section
+Claude's idle name. Changing idle remaining occupancy requires changing this section
 and a MenuBar test that names the tool.
 
 ## Independent tool speeds
@@ -180,20 +186,21 @@ and a MenuBar test that names the tool.
 Auto occupancy follows Glance grammar. Right now shows tools with a fresh rate or currently observed running task.
 Inactive quota readings and stale unconfirmed tasks do not reserve speed panels. Unused remaining does not occupy a working Now column.
 Tools join with stable identity and a restrained transition; when nothing is active,
-the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unused idle Codex and Grok rows are not listed. Idle Auto keeps the status item to the app icon, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off Auto. Codex appears in Auto only while it is running or has a measured rate. Each tool owns its units,
+the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unused idle Grok rows and unused Codex or Grok zeros are not listed. Idle Auto names measured Codex and Claude remaining without a speed line. Unused Codex or Grok zeros stay off Auto. Codex speed appears in Auto only while it is running or has a measured rate. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
-Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools and unused Claude whose remaining is a measured zero, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
+Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools with explicit `tok/s`, `tok/m`, or `tok/h` units, idle named Codex and Claude remaining, and unused Claude whose remaining is a measured zero. No tool's
 speed is labeled as another tool or silently pooled into it.
 
 Menu bar settings offer Codex, Claude, Grok, and Auto. Auto shows a named
-single tool or Total when several tools are active, and stays quiet when none
-are running except Claude at a measured-zero remaining. Total adds available output
+single tool or Total when several tools are active, and names measured Codex and
+Claude remaining when none are running. Total adds available output
 rates in one displayed unit and labels partial reporting; it never adds quota
 percentages or projects a combined exhaustion time. Each remaining allowance
 keeps its tool identity and the shared accent. A single-tool menu-bar readout
 names the tool once at the start; its quota field does not repeat that name,
-including when unavailable. Mixed-tool Auto readouts name each separate quota
-so an allowance cannot be mistaken for the active tool's quota. This is a
+including when unavailable. Idle Auto with more than one remaining concatenates
+those same named remaining faces. Working mixed-tool Auto readouts name each
+separate quota so an allowance cannot be mistaken for the active tool's quota. This is a
 composition rule across all field selections, orders and compactness settings;
 it does not reset saved configuration. The dropdown groups each tool's speed
 with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
@@ -211,7 +218,7 @@ Dividers separate tools without adding card surfaces. The compact gauge leaves t
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
 fits its content rather than reserving a fixed height, follows the saved
 appearance, and uses the same saved application accent as Now. The quick
-popover shows each working tool, and unused Claude whose remaining is a measured zero, as name, rate, and remaining percent. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Unused remaining above zero stays off Auto and the popover. Unused Codex or Grok zeros stay off Auto and the popover. Grok remaining, when present, comes from the installed Grok agent and stays labeled Grok. Claude reads
+popover shows each working tool, idle named Codex and Claude remaining, and unused Claude whose remaining is a measured zero. Working rows keep name, rate, and remaining percent. Idle remaining rows keep remaining as the only large figure; Idle is caption, not a rate-sized word. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. Menu bar quota remains separately labeled for each selected tool. Unused Codex or Grok zeros stay off Auto and the popover. Idle Grok remaining stays off Auto. Grok remaining, when present on a working or explicit Grok line, comes from the installed Grok agent and stays labeled Grok. Claude reads
 its account-bound local usage cache, which the installed Claude Code refreshes every 15 minutes at Token Bar's request; missing or stale readings stay unavailable. A missing reset stays unavailable; remaining can still be measured. The optional Fable quota field, off by default, names the binding limit among Claude's current 5-hour, weekly and Fable weekly readings; it compares those percentages and never adds them. A measured Fable zero or missing budget is omitted from the status item rather than shown as “Fable 0%” or unavailable copy. An optional time-left field follows it in smaller secondary text (“≈2h 40m left”). Each limit's burn is a time-weighted average of up to four hours of readings with a one-hour half-life, restarting at a reset, so bursts and uneven refresh timing do not swing the projection. Until 30 minutes of readings exist, or when no limit would run out before its reset, it says learning pace, no recent use or resets first rather than a guessed time. Completion removes a task's rate; stale or insufficient counter
 reports show an em dash, never a guessed zero.
 
@@ -294,15 +301,17 @@ AppearanceHost owns the rendered accent, native tint, and color scheme for every
 surface, including welcome, detail sheets and synthetic previews. ToolPalette
 resolves every tool to that same accent. Existing `appearance.toolColors` and
 `appearance.toolsFollowAccent` values remain stored for compatibility, but do
-not introduce independent colors. System/Dark/Light and custom app accents
-remain editable. Orange is reserved for warning/degraded evidence and red for
+not introduce independent colors. System/Dark/Light and custom app accents remain editable. An absent or invalid
+saved accent follows the macOS control accent and System appearance; a stored
+hex is kept. Orange is reserved for warning/degraded evidence and red for
 actual failure in app-authored status styling; ordinary information uses adaptive
 system colors. A user-selected custom accent remains the single accent.
 Accent foregrounds and native tint resolve together against native page, sheet,
 and control canvases. Keep the saved hue only at 7:1 source contrast, reserving
 headroom for display conversion and small glyphs; otherwise use native adaptive
 label ink. Rendered text/icon regression coverage requires at least 4.5:1.
-The custom-color swatch retains the saved color. Dark/Lime remains the canonical
+The custom-color swatch retains the saved color; the macOS accent swatch follows
+`controlAccentColor`. Dark/Lime remains the canonical
 marketing state; fallback never changes saved preferences or adds another hue.
 Tool charts distinguish series through line styles, symbols and bar positions,
 not competing hues. MenuBarPresentation.combined is shared by the status item,
@@ -641,6 +650,7 @@ evidence demonstrations.
 | `--render-cost-preview --sample-history` | Same fixture → DashboardRoot / History | Separate secondary image; no startup/import claim. |
 | `--render-compact-preview`, `--preview-tools` | ProductPreview → QuickLiveView or DashboardRoot | Shipping compact/dashboard views; disposable preferences; explicit interactive variant. |
 | `--render-motion-preview` | ProductMotionPreview → DashboardRoot / Now and MenuBarPresentation.combined | Two separate output streams, not a composite; fixed frame-indexed sample times. Real native animation scheduling may differ between hosts. |
+| `--render-motion-preview --sample-idle` | Same owners, one idle frame | Status-item remaining without a speed line; Dark/Lime marketing still. |
 | `--render-pages-preview` | CostPreview → one DashboardRoot destination per PNG | Default populated, fixed report clock; explicit partial/failed demonstrations. |
 | `--layout-matrix`, `--sample-light` | Native layout diagnostics | Explicit Light/Dark alternatives, each in its own image; never a mixed-theme hero. |
 | `--render-history-preview` | HistoryPreview → shipping History | Synthetic saved/import-in-progress behavior diagnostic; distinct from marketing History still. |
@@ -648,6 +658,7 @@ evidence demonstrations.
 | `--render-welcome`, `--preview-welcome` | FirstRunWelcome with AppearanceHost | Isolated onboarding diagnostic, not a dashboard product image. |
 | `scripts/encode-motion-preview.sh` | Native frame encoding only | No redraw or montage; Codex-only native frame 105 is the poster and frame 1359 anchors the settled loop. |
 | `site/public/dashboard-lime.png` | Canonical Now still | Regenerate through ProductPreview; no image-editing pass. |
+| `site/public/menu-bar-idle.png` | Idle status-item remaining | `--render-motion-preview --sample-idle`; Dark/Lime; does not replace the working poster. |
 | `site/public/*-demo.png/mp4` | Native motion frames and encodes | Synthetic recordings only; no site-specific dashboard recreation. |
 
 `bash scripts/verify-product-previews.sh <new-directory>` renders each canonical
