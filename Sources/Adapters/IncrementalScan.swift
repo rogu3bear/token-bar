@@ -107,16 +107,14 @@ extension UsageScanner {
         let checkpoint = UsageCheckpoint(generation: dirtyGeneration, contentGeneration: contentGeneration,
                                          ids: ledger.eventIDs ?? [], url: url)
         try checkpointWillRun?(.ledger)
-        try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if metadataOnly {
             var metadata = ledger
             metadata.entries = []
-            try JSONEncoder().encode(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata))
-                .write(to: url, options: .atomic)
+            try PrivateCache.write(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata), to: url)
         } else {
             var durable = ledger
             durable.checkpointID = UUID()
-            try JSONEncoder().encode(durable).write(to: url, options: .atomic)
+            try PrivateCache.write(durable, to: url)
             ledger.checkpointID = durable.checkpointID
         }
         pendingCheckpoint = checkpoint
@@ -127,7 +125,6 @@ extension UsageScanner {
 
     private func finishCheckpoint() throws {
         guard let checkpoint = pendingCheckpoint else { return }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: checkpoint.url.path)
         guard let eventIndex else { throw RequestArchive.failure("Event identity index is unavailable") }
         if !checkpoint.indexed {
             try checkpointWillRun?(.index)
