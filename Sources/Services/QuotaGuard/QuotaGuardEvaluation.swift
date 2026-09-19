@@ -127,7 +127,7 @@ enum QuotaGuardEvaluator {
             if input.samples.contains(where: { sameAllowance($0) && (!$0.date.timeIntervalSince1970.isFinite || !$0.used.isFinite || !(0...100).contains($0.used) || $0.date > reading.date) }) {
                 d.evidence = .insufficient; d.reason = .invalidValue; return d
             }
-            let history = input.samples.filter { sameAllowance($0) && $0.date >= reading.date.addingTimeInterval(-1800) }
+            let history = input.samples.filter { sameAllowance($0) && $0.date >= reading.date.addingTimeInterval(-Runway.lookback) }
             var segment: [QuotaReading] = []
             var reason: QuotaReason = .learning
             for sample in history + [reading] {
