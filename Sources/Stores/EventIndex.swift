@@ -1,6 +1,14 @@
 import Foundation
 import SQLite3
 
+/// Owner-only mode for sqlite files created after open. JSON caches use `PrivateCache`.
+enum PrivateFile {
+    static let mode: Int = 0o600
+    static func protect(_ url: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+    }
+}
+
 /// Committed logical event identities. New identities stay with their ledger transaction
 /// until its JSON snapshot is durable, then move into this index. Counts never depend on an
 /// identity that was committed before its matching ledger entry.
@@ -14,7 +22,7 @@ final class EventIndex {
         guard sqlite3_open(url.path, &db) == SQLITE_OK else { throw Self.error("Could not open the historical event index") }
         guard sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS event_ids (id TEXT PRIMARY KEY) WITHOUT ROWID", nil, nil, nil) == SQLITE_OK,
               sqlite3_prepare_v2(db, "SELECT 1 FROM event_ids WHERE id = ?", -1, &lookup, nil) == SQLITE_OK else { throw Self.error("Could not initialize the historical event index") }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try PrivateFile.protect(url)
         ready = true
     }
     deinit { sqlite3_finalize(lookup); sqlite3_close(db) }
