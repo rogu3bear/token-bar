@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 import Darwin
 
 /// Durable byte position; the boundary digest detects replacement/truncation
@@ -153,7 +152,7 @@ extension UsageScanner {
         let length = min(offset, 128)
         try handle.seek(toOffset: offset - length)
         let bytes = try handle.read(upToCount: Int(length)) ?? Data()
-        return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        return EventIdentity.hash(bytes)
     }
 
     func claudeTail(_ url: URL, key: String, stamp: ClaudeFileCheck,
@@ -251,7 +250,7 @@ extension UsageScanner {
         guard !others.isEmpty else { return }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let evidence = try encoder.encode(Dictionary(uniqueKeysWithValues: others))
-        let witness = SHA256.hash(data: evidence).map { String(format: "%02x", $0) }.joined()
+        let witness = EventIdentity.hash(evidence)
         guard witness != cursor.aliasWitness else { return }
         let candidates = [cursor] + others.map { $0.1 }
         // This upper bound constrains reconciliation; it is never admitted as
@@ -276,7 +275,7 @@ extension UsageScanner {
         let count = bytes.withUnsafeMutableBytes { pread(descriptor, $0.baseAddress, length, off_t(start)) }
         guard count == length else { throw POSIXError(.EIO) }
         lastWork.codexValidationBytes += length
-        return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        return EventIdentity.hash(bytes)
     }
     func readLog(_ url: URL, session: String, cursor: inout Cursor,
                  account: Account?, poll: Date, historical: Bool, startDay: Date) throws {

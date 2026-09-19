@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 import Darwin
 
 /// Serial Insights-queue owner. Checkpoints contain derived counters, hashes and
@@ -53,7 +52,7 @@ final class PromptIndex {
     private(set) var filesReused = 0
     init(directory: URL? = nil) { self.directory = directory }
     static func digest(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        EventIdentity.hash(data)
     }
     private func url(_ path: String) -> URL? {
         directory?.appendingPathComponent(Self.digest(Data(path.utf8)) + ".json")

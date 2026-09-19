@@ -1,7 +1,6 @@
 import Observation
 import Foundation
 import Combine
-import CryptoKit
 import Darwin
 
 /// Account remaining from the installed Grok agent, the Codex app-server analog.
@@ -15,7 +14,7 @@ enum GrokBilling {
         for value in root.values {
             guard let object = value as? [String: Any] else { continue }
             if let id = (object["user_id"] as? String) ?? (object["principal_id"] as? String), !id.isEmpty {
-                return "grok:" + SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
+                return "grok:" + EventIdentity.hash(id)
             }
         }
         return nil

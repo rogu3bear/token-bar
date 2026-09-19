@@ -1,6 +1,5 @@
 import Foundation
 import Darwin
-import CryptoKit
 
 struct Tokens: Codable, Equatable {
     var input: Int = 0
@@ -369,7 +368,7 @@ final class UsageScanner {
         let canonical = (try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])) ?? Data()
         // Preserve the established fingerprint contract, including fork deduplication.
         let identity = (cursor.turnID ?? "fallback|\(session)|\(stamp)") + "|" + String(decoding: canonical, as: UTF8.self)
-        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+        let fingerprint = EventIdentity.hash(identity)
         let previousFields = cursor.previousFields
         let reconciling = cursor.reconciliation != nil
         let recoveredBoundary = cursor.reconciliation.map { recovery in

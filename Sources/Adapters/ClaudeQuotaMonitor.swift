@@ -1,7 +1,6 @@
 import Observation
 import Foundation
 import Combine
-import CryptoKit
 
 /// Passive, account-bound observations come from Claude Code's local usage cache,
 /// which the installed Claude Code refreshes on request. The identity-free
@@ -33,7 +32,7 @@ enum ClaudeQuotaSource {
     static let fableWindow = scopedWindow("Fable")
     static func scopedWindow(_ model: String) -> String { "seven_day_model:" + model.lowercased() }
     static func accountID(_ uuid: String) -> String {
-        "claude:" + SHA256.hash(data: Data(uuid.utf8)).map { String(format: "%02x", $0) }.joined()
+        "claude:" + EventIdentity.hash(uuid)
     }
     static func reading(accountID: String, window: String, minutes: Int, used: Double, reset: Date?, date: Date, now: Date) -> QuotaReading? {
         guard used.isFinite, (0...100).contains(used),

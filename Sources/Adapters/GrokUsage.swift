@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 /// Local Grok/xAI session usage. Reads persisted usage.json, summary.json, and the grok usage envelope.
 /// Never copies prompt, chat, title, or summary text into the ledger.
@@ -350,7 +349,7 @@ extension UsageScanner {
              "turnNumber", "endedAt"].contains(key)
         }, options: [.sortedKeys])) ?? Data()
         let identity = "grok|\(session)|\(turn)|\(String(decoding: canonical, as: UTF8.self))"
-        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+        let fingerprint = EventIdentity.hash(identity)
         if let duplicate = identityKnown(fingerprint) { if duplicate { return } } else { return }
         var cursor = Cursor(); cursor.turnID = turn; cursor.provider = GrokUsage.provider; cursor.model = model
         cursor.effort = effort
