@@ -20,7 +20,7 @@ struct CompactToolRate: View {
             remaining: allowance.remaining,
             remainingAvailable: allowance.estimate != nil,
             detail: expanded ? allowance.detail : allowance.estimate == nil ? allowance.qualifier : nil,
-            accessibilityRate: activity + ", " + (meter.hasRate ? meter.speedText + " per " + meter.unit.label : "rate unavailable"),
+            accessibilityRate: CompactLiveCopy.spokenRate(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             expanded: expanded
         )
     }
