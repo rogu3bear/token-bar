@@ -13,7 +13,7 @@ struct ClaudeConnectionControl: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 Spacer(minLength: 4)
                 if model.status == .notConnected {
-                    Button("Connect Claude Code") { confirming = true }
+                    Button("Connect \(ClaudeCodeUsage.harness)") { confirming = true }
                         .buttonStyle(.borderedProminent).controlSize(.small)
                 } else {
                     Button("Disconnect") { model.disconnect() }
@@ -27,7 +27,7 @@ struct ClaudeConnectionControl: View {
             if let caveat = model.caveat { Text(caveat).font(.caption).foregroundStyle(.secondary) }
             if let error = model.error { ErrorNotice(message: error) }
         }
-        .alert("Connect Claude Code?", isPresented: $confirming) {
+        .alert("Connect \(ClaudeCodeUsage.harness)?", isPresented: $confirming) {
             Button("Connect") { model.connect() }
             Button("Cancel", role: .cancel) {}
         } message: {
