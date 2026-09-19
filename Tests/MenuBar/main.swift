@@ -420,7 +420,7 @@ assert(grokMeasured.string.hasPrefix("Grok") && grokMeasured.string.contains("51
 assert(!grokMeasured.string.contains("Codex 40% remaining"))
 print("PASS: Auto menu bar follows Grok activity without a rate and without falling back to Codex")
 print("PASS: Auto does not borrow unused Codex remaining beside Grok speed; explicit Grok does not inherit Codex quota")
-let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude", window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
+let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
 let claudeSpentState = ToolQuotaState(readings: [claudeSpent], samples: [claudeSpent], horizon: ClaudeQuotaSource.horizon)
 var spentBar = MenuBarConfiguration(); spentBar.enabled = [.dial, .rate, .quota, .fable]
 let spent = MenuBarPresentation.combined(spentBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
@@ -927,7 +927,7 @@ do {
                resetJitter: Double = 0) -> ToolQuotaState {
         func series(_ window: String, _ values: [Double], minutes: Int, reset: Double) -> [QuotaReading] {
             values.enumerated().map { index, used in
-                QuotaReading(accountID: account, bucket: "claude", name: "Claude", window: window, minutes: minutes, used: used,
+                QuotaReading(accountID: account, bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: window, minutes: minutes, used: used,
                              reset: cacheNow.addingTimeInterval(reset + (index % 2 == 0 ? 0 : resetJitter)),
                              date: cacheNow.addingTimeInterval(-Double(values.count - 1 - index) * step))
             }
