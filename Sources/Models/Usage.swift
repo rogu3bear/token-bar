@@ -282,7 +282,7 @@ final class UsageScanner {
         "\(Int64((entry.date.timeIntervalSince1970 * 1000).rounded()))|\(entry.session)|\(entry.model)|\(entry.tokens.input)|\(entry.tokens.cached)|\(entry.tokens.output)|\(entry.tokens.reasoning)"
     }
     private func historyKey(_ entry: Entry) -> String {
-        let day = Calendar.current.startOfDay(for: entry.date).timeIntervalSince1970
+        let day = LedgerDay.key(entry.date)
         // Harness and project are part of the key. Without them a day bucket
         // would merge turns from different tools or different projects and keep
         // only the first one's attribution, which is exactly the blurring this

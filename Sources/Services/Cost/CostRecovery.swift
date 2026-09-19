@@ -3,7 +3,7 @@ import Foundation
 /// Metadata enrichment only: never replaces an unmatched usage total or its account observation.
 enum CostRecovery {
     static func groupKey(_ e: Entry) -> String {
-        "\(Calendar.current.startOfDay(for: e.date).timeIntervalSince1970)|\(e.session)|\(e.model)"
+        "\(LedgerDay.key(e.date))|\(e.session)|\(e.model)"
     }
     static func sameUsage(_ a: Tokens, _ b: Tokens) -> Bool {
         a.input == b.input && a.cached == b.cached && a.output == b.output && a.reasoning == b.reasoning
