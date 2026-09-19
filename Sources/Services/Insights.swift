@@ -44,6 +44,11 @@ enum InsightAnalysis {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return !t.isEmpty && !["<environment_context>", "<INSTRUCTIONS>", "# AGENTS.md instructions", "<permissions instructions>", "<subagent_notification>", "<turn_aborted>", "<codex_internal_context", "<codex_delegation>", "<skill>", "<heartbeat>"].contains(where: t.hasPrefix)
     }
+    /// Local hour window shown on Insights. Midnight wraps to `23:00–00:00`.
+    static func hourBucket(_ date: Date, calendar: Calendar = .current) -> String {
+        let hour = calendar.component(.hour, from: date)
+        return String(format: "%02d:00–%02d:00", hour, (hour + 1) % 24)
+    }
     static func build(_ records: [PromptRecord]) -> PromptInsights {
         var analysis = Accumulator()
         for record in records { analysis.append(record) }
@@ -71,8 +76,7 @@ enum InsightAnalysis {
             if unique.contains("please") || unique.contains("thanks") { result.polite += 1 }
             let normalized = record.text.lowercased().split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
             if normalized.count >= 3 && normalized.count <= 300 { repeats[normalized, default: 0] += 1 }
-            let hour = Calendar.current.component(.hour, from: record.date)
-            hours[String(format: "%02d:00–%02d:00", hour, (hour + 1) % 24), default: 0] += 1
+            hours[hourBucket(record.date), default: 0] += 1
         }
         func snapshot(now: Date = Date()) -> PromptInsights {
             func ranked(_ values: [String: Int]) -> [PromptFact] {
