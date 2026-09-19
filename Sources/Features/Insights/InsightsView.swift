@@ -9,7 +9,7 @@ struct InsightsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Insights", subtitle: "Changes and interpretation limits in local evidence, updated quietly in the background.")
+                PageHeader(.insights, subtitle: "Changes and interpretation limits in local evidence, updated quietly in the background.")
                 if let error = usage.snapshot.error { ErrorNotice(message: error) }
                 if trends.sourceUnavailable {
                     ErrorNotice(message: trends.hasResult ? "Usage refresh unavailable. Previous trends remain visible and may be stale." : "Usage trends unavailable. No successful usage result is available.")
