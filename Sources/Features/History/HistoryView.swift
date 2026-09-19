@@ -21,15 +21,15 @@ struct HistoryView: View {
                     ErrorNotice(message: error)
                 }
                 HStack(alignment: .top, spacing: PageStyle.related) {
-                    card("TOTAL PROCESSED", model.totals.total)
+                    card(UsageMetric.total, model.totals)
                     card("INPUT", model.totals.input)
-                    card("OUTPUT", model.totals.output)
+                    card(UsageMetric.output, model.totals)
                 }
                 ChoiceFlow(spacing: 14) {
                     ForEach(model.report.toolTimelines) { series in
                         HStack(spacing: 5) {
                             Circle().fill(series.tool.color(in: palette)).frame(width: 8, height: 8)
-                            Text(series.id + ": " + compact(series.totals.total))
+                            Text(series.id + ": " + UsageMetric.total.formatted(series.totals))
                         }.font(.caption).help(series.totals.total.formatted() + " processed tokens in the selected report")
                     }
                 }
@@ -87,6 +87,10 @@ struct HistoryView: View {
         case 3: return model.report.days.map { UsageRow(id: $0.date.ISO8601Format(), title: $0.date.formatted(date: .complete, time: .omitted), tokens: $0.tokens, last: $0.date) }
         default: return model.report.tasks
         }
+    }
+    private func card(_ metric: UsageMetric, _ tokens: Tokens) -> some View {
+        SummaryMetric(title: metric.rawValue.uppercased(), value: metric.formatted(tokens))
+            .help(metric.amount(tokens).formatted() + " tokens")
     }
     private func card(_ label: String, _ value: Int) -> some View {
         SummaryMetric(title: label, value: compact(value))
