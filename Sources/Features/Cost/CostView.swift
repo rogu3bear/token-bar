@@ -122,7 +122,7 @@ struct CostView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private func costRow(_ row: CostRow) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
             HStack {
                 Text(row.title).font(.callout.weight(.medium)).textSelection(.enabled)
                 Spacer()
