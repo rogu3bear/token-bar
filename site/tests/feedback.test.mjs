@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { DRAFT_KEY, FIELDS, issueURL, copyText } from '../public/feedback-draft.js';
+import { DRAFT_KEY, FIELDS, VERSION_QUERY_MAX, issueURL, copyText } from '../public/feedback-draft.js';
 import { initFeedback } from '../public/feedback.js';
 const report = { title: 'Spacing & units #1', behavior: 'A <script> & Unicode 界 test.\nExpected a stable dial.', version: '0.1.2', macos: '15.6' };
 function setup({ initial, search = '', storageFails = false, clipboardFails = false, navigationFails = false } = {}) {
@@ -56,6 +56,13 @@ test('draft restores, version convenience is removed from address and never repl
   assert.equal(app.form.elements.version.value, '0.1.2'); assert.equal(app.form.elements.behavior.value, report.behavior);
   assert.deepEqual(app.addresses, ['/feedback/']);
   assert.equal(setup({ search: '?version=0.1.2' }).form.elements.version.value, '0.1.2');
+});
+test('version convenience uses the same length the app truncates to', async () => {
+  const swift = await readFile(new URL('../../Sources/Services/Feedback.swift', import.meta.url), 'utf8');
+  assert.match(swift, new RegExp(`versionLimit = ${VERSION_QUERY_MAX}`));
+  const allowed = 'v'.repeat(VERSION_QUERY_MAX);
+  assert.equal(setup({ search: `?version=${allowed}` }).form.elements.version.value, allowed);
+  assert.equal(setup({ search: `?version=${allowed}x` }).form.elements.version.value, '');
 });
 test('encoded length guard prevents navigation and retains a selectable complete draft', async () => {
   const app = setup(); const long = { ...report, behavior: '界'.repeat(2400) }; app.fill(long);
