@@ -1,6 +1,16 @@
 import Foundation
 import UserNotifications
 
+/// Notification actions and the in-app Guard buttons share these titles and identifiers.
+enum QuotaGuardAction {
+    static let category = "quota-guard"
+    static let requestPrefix = "quota-"
+    static let view = "view-quota"
+    static let snooze = "snooze-quota"
+    static let viewTitle = "View quota"
+    static let snoozeTitle = "Snooze 30 min"
+}
+
 /// Created only by the normal app, never by preview/test models.
 final class QuotaGuardNotifications: NSObject, QuotaNotificationAdapter, UNUserNotificationCenterDelegate {
     private(set) static var constructionCount = 0
@@ -18,9 +28,9 @@ final class QuotaGuardNotifications: NSObject, QuotaNotificationAdapter, UNUserN
         center = UNUserNotificationCenter.current()
         super.init()
         center.delegate = self
-        let view = UNNotificationAction(identifier: "view-quota", title: "View quota", options: .foreground)
-        let snooze = UNNotificationAction(identifier: "snooze-quota", title: "Snooze 30 min", options: [])
-        center.setNotificationCategories([UNNotificationCategory(identifier: "quota-guard", actions: [view, snooze], intentIdentifiers: [], options: [])])
+        let view = UNNotificationAction(identifier: QuotaGuardAction.view, title: QuotaGuardAction.viewTitle, options: .foreground)
+        let snooze = UNNotificationAction(identifier: QuotaGuardAction.snooze, title: QuotaGuardAction.snoozeTitle, options: [])
+        center.setNotificationCategories([UNNotificationCategory(identifier: QuotaGuardAction.category, actions: [view, snooze], intentIdentifiers: [], options: [])])
     }
     func permission(request: Bool, completion: @escaping (QuotaNotificationPermission) -> Void) {
         func read() {
@@ -41,7 +51,7 @@ final class QuotaGuardNotifications: NSObject, QuotaNotificationAdapter, UNUserN
     func submit(_ notification: QuotaNotification, completion: @escaping (Bool) -> Void) {
         let content = UNMutableNotificationContent()
         content.title = notification.title; content.body = notification.body
-        content.categoryIdentifier = "quota-guard"
+        content.categoryIdentifier = QuotaGuardAction.category
         if notification.sound { content.sound = .default }
         // Request identifier is the only route: no account ID or user text in payload.
         center.add(UNNotificationRequest(identifier: notification.id, content: content, trigger: nil)) { error in
@@ -50,13 +60,13 @@ final class QuotaGuardNotifications: NSObject, QuotaNotificationAdapter, UNUserN
     }
     func pending(_ completion: @escaping (Set<String>) -> Void) {
         center.getPendingNotificationRequests { requests in
-            let ids = Set(requests.map(\.identifier).filter { $0.hasPrefix("quota-") })
+            let ids = Set(requests.map(\.identifier).filter { $0.hasPrefix(QuotaGuardAction.requestPrefix) })
             DispatchQueue.main.async { completion(ids) }
         }
     }
     func delivered(_ completion: @escaping (Set<String>) -> Void) {
         center.getDeliveredNotifications { values in
-            let ids = Set(values.map { $0.request.identifier }.filter { $0.hasPrefix("quota-") })
+            let ids = Set(values.map { $0.request.identifier }.filter { $0.hasPrefix(QuotaGuardAction.requestPrefix) })
             DispatchQueue.main.async { completion(ids) }
         }
     }
@@ -68,9 +78,9 @@ final class QuotaGuardNotifications: NSObject, QuotaNotificationAdapter, UNUserN
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let id = response.notification.request.identifier
-        guard id.hasPrefix("quota-"), response.actionIdentifier != UNNotificationDismissActionIdentifier else { completionHandler(); return }
+        guard id.hasPrefix(QuotaGuardAction.requestPrefix), response.actionIdentifier != UNNotificationDismissActionIdentifier else { completionHandler(); return }
         DispatchQueue.main.async {
-            let snooze = response.actionIdentifier == "snooze-quota"
+            let snooze = response.actionIdentifier == QuotaGuardAction.snooze
             if let action = self.action { action(id, snooze) }
             else if self.pendingActions.count < 16 { self.pendingActions.append((id, snooze)) }
             completionHandler()
