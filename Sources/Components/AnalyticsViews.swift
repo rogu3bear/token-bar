@@ -69,7 +69,7 @@ struct ContributionChart: View {
         let shown = Array(ranked.prefix(limit))
         let maximum = max(1, shown.first.map { metric.amount($0.tokens) } ?? 1)
         VStack(alignment: .leading, spacing: 14) {
-            if shown.isEmpty { Text("No recorded usage in this selection.").foregroundStyle(.secondary).padding(.vertical, 24) }
+            if shown.isEmpty { Text("No recorded usage in this selection.").foregroundStyle(.secondary).padding(.vertical, PageStyle.section) }
             ForEach(shown) { row in
                 rowButton(row, maximum: maximum)
             }
