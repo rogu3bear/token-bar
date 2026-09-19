@@ -40,7 +40,7 @@ enum GrokBilling {
         guard minutes > 0 else { return nil }
         let window = windowName(period["type"] as? String)
         let plan = result["subscription_tier"] as? String
-        return QuotaReading(accountID: accountID, bucket: "grok", name: plan ?? "Grok", window: window, minutes: minutes, used: used, reset: reset, date: now)
+        return QuotaReading(accountID: accountID, bucket: "grok", name: plan ?? Harness.grok, window: window, minutes: minutes, used: used, reset: reset, date: now)
     }
     static func windowName(_ type: String?) -> String {
         let text = type?.uppercased() ?? ""
