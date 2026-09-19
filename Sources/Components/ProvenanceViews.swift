@@ -32,7 +32,7 @@ struct ProvenanceBadge: View {
                     Text(provenance.title).font(.headline)
                     Text(provenance.explanation).font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(16).frame(width: 320)
+                .padding(PageStyle.related).frame(width: 320)
                 .textSelection(.enabled)
             }
         }
@@ -110,14 +110,14 @@ struct IntegrityBanner: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(status)
                 .sheet(isPresented: $showingDetails) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: PageStyle.related) {
                         Text("Data integrity").font(.title2.bold())
                         ScrollView {
                             IntegrityDetails(report: report)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         SheetDoneButton { showingDetails = false }
-                    }.padding(24).frame(width: 560, height: 440)
+                    }.padding(PageStyle.section).frame(width: 560, height: 440)
                         .onExitCommand { showingDetails = false }
                 }
         }
@@ -127,7 +127,7 @@ struct IntegrityBanner: View {
 struct IntegrityDetails: View {
     var report: IntegrityReport
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             LabeledContent("Records excluded", value: report.total.formatted())
             LabeledContent("Records counted with repaired fields", value: report.repairedTotal.formatted())
             Divider()
