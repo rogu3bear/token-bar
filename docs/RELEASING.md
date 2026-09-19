@@ -19,6 +19,16 @@ GitHub download was verified on September 16, 2026: 3,958,465 bytes, SHA-256
 `f3fdf6bee801a64e46ace1c8b73607885ddbd701cea8a027b219f3f0e6e91710`.
 Later site and documentation commits do not move the native release tag.
 
+## Preparing the successor
+
+The source candidate is **0.1.10**, build **30110**. It adds the optional
+launch-time update check, names measured Codex and Claude remaining on idle
+Auto, keeps remaining the only large figure on idle popover rows, and follows
+the macOS accent by default. It is not a public download until its exact
+source-bound installer passes signing, notarization, source binding and the
+authorized publication step. The public links above, the README download and
+the site release manifest remain on 0.1.9 until that publication is verified.
+
 ## One-time credential setup
 
 Create an app-specific password in the Apple account UI. In a local Terminal, run the following and supply the password only at the hidden prompt:
