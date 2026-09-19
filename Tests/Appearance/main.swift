@@ -467,3 +467,13 @@ MainActor.assumeIsolated {
     }
     print("PASS: Now remaining occupies the same provider column as its speed header and gauge")
 }
+
+assert(NowOccupancyCopy.line(sourcesKnown: false, occupied: false) == NowOccupancyCopy.noSources)
+assert(NowOccupancyCopy.line(sourcesKnown: true, occupied: false) == NowOccupancyCopy.noneWorking)
+assert(NowOccupancyCopy.line(sourcesKnown: true, occupied: true) == nil)
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: false, occupied: false) == nil,
+       "Dashboard Now must not stack 'not working' on top of missing tools")
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: false) == NowOccupancyCopy.noneWorking)
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: true) == nil)
+print("PASS: Now empty occupancy copy distinguishes missing tools from idle-with-sources")
+
