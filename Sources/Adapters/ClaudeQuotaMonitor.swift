@@ -57,6 +57,8 @@ enum ClaudeQuotaSource {
     static var relayScriptPath: String {
         ClaudeStatuslineConnection.stableRelayURL(support: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]).path
     }
+    /// Remaining weekly duration for the 7-day allowance and model-scoped Fable remaining. Not Grok weekly or Codex primary.
+    static var sevenDayMinutes: Int { windows.first { $0.key == "seven_day" }!.minutes }
 }
 struct ClaudeQuotaCache: Decodable {
     struct Account: Decodable { var accountUuid: String }
@@ -125,7 +127,7 @@ struct ClaudeQuotaCache: Decodable {
         return (bound.utilization.limits ?? []).compactMap { limit in
             guard limit.kind == "weekly_scoped", let model = limit.scope?.model?.display_name, !model.isEmpty,
                   let used = limit.percent else { return nil }
-            return ClaudeQuotaSource.reading(accountID: bound.id, window: ClaudeQuotaSource.scopedWindow(model), minutes: 10080,
+            return ClaudeQuotaSource.reading(accountID: bound.id, window: ClaudeQuotaSource.scopedWindow(model), minutes: ClaudeQuotaSource.sevenDayMinutes,
                                              used: used, reset: Self.date(limit.resets_at), date: bound.date, now: now)
         }
     }
