@@ -30,7 +30,7 @@ struct ToolSpeedHeader: View {
             .accessibilityLabel(tool.label + " activity and speed")
             .sheet(isPresented: $showActivity) {
                 VStack(alignment: .trailing, spacing: 0) {
-                    SheetDoneButton { showActivity = false }.padding(16)
+                    SheetDoneButton { showActivity = false }.padding(PageStyle.related)
                     RunningDetails(snapshot: meter.activity, unit: meter.unit)
                 }.frame(width: 560, height: 450).onExitCommand { showActivity = false }
             }
