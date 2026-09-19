@@ -1,5 +1,6 @@
 export const DRAFT_KEY = 'tokenbar.issue-draft.v1';
 export const MAX_ISSUE_URL = 7500;
+export const VERSION_QUERY_MAX = 40;
 export const FIELDS = ['title', 'behavior', 'version', 'macos'];
 export function draftFields(value = {}) {
   return Object.fromEntries(FIELDS.map(key => [key, typeof value?.[key] === 'string' ? value[key] : '']));
