@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Give integrity related and section groups the PageStyle measures. Provenance popover, integrity details, and the details sheet cannot each spell 16 and 24.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 
