@@ -20,7 +20,6 @@ enum DataStatePreview {
         func entry(_ output: Int, priced: Bool = true) -> Entry {
             var entry = Entry(date: now, session: "sample", model: priced ? "gpt-6-astra" : "sample-unpriced", tokens: Tokens(), account: nil)
             entry.tokens = Tokens.canonical(input: 0, cacheRead: 0, cacheWrite: 0, output: output, reasoning: 0, convention: .cachedWithinInput)
-            entry.tokens.cacheWrite = 0
             entry.provider = "openai"; entry.effort = "high"; entry.contextBand = "short"
             entry.tokenFields = UsageMetadata.fields; entry.costMetadataVersion = 1
             return entry
