@@ -57,8 +57,7 @@ struct PromptInsightsSection: View {
     private var readStatus: some View {
         VStack(alignment: .leading, spacing: 6) {
             if state.loading {
-                Text(state.filesTotal.map { "Checking prompt history · \(state.filesChecked) of \($0) files · \(max(0, $0 - state.filesChecked)) remaining" }
-                     ?? "Finding recent chats in the background…")
+                Text(state.checkingCaption)
                 if let total = state.filesTotal, total > 0 {
                     ProgressView(value: Double(state.filesChecked), total: Double(total))
                         .progressViewStyle(.linear).accessibilityLabel("Reading prompt history")

@@ -30,4 +30,12 @@ struct PromptReadState {
         result = sample; completed = true; loading = false; failed = false
     }
     mutating func fail() { loading = false; failed = true }
+    /// Known remaining is only a count when the read has a total. Missing total stays “finding,” not 0 remaining.
+    var remainingFiles: Int? { filesTotal.map { max(0, $0 - filesChecked) } }
+    var checkingCaption: String {
+        guard let total = filesTotal, let remaining = remainingFiles else {
+            return "Finding recent chats in the background…"
+        }
+        return "Checking prompt history · \(filesChecked) of \(total) files · \(remaining) remaining"
+    }
 }
