@@ -3,9 +3,9 @@ let size = CGSize(width: 900, height: 700)
 for x in [0.0, 400, 850] {
     for y in [30.0, 300, 640] {
         let layout = ContainedPopupLayout.fit(trigger: CGRect(x: x, y: y, width: 100, height: 30), container: size)
-        assert(layout.frame.minX >= 12 && layout.frame.maxX <= size.width - 12)
-        assert(layout.frame.minY >= 12 && layout.frame.maxY <= size.height - 12)
-        assert(layout.frame.height <= 380)
+        assert(layout.frame.minX >= ContainedPopupLayout.inset && layout.frame.maxX <= size.width - ContainedPopupLayout.inset)
+        assert(layout.frame.minY >= ContainedPopupLayout.inset && layout.frame.maxY <= size.height - ContainedPopupLayout.inset)
+        assert(layout.frame.height <= ContainedPopupLayout.maxHeight)
     }
 }
 assert(ContainedPopupLayout.fit(trigger: CGRect(x: 300, y: 600, width: 200, height: 30), container: size).above)
