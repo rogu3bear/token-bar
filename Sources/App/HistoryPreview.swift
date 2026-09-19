@@ -27,7 +27,7 @@ enum HistoryPreview {
                                         tokens: Tokens(["input_tokens": output * 2, "output_tokens": output])))
         }
         for index in ledger.entries.indices {
-            ledger.entries[index].harness = index < 2 ? "Claude Code" : "Codex Desktop"
+            ledger.entries[index].harness = index < 2 ? ClaudeCodeUsage.harness : "Codex Desktop"
             ledger.entries[index].provider = index < 2 ? "anthropic" : "openai"
         }
         try JSONEncoder().encode(ledger).write(to: support.appendingPathComponent("ledger.json"))
