@@ -274,7 +274,8 @@ before showing counts and retain it when the next source is unavailable.
 zero. An empty selection has no estimate; a supported zero-token record can
 have a measured zero-dollar estimate. Nonzero wholly unpriced usage has 0%
 coverage and no estimate; mixed coverage is a partial estimate. Headline and
-evidence views use the same coverage value. Loading retains an existing
+evidence views use the same coverage value and the same tenth-percent face;
+a missing coverage is an em dash. Loading retains an existing
 calculation, and a failed source cannot become an empty-selection claim.
 The last successful usage-read time is retained in memory across failed reads
 and shown beside available cost results.

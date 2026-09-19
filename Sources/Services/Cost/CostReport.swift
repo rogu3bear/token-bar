@@ -76,6 +76,7 @@ struct CostReport {
     var issues: [String: Int] = [:]
     var totalTokens: Int { pricedTokens + unpricedTokens }
     var coverage: Double? { totalTokens > 0 ? Double(pricedTokens) / Double(totalTokens) : nil }
+    var coverageText: String { CostPricing.percent(coverage) }
     var hasPricedRecords: Bool { lines.contains { $0.estimate.amounts != nil } }
     var availabilityMessage: String {
         guard calculatedAt != nil else { return "Cost results are not available yet." }

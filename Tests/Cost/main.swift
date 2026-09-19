@@ -215,6 +215,11 @@ check(zeroSelection.hasPricedRecords && zeroSelection.amounts.total == 0 && zero
 let unpricedSelection = CostReport.build(source: [unknown], query: UsageQuery(period: 1), catalog: [:], now: now)
 check(unpricedSelection.coverage == 0 && !unpricedSelection.hasPricedRecords, "Unpriced nonzero usage has measured zero coverage")
 check(report.availabilityMessage.contains("Partial estimate") && report.coverage == 0.75, "Mixed pricing is partial rather than unavailable")
+check(CostPricing.percent(0.75) == "75.0%" && CostPricing.percent(0) == "0.0%" && CostPricing.percent(nil) == "—",
+      "Coverage percent is tenths or an em dash")
+check(report.coverageText == CostPricing.percent(report.coverage) && report.coverageText == "75.0%", "Headline and evidence share one coverage face")
+check(CostPricing.percent(report.output.outputCoverage) == "75.0%", "Output coverage uses the same percent face")
+check(CostReport().coverageText == "—", "Uncalculated coverage is an em dash, not 0%")
 check(CostReport().calculatedAt == nil && CostReport().coverage == nil, "Uncalculated report is unavailable")
 print("PASS: uncalculated, empty selection, measured zero, unpriced and partial cost availability")
 check(emptySelection.statusMessage(sourceAvailable: false).contains("unavailable"), "A failed source cannot masquerade as an empty selection")
