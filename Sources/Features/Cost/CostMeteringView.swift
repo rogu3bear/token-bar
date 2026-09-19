@@ -20,9 +20,8 @@ struct CostMeteringView: View {
             }
             if let error = model.comparisons.recoveryError { ErrorNotice(message: error) }
             if model.comparisons.busy { ProgressView("Preparing retained observations…") }
-            if let calculated = model.comparisons.calculatedAt {
-                Text("Calculated " + calculated.formatted(date: .abbreviated, time: .standard) + (model.comparisons.busy ? " · previous result while updating" : ""))
-                    .font(.caption).foregroundStyle(.secondary)
+            if let caption = model.comparisons.calculatedCaption {
+                Text(caption).font(.caption).foregroundStyle(.secondary)
             }
             if let report = model.comparisons.metering[windowID] {
                 if let reason = report.reason { Text(reason).foregroundStyle(.secondary) }

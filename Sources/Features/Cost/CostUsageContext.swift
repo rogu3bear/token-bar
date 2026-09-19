@@ -29,9 +29,8 @@ struct CostUsageContext: View {
                 Text("\(snapshot.source) · read \(snapshot.observed.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
                 if let lifetime = snapshot.lifetimeTokens { Text("Provider lifetime: \(lifetime.formatted()) tokens · \(snapshot.days.count.formatted()) dated buckets available").font(.callout) }
                 if model.comparisons.busy { ProgressView("Preparing comparison…") }
-                if let calculated = model.comparisons.calculatedAt {
-                    Text("Calculated " + calculated.formatted(date: .abbreviated, time: .standard) + (model.comparisons.busy ? " · previous result while updating" : ""))
-                        .font(.caption).foregroundStyle(.secondary)
+                if let caption = model.comparisons.calculatedCaption {
+                    Text(caption).font(.caption).foregroundStyle(.secondary)
                 }
                 if let comparison = model.comparisons.provider {
                 if let reason = comparison.reason { Text(reason).font(.callout).foregroundStyle(.secondary) }

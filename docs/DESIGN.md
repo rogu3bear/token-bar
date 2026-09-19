@@ -277,7 +277,9 @@ coverage and no estimate; mixed coverage is a partial estimate. Headline and
 evidence views use the same coverage value. Loading retains an existing
 calculation, and a failed source cannot become an empty-selection claim.
 The last successful usage-read time is retained in memory across failed reads
-and shown beside available cost results.
+and shown beside available cost results. Account-total and allowance-window
+comparisons share one calculated-at caption; a refresh in flight labels the
+retained clock as a previous result while updating.
 
 ## Rate-unit and color ownership
 
