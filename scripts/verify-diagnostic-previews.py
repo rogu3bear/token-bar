@@ -5,14 +5,18 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bundle_layout import built_executable
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("output", type=Path)
 parser.add_argument("--motion-raster", action="store_true", help="Also capture and report native animation raster differences (not a determinism gate)")
 args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
-binary = root / "build/Token Bar.app/Contents/MacOS/TokenBar"
+binary = built_executable(root)
 output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=False)
 
