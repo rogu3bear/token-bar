@@ -40,7 +40,7 @@ struct QuotaGuardSummary: View {
                 summaryText(decision).frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
                 actions(decision).fixedSize()
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: PageStyle.labelGap) {
                 summaryText(decision)
                 actions(decision)
             }
