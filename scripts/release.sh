@@ -6,7 +6,11 @@ cd "$(dirname "$0")/.."
 : "${NOTARY_PROFILE:?Set the Keychain notarytool profile name, not a password}"
 version=$(tr -d '\n' < VERSION)
 export TOKENBAR_DIST_DIR="${TOKENBAR_DIST_DIR:-$PWD/dist}"
-pkg="$TOKENBAR_DIST_DIR/TokenBar-$version-arm64.pkg"
+# Published installer basename. package.sh and verify-release.sh must match.
+installer_package() {
+    printf 'TokenBar-%s-arm64.pkg\n' "$1"
+}
+pkg="$TOKENBAR_DIST_DIR/$(installer_package "$version")"
 receipt="$TOKENBAR_DIST_DIR/notarization-$version.json"
 for existing in "$receipt" "$pkg" "$pkg.sha256"; do
     if [[ -e "$existing" || -L "$existing" ]]; then
