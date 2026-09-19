@@ -34,7 +34,7 @@ var failed = input(reading()); failed.failed = true
 check(decision(failed).reason == .providerError, "failure cannot reuse fresh old reading")
 var relay = input(reading()); relay.relay = true
 check(decision(relay).reason == .unsupportedSource, "relay cannot authenticate")
-var claude = input(reading(-121), tool: .claude); claude.horizon = 1800
+var claude = input(reading(-121), tool: .claude); claude.horizon = ClaudeQuotaSource.horizon
 check(decision(claude).evidence == .stale, "guard tightens Claude without altering display")
 var strict = input(reading(-61)); strict.horizon = 60
 check(decision(strict).evidence == .stale, "shorter provider horizon preserved")
