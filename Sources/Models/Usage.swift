@@ -455,7 +455,7 @@ final class UsageScanner {
         entry.harness = cursor.harness; entry.projectPath = cursor.projectPath
         entry.contextWindow = (info["model_context_window"] as? Int).flatMap { $0 > 0 ? $0 : nil }
         // Only price a known single request; cumulative deltas can span multiple calls.
-        if let last, delta == last, last.input >= 0 { entry.contextBand = last.input > 272_000 ? "long" : "short" }
+        if let last, delta == last, last.input >= 0 { entry.contextBand = last.input > CostPricing.threshold ? "long" : "short" }
         let fields: [String]
         if let last, delta == last, let lastRaw = info["last_token_usage"] as? [String: Any] {
             fields = UsageMetadata.recordedFields(lastRaw)
