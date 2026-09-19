@@ -285,7 +285,7 @@ import ServiceManagement
                 case .other, .unknown: break
                 }
             }
-            availableTools = Array(Set(result.entries.map { $0.harness ?? "Unattributed" })).sorted()
+            availableTools = Array(Set(result.entries.map { $0.harness ?? DimensionReport.unattributed })).sorted()
             availableModels = Array(Set(result.entries.map(\.model))).sorted()
             availableAccounts = Dictionary(result.entries.compactMap { $0.account }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }).values.sorted { $0.label < $1.label }
             availableEfforts = Array(Set(result.entries.map { $0.effort ?? "Unknown" })).sorted()

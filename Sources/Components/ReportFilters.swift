@@ -10,7 +10,7 @@ struct ReportFilters: View {
         [all] + Set(values + (selected == all ? [] : [selected])).subtracting([all]).sorted()
     }
     private var accountChoices: [(String, String)] {
-        var result = [("All accounts", "All accounts"), ("Unattributed", "Unattributed")]
+        var result = [("All accounts", "All accounts"), (DimensionReport.unattributed, DimensionReport.unattributed)]
         result += model.availableAccounts.map { ($0.id, $0.label + " (inferred)") }
         if !result.contains(where: { $0.0 == model.accountFilter }) { result.append((model.accountFilter, "Selected account")) }
         return result
