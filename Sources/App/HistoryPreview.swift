@@ -68,10 +68,7 @@ enum HistoryPreview {
         defer { PreviewModelScope.close(window) }
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-        AppearanceRendering.capture(host, to: bitmap)
-        guard let data = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-        try data.write(to: destination, options: .atomic)
+        try PreviewModelScope.png(host, to: destination)
         print("PASS: saved usage visible during import; native minute timeline rendered")
     }
 }
