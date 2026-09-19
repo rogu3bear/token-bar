@@ -78,7 +78,7 @@ assert(all.totals.total == 330 && all.totals.cached == 80 && all.days.count == 2
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 0), catalog: catalog, now: now).totals.total == 220)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 2), catalog: catalog, now: now).totals.total == 330)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 4, start: oldDate, end: oldDate), catalog: catalog, now: now).totals.total == 110)
-assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, model: "A", account: "Unattributed", search: "Historical"), catalog: catalog, now: now).totals.total == 110)
+assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, model: "A", account: DimensionReport.unattributed, search: "Historical"), catalog: catalog, now: now).totals.total == 110)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, account: account.id), catalog: catalog, now: now).totals.total == 220)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 4, start: now, end: oldDate), catalog: catalog, now: now).entries.isEmpty)
 print("PASS: aggregation, cache subset, today/week/custom dates, combined model/account/task filter, reversed dates")
