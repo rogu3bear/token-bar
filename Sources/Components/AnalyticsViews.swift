@@ -78,7 +78,11 @@ struct ContributionChart: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(row.title).font(.headline)
                     Text(row.subtitle.isEmpty ? row.id : row.subtitle).font(.caption).foregroundStyle(.secondary)
-                    Text("\(metric.amount(row.tokens).formatted()) \(metric.rawValue.lowercased()) tokens · Last activity \(row.last.formatted(date: .abbreviated, time: .shortened))").font(.callout)
+                    HStack(spacing: 4) {
+                        Text("\(metric.amount(row.tokens).formatted()) \(metric.rawValue.lowercased()) tokens · Last activity")
+                        RelativeAgeText(date: row.last)
+                        Text("ago")
+                    }.font(.callout)
                 }.textSelection(.enabled).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
             }
         }

@@ -143,6 +143,14 @@ struct LocalPace {
     }
 }
 
+/// History report age and contribution last-activity share this relative face.
+enum RelativeFreshnessCopy {
+    static let loading = "Loading…"
+    static func caption(_ prefix: String, date: Date, now: Date) -> String {
+        prefix + " " + RelativeAgeText.label(from: date, to: now) + " ago"
+    }
+}
+
 
 /// Equality includes metadata, not just totals, so enrichment invalidates a cached report.
 struct ReportInputs: Equatable {
