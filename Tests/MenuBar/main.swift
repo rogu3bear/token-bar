@@ -767,7 +767,7 @@ do {
     typealias Budget = ClaudeQuotaSource.FableBudget
     let bound = try claudeState(try claudeLimitsCache())
     assert(bound.readings.map(\.window) == ["five_hour", "seven_day"], "Scoped windows never join the prioritized Claude allowance or Quota Guard")
-    assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == 10080)
+    assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == ClaudeQuotaSource.sevenDayMinutes)
     assert(abs(bound.scoped[0].reset!.timeIntervalSince(cacheNow.addingTimeInterval(6 * 86400))) < 0.01, "Microsecond reset stamps parse")
     // Assertions evaluate lazily and cannot throw, so fixtures are decoded first.
     let weekBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 20))
