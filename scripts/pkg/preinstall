@@ -16,7 +16,9 @@ case "$incoming" in
         echo "This installer is missing its build number. No files were replaced." >&2
         exit 1 ;;
 esac
-installed_info="/Applications/Token Bar.app/Contents/Info.plist"
+installed_app="/Applications/Token Bar.app"
+executable="TokenBar"
+installed_info="$installed_app/Contents/Info.plist"
 if [ -f "$installed_info" ]; then
     current=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$installed_info" 2>/dev/null) || current=0
     case "$current" in ''|*[!0-9]*) current=0 ;; esac
@@ -25,8 +27,8 @@ if [ -f "$installed_info" ]; then
         exit 1
     fi
 fi
-target="/Applications/Token Bar.app/Contents/MacOS/TokenBar"
-for pid in $(/usr/bin/pgrep -x TokenBar 2>/dev/null || true); do
+target="$installed_app/Contents/MacOS/$executable"
+for pid in $(/usr/bin/pgrep -x "$executable" 2>/dev/null || true); do
     command=$(/bin/ps -p "$pid" -o comm= 2>/dev/null) || continue
     [ "$command" = "$target" ] || continue
     /bin/kill -TERM "$pid" 2>/dev/null || true
