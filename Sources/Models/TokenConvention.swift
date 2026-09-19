@@ -11,7 +11,8 @@ import Foundation
 /// - `cacheBesideInput`: Claude Code and OpenCode. Cache read and cache write
 ///   are disjoint from input and must be added to it. Verified against
 ///   OpenCode's own `total`, which equals input + read + write + output on
-///   every row that reports one.
+///   every row that reports one. A missing cache-write stays nil; pass the
+///   optional through instead of `?? 0`. A recorded zero stays zero.
 enum TokenConvention {
     case cachedWithinInput
     case cacheBesideInput
@@ -24,7 +25,7 @@ extension Tokens {
     /// that was served from cache, so `total` is `input + output` for every
     /// harness and cache share is `cached / input` everywhere. Readers convert
     /// once, here, rather than each teaching the rest of the app its dialect.
-    static func canonical(input: Int, cacheRead: Int, cacheWrite: Int,
+    static func canonical(input: Int, cacheRead: Int, cacheWrite: Int?,
                           output: Int, reasoning: Int,
                           convention: TokenConvention) -> Tokens {
         var tokens = Tokens()
@@ -36,13 +37,13 @@ extension Tokens {
             // Cache reads and writes were context this request consumed, so they
             // belong in input. Without this the request looks far smaller than
             // it was: a Claude Code turn can report 2 input tokens beside 27,000
-            // cache reads.
-            tokens.input = max(0, input) + max(0, cacheRead) + max(0, cacheWrite)
+            // cache reads. A missing write adds nothing and stays unavailable.
+            tokens.input = max(0, input) + max(0, cacheRead) + max(0, cacheWrite ?? 0)
             tokens.cached = max(0, cacheRead)
         }
         tokens.output = max(0, output)
         tokens.reasoning = min(max(0, reasoning), max(0, output))
-        tokens.cacheWrite = cacheWrite >= 0 ? cacheWrite : nil
+        tokens.cacheWrite = cacheWrite.flatMap { $0 >= 0 ? $0 : nil }
         return tokens
     }
 }

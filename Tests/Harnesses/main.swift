@@ -44,6 +44,9 @@ let hostile = Tokens.canonical(input: -5, cacheRead: -9, cacheWrite: -1,
 check(hostile.input == 0 && hostile.output == 0, "negative counters must clamp to zero")
 check(hostile.reasoning == 0, "reasoning cannot exceed output")
 check(hostile.cacheWrite == nil, "a negative cache write is absent, not zero")
+let missingWrite = Tokens.canonical(input: 10, cacheRead: 0, cacheWrite: nil,
+                                    output: 2, reasoning: 0, convention: .cacheBesideInput)
+check(missingWrite.cacheWrite == nil && missingWrite.input == 10, "a missing cache write stays unavailable, not a measured zero")
 print("PASS: malformed counters cannot enter the ledger as negative or impossible values")
 
 // Claude Code deduplication -------------------------------------------------
