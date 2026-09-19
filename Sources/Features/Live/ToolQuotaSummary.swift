@@ -103,14 +103,14 @@ struct AccountAllowanceSection: View {
                 }
             } else {
                 Text("Account allowances").font(.headline)
-                HStack(alignment: .top, spacing: 24) {
+                HStack(alignment: .top, spacing: PageStyle.section) {
                     ForEach(tools) { tool in
                         AccountAllowanceDisclosure(tool: tool, quota: quota(tool), now: now,
                                                    connection: tool == .claude ? connection : nil)
                     }
                 }
             }
-        }.padding(.horizontal, 16)
+        }.padding(.horizontal, PageStyle.related)
     }
 }
 
