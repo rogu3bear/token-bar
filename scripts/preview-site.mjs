@@ -1,10 +1,8 @@
 import { resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const publicRoot = fileURLToPath(new URL('../site/public', import.meta.url));
+import { sitePublicRoot } from './site-layout.mjs';
 
 // Static-only preview. Byte ranges let native video recordings seek and loop.
-export async function previewResponse(request, root = publicRoot) {
+export async function previewResponse(request, root = sitePublicRoot) {
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 });
   let pathname;
   try { pathname = decodeURIComponent(new URL(request.url).pathname); }
