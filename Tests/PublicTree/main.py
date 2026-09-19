@@ -55,3 +55,14 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-public-tree-") as scratch:
     (root / "config.txt").write_text("clean working copy")
     assert b"provider API key" in check(1).stderr
 print("PASS: public-tree guard checks the index, ignored tracked files, examples and redacted secrets")
+
+# The GitHub Release asset name is one TokenBar-$version-arm64.pkg. release.sh
+# names it; package.sh and verify-release.sh must not spell a different file.
+release = (owner / "scripts/release.sh").read_text()
+package = (owner / "scripts/package.sh").read_text()
+verify = (owner / "scripts/verify-release.sh").read_text()
+assert "installer_package" in release
+assert "TokenBar-%s-arm64.pkg" in release
+assert "TokenBar-$version-arm64.pkg" in package
+assert "TokenBar-$version-arm64.pkg" in verify
+print("PASS: signed installer basename is one TokenBar-$version-arm64.pkg")
