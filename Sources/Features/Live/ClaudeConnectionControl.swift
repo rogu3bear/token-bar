@@ -7,7 +7,7 @@ struct ClaudeConnectionControl: View {
     var compact = false
     @State private var confirming = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
             HStack(spacing: 10) {
                 Text("Claude Code status line · " + model.status.label)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
