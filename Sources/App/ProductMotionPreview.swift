@@ -29,8 +29,8 @@ enum ProductMotionPreview {
         model.live.state.samples = [first, quota]
         var claudeQuota = quota
         claudeQuota.accountID = "claude:sample-account"
-        claudeQuota.name = "Claude"
-        claudeQuota.bucket = "claude"
+        claudeQuota.name = ClaudeQuotaSource.name
+        claudeQuota.bucket = ClaudeQuotaSource.bucket
         claudeQuota.minutes = 300
         claudeQuota.used = 58
         claudeQuota.reset = now.addingTimeInterval(14400)
