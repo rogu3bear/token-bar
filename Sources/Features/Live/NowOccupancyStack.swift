@@ -8,7 +8,7 @@ struct NowOccupancyStack<Remaining: View, Header: View, Gauge: View, Footer: Vie
     @ViewBuilder var gauge: (LiveTool) -> Gauge
     @ViewBuilder var footer: (LiveTool) -> Footer
     var body: some View {
-        ProviderColumnsLayout(columns: working.count, leadingIntrinsicRows: 2, headerRow: 1) {
+        ProviderColumnsLayout(nowColumns: working.count) {
             ForEach(working) { tool in
                 remaining(tool)
             }

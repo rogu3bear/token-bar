@@ -66,3 +66,14 @@ struct ProviderColumnsLayout: Layout {
         }
     }
 }
+
+extension ProviderColumnsLayout {
+    /// Remaining row plus the speed header that owns column width.
+    static let nowLeadingIntrinsicRows = 2
+    /// Speed header row; remaining copies its measure so remaining.midX == gauge.midX.
+    static let nowHeaderRow = 1
+
+    init(nowColumns columns: Int) {
+        self.init(columns: columns, leadingIntrinsicRows: Self.nowLeadingIntrinsicRows, headerRow: Self.nowHeaderRow)
+    }
+}
