@@ -842,6 +842,10 @@ do {
     check(HarnessDiscovery.claudeCode(environment: environment, userHome: userHome)?.path == configured.path, "Official custom root reaches discovery")
     check(ClaudeCodeUsage.home(environment: environment, userHome: userHome).path == configured.path, "Official custom root reaches reader")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_HOME": legacy.path, "CLAUDE_CONFIG_DIR": configured.path], userHome: userHome)?.path == legacy.path, "Explicit legacy transcript override retains precedence")
+    check(ClaudeStatuslineConnection.settingsURL(environment: ["CLAUDE_HOME": legacy.path, "CLAUDE_CONFIG_DIR": configured.path], home: userHome).path == legacy.appendingPathComponent("settings.json").path,
+          "Connect edits settings.json in the same home the reader uses")
+    check(ClaudeStatuslineConnection.settingsURL(environment: environment, home: userHome).path == configured.appendingPathComponent("settings.json").path,
+          "Official custom root reaches Connect")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_HOME": "", "CLAUDE_CONFIG_DIR": configured.path], userHome: userHome)?.path == configured.path, "Empty override is ignored")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_CONFIG_DIR": userHome.appendingPathComponent("missing").path], userHome: userHome) == nil, "Missing explicit root cannot silently select another installation")
     let transcript = configured.appendingPathComponent("projects/configured.jsonl")

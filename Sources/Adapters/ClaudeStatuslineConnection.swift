@@ -17,8 +17,7 @@ enum ClaudeStatuslineConnection {
 
     static func settingsURL(environment: [String: String] = ProcessInfo.processInfo.environment,
                             home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
-        let directory = environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) } ?? home.appendingPathComponent(".claude")
-        return directory.appendingPathComponent("settings.json")
+        ClaudeCodeUsage.home(environment: environment, userHome: home).appendingPathComponent("settings.json")
     }
     static func stableRelayURL(support: URL) -> URL {
         support.appendingPathComponent("CodexTokenBar/claude-statusline-relay.sh")
