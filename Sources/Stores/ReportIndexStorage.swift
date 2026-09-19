@@ -3,8 +3,9 @@ import Foundation
 /// Derived positions and tariff context only. The ledger's durable content ID
 /// binds this disposable index to the exact entries that produced it.
 enum ReportIndexStorage {
+    static let version = 1
     private struct Saved: Codable {
-        var version = 1
+        var version = ReportIndexStorage.version
         var contentID: UUID
         var count: Int
         var chronological: [Int]
@@ -13,7 +14,7 @@ enum ReportIndexStorage {
     static func load(_ url: URL, contentID: UUID, entries: [Entry]) throws -> ReportIndex? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let saved = try JSONDecoder().decode(Saved.self, from: Data(contentsOf: url))
-        guard saved.version == 1, saved.contentID == contentID, saved.count == entries.count else { return nil }
+        guard saved.version == version, saved.contentID == contentID, saved.count == entries.count else { return nil }
         guard saved.chronological.count == entries.count,
               Set(saved.chronological) == Set(entries.indices),
               zip(saved.chronological, saved.chronological.dropFirst()).allSatisfy({
