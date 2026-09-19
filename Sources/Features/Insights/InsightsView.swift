@@ -14,7 +14,8 @@ struct InsightsView: View {
                 if trends.sourceUnavailable {
                     ErrorNotice(message: trends.hasResult ? "Usage refresh unavailable. Previous trends remain visible and may be stale." : "Usage trends unavailable. No successful usage result is available.")
                     if trends.hasResult, let date = usage.lastSuccessfulUsageRead {
-                        Text("Last successful usage read " + date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                        ReadAgeCaption(date: date, prefix: "Last successful usage read")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if trends.hasResult {

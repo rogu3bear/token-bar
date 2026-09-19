@@ -258,6 +258,14 @@ assert(RateDisplay.compact(999_950) == "1M")
 print("PASS: compact minute/hour rate labels and million boundary")
 
 do {
+    let stamp = Date(timeIntervalSince1970: 1_000_000_000)
+    let suffix = RelativeAgeText.captionSuffix(stamp)
+    assert(suffix.hasPrefix("ago · "), suffix)
+    assert(suffix.hasSuffix(stamp.formatted(date: .abbreviated, time: .shortened)), suffix)
+}
+print("PASS: read-age captions share one relative-plus-absolute suffix")
+
+do {
     let now = Date()
     let legacy = Data("{\"accounts\":{},\"samples\":[],\"plans\":[]}".utf8)
     let legacyState = try JSONDecoder().decode(LiveState.self, from: legacy)

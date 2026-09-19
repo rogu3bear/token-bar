@@ -20,11 +20,8 @@ struct CostSummary: View {
             }
             if !refreshing || report.calculatedAt != nil { Text(report.statusMessage(sourceAvailable: sourceAvailable)).foregroundStyle(.secondary) }
             if let sourceDate {
-                HStack(spacing: 4) {
-                    Text("Last successful usage read")
-                    RelativeAgeText(date: sourceDate)
-                    Text("ago · " + sourceDate.formatted(date: .abbreviated, time: .shortened))
-                }.font(.caption).foregroundStyle(.secondary)
+                ReadAgeCaption(date: sourceDate, prefix: "Last successful usage read")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             HStack(alignment: .top, spacing: PageStyle.related) {
                 metric("ESTIMATED API EQUIVALENT", report.hasPricedRecords ? CostPricing.dollars(report.amounts.total) : "—", "USD · API equivalent")

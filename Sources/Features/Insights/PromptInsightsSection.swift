@@ -65,11 +65,7 @@ struct PromptInsightsSection: View {
                         .animation(reduceMotion ? nil : .linear(duration: 0.2), value: state.filesChecked)
                 }
             } else if let date = state.result?.readAt {
-                HStack(spacing: 4) {
-                    Text(state.isPartial ? "Partial sample read" : "Results read")
-                    RelativeAgeText(date: date)
-                    Text("ago · " + date.formatted(date: .abbreviated, time: .shortened))
-                }
+                ReadAgeCaption(date: date, prefix: state.isPartial ? "Partial sample read" : "Results read")
             } else if !state.failed {
                 Text(state.message)
             }
