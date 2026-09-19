@@ -170,6 +170,12 @@ enum ProductPreview {
             model.claudeMeter.activity.measurements = [:]
             model.claudeMeter.tick(now: now)
         }
+        if CommandLine.arguments.contains("--sample-update") {
+            let successor = ReleaseManifest(version: "9.9.9", available: true,
+                url: UpdateCheck.downloadPrefix + "v9.9.9/TokenBar-9.9.9-arm64.pkg", sha256: nil, notarized: true)
+            model.updateCheck.adopt(.available(successor), at: now)
+            precondition(model.updateCheck.availableRelease?.version == "9.9.9")
+        }
         // Flush the model's observation callbacks before constructing shipping consumers.
         RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         if !CommandLine.arguments.contains("--sample-no-accounts") {

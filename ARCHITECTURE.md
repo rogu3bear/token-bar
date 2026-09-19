@@ -22,7 +22,7 @@ not application state or UI code.
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
 | `ActivityFeed`, `Activity`, `ClaudeActivityReader`, `Tachometer` | tool-scoped tasks, counter deltas, independent dials | in-memory |
-| `ClaudeQuotaMonitor`, `ClaudeUsageRefresh`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon, refreshed by the installed Claude Code every 15 minutes; model-scoped weekly rows (Fable) kept apart for the menu-bar roll-up; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; Token Bar reads no credential and makes no network request itself | In-memory quota samples; empty private `claude-usage-refresh/` working directory; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
+| `ClaudeQuotaMonitor`, `ClaudeUsageRefresh`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon, refreshed by the installed Claude Code every 15 minutes; model-scoped weekly rows (Fable) kept apart for the menu-bar roll-up; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; Token Bar reads no credential and makes no Claude network request itself | In-memory quota samples; empty private `claude-usage-refresh/` working directory; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
 | `GrokQuotaMonitor` | JSON-RPC to `grok agent --no-leader stdio`, `_x.ai/billing` | In-memory quota samples only |
 | `LiveMonitor`, `LiveStateStore`, `ProviderUsage`, `CodexInstallation` | JSON-RPC to `codex app-server --stdio` for quota, plan, account usage | `live-accounts.sqlite`; legacy JSON retained for migration/rollback |
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
@@ -30,6 +30,7 @@ not application state or UI code.
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
 | `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `InsightsView`, `DashboardNavigation` | five product destinations plus capsule chrome | query state via `UsageModel` |
 | `MenuBarSettingsView`, `AppearanceSettingsView` | Settings owner: menu-bar fields and appearance. They remain capsule destinations, not a third SwiftUI scene | `UserDefaults` preferences |
+| `UpdateCheck`, `UpdateCheckControl` | Optional launch-time read of the site's public `release.json` over an ephemeral session with no cookies, cache, or app version; numeric version ordering; offers only a newer, notarized GitHub Release asset and opens it in the browser on click. Previews never construct a live check | `updateCheck.enabled.v1`; outcome is process-owned |
 | `site/public/feedback*.js`, `site/worker.js` | local report drafting; advanced-mode static fallback and retired API responses | browser local storage for the draft |
 
 ## Sources of truth
@@ -41,9 +42,9 @@ not application state or UI code.
 | Request detail | `ledger.requests.sqlite` | request CSV, evidence panel | `Tests/Accuracy` |
 | Quota and accounts | app-server responses, incrementally persisted in `live-accounts.sqlite` | runway, account cards | `Tests/main.swift`, `Tests/MenuBar` |
 | Pricing | `CostRateCard` and `CostRateHistory` in source | cost report, CSV | `Tests/Cost`, `docs/COST.md` |
-| Preferences | `UserDefaults` keys `appearance.*`, `menuBarConfiguration.v1`, `dashboard.rateUnit.<tool>` | tool units, menu bar title, theme | `Tests/Appearance`, `Tests/MenuBar` |
+| Preferences | `UserDefaults` keys `appearance.*`, `menuBarConfiguration.v1`, `dashboard.rateUnit.<tool>`, `updateCheck.enabled.v1` | tool units, menu bar title, theme, update check | `Tests/Appearance`, `Tests/MenuBar`, `Tests/UpdateCheck` |
 | Version | `VERSION` | Info.plist, package name, `release.json` | `scripts/build.sh` |
-| Public download | Notarized GitHub Release asset; `site/public/release.json` binds its URL/hash | landing page button | `scripts/verify-release.sh`, `site/tests/site.test.mjs` |
+| Public download | Notarized GitHub Release asset; `site/public/release.json` binds its URL/hash | landing page button, in-app update notice | `scripts/verify-release.sh`, `site/tests/site.test.mjs`, `Tests/UpdateCheck` |
 | Harness and project | `session_meta.originator` and `cwd`, normalized by `Project` | harness and project reports | `Tests/Dimensions` |
 | Claude Code usage | `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`, with `projects/**/*.jsonl` message snapshots plus verified increments; a missing explicit root stays unavailable | tool and project reports | `Tests/Harnesses` |
 | OpenCode usage | `opencode.db` `message` table, read-only | tool, provider and project reports | `Tests/Harnesses` |
@@ -256,7 +257,7 @@ pin this choice.
 ## Validation
 
 ```bash
-./scripts/test.sh [group]    # fourteen groups; each prints PASS lines, traps on failure
+./scripts/test.sh [group]    # fifteen groups; each prints PASS lines, traps on failure
 (cd site && bun test)        # site and backend tests
 ./scripts/build.sh           # compiles every discovered source, signs, verifies
 ```

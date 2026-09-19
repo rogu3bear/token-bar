@@ -57,6 +57,6 @@ headers/footer links and any enabled installer by hash. Verify local draft
 retention, prefill encoding/template fields, length/copy fallbacks, and retired
 API 410/no-store behavior separately. No email delivery check applies.
 
-Keep `release.json` bound to the notarized GitHub Release asset. GitHub
+`release.json` is also read by the installed app's optional update check, so its keys (`version`, `available`, `url`, `sha256`, `notarized`) are a contract with `Sources/Services/UpdateCheck.swift`; `site/tests/site.test.mjs` guards them. Keep `release.json` bound to the notarized GitHub Release asset. GitHub
 Packages is not a current download origin. Documentation-only changes outside
 `site/` need no site rebuild or deployment when published inputs are unchanged.

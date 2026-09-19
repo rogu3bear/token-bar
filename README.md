@@ -72,7 +72,8 @@ For Codex account allowance, use an existing local Codex installation and sign
 in there. API-key-only accounts may not supply subscription quota.
 
 Only one copy can use the local usage store at a time. Quit an existing copy
-before opening a development build. Launch at login is optional.
+before opening a development build. Launch at login and the launch-time
+update check are both optional in Menu bar settings.
 
 To build your own installer, run `./scripts/package.sh` after following the
 build steps below. Local development packages are not notarized. See
@@ -130,7 +131,10 @@ flushes pending work. See [storage and recovery](ARCHITECTURE.md#log-to-ledger).
 Token Bar does not upload usage history or include telemetry. Prompt insights
 read local Codex text in memory; prompt text is not copied into the usage ledger.
 Installed provider tools may contact their services to read account allowance.
-Token Bar does not ask you for passwords or API keys.
+Token Bar does not ask you for passwords or API keys. When it starts, it reads
+the public release list on its website once to tell you about a newer
+notarized installer; the request carries no usage, account or version, and
+Menu bar settings turns it off. Downloads remain your click.
 
 Feedback is voluntary. The [feedback form](https://token-bar-9v8.pages.dev/feedback/)
 saves a draft in your browser. Review on GitHub sends its fields to GitHub in a
