@@ -323,7 +323,7 @@ import ServiceManagement
             }
             var result = self.scanner.scan(historical: history, changedPaths: paths, toolProgress: { tool, done, total in
                 showProgress(.work(title: "Reading \(tool) history", completed: done, total: total,
-                                   unit: tool == "OpenCode" ? "records" : "files"), completed: done, total: total)
+                                   unit: tool == OpenCodeUsage.harness ? "records" : "files"), completed: done, total: total)
             }, progress: { done, total in
                 showProgress(.codex(completed: done, total: total), completed: done, total: total)
             })
