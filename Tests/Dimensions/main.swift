@@ -67,7 +67,7 @@ let partial = [
 let partialProjects = DimensionReport.byProject(partial)
 check(partialProjects.count == 2, "a missing project must produce its own row")
 let unattributed = partialProjects.first { !$0.attributed }
-check(unattributed?.name == "Unattributed", "a missing project must be labelled, not blank")
+check(unattributed?.name == DimensionReport.unattributed, "a missing project must be labelled, not blank")
 check(unattributed?.tokens.input == 7, "unattributed usage must be counted, not discarded")
 check(unattributed?.paths.isEmpty == true, "an unattributed row must not invent a path")
 print("PASS: missing project attribution is reported as unattributed, not zero")
@@ -165,7 +165,7 @@ check(report.projects.count == 2, "expected one project row plus unattributed, g
 let alpha = report.projects.first { $0.title == "alpha" }
 check(alpha != nil, "the project row must be named for its directory")
 check(alpha?.tokens.output == 85, "case-variant spellings must total into one project row, got \(alpha?.tokens.output ?? -1)")
-check(report.projects.contains { $0.title == "Unattributed" }, "usage without a project must still appear")
+check(report.projects.contains { $0.title == DimensionReport.unattributed }, "usage without a project must still appear")
 print("PASS: the usage report groups output by project")
 
 check(report.harnesses.count == 2, "expected two tool rows, got \(report.harnesses.count)")
