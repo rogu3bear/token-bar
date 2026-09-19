@@ -48,6 +48,7 @@ not application state or UI code.
 | Claude Code usage | `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`, with `projects/**/*.jsonl` message snapshots plus verified increments; a missing explicit root stays unavailable | tool and project reports | `Tests/Harnesses` |
 | OpenCode usage | `opencode.db` `message` table, read-only | tool, provider and project reports | `Tests/Harnesses` |
 | Counter convention | `Tokens.canonical` | every total and cache share | `Tests/Harnesses` |
+| Event timestamp | `EventTime.parse` | Codex/Claude activity, Claude turns, provider day bounds | `Tests/main.swift` |
 
 ## Critical flows
 

@@ -63,8 +63,6 @@ final class ActivityReader {
     private var measurements: [String: RateMeasurement] = [:]
     private var offsets: [String: UInt64] = [:]
     private var counters: [String: (output: Int, date: Date)] = [:]
-    private let iso = ISO8601DateFormatter()
-    private let plainISO = ISO8601DateFormatter()
     var snapshot: ActivitySnapshot {
         // Fork copies of the same turn are one activity, not extra running chats.
         var turns: [String: TaskActivity] = [:]
@@ -78,11 +76,10 @@ final class ActivityReader {
         }
         return ActivitySnapshot(turns: turns, measurements: measurements, readAt: Date())
     }
-    init() { iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds] }
     func consume(_ root: [String: Any], observed: Date, kind: ActivityKind = .unknown, session: String? = nil, name: String = "", model: String = "", created: Date = .distantPast) {
         guard root["type"] as? String == "event_msg", let p = root["payload"] as? [String: Any],
               let type = p["type"] as? String, let stamp = root["timestamp"] as? String,
-              let date = iso.date(from: stamp) ?? plainISO.date(from: stamp) else { return }
+              let date = EventTime.parse(stamp) else { return }
         if type == "token_count", let session, let task = sessions[session], task.running,
            let info = p["info"] as? [String: Any], let total = info["total_token_usage"] as? [String: Any],
            let output = total["output_tokens"] as? Int {
