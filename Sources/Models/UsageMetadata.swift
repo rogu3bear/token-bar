@@ -33,6 +33,14 @@ enum UsageMetadata {
         guard entry.pricingDay == nil, entry.bucket != "day" else { return }
         entry.pricingDay = day(entry.date)
     }
+
+    /// CSV attribution. Unattributed is unknown, never a guessed person; an id
+    /// is local sign-in evidence, not a dashboard scrape.
+    static let unknownAccount = "unknown"
+    static let inferredAccount = "inferred from local sign-in observation"
+    static func accountAttribution(_ account: Account?) -> String {
+        account == nil ? unknownAccount : inferredAccount
+    }
 }
 extension Entry {
     func hasField(_ name: String) -> Bool { tokenFields?.contains(name) == true }

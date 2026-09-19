@@ -32,13 +32,30 @@ try archive!.acknowledge { _ in true }; count = try archive!.count; check(count 
 let csvURL = root.appendingPathComponent("requests.csv")
 let exported = try RequestExport.write(archive: archive!, destination: csvURL, query: UsageQuery(period: 1), catalog: [:], effort: "All levels", now: date("2026-09-10"))
 let csv = try String(contentsOf: csvURL, encoding: .utf8)
-check(exported == 1 && csv.contains("2026-09-07T00:02:03.456Z") && csv.contains("single_request"), "Export retains fractional timestamp and explicit granularity")
+check(exported == 1 && csv.contains("2026-09-07T00:02:03.456Z") && csv.contains("single_request") && csv.contains(UsageMetadata.unknownAccount), "Export retains fractional timestamp, explicit granularity and unattributed account face")
 let source = try RequestArchive(url: root.appendingPathComponent("source.sqlite"))
 try source.record(entry("2026-09-07", id: "different-id"), admitted: true)
 let excluded = try archive!.importAccepted(from: source, groups: [CostRecovery.groupKey(first)], accounts: [:])
 check(excluded == 1, "Skipped identity-conflicting groups must be observable")
 count = try archive!.count; check(count == 1, "Same group totals with changed event identities must not double the archive")
 print("PASS: durable pending archive, restart acknowledgment, immutable dedup, rollback, exact timestamp export and conflicting backfill IDs")
+
+do {
+    check(UsageMetadata.accountAttribution(nil) == "unknown",
+          "Missing account stays unknown, not a guessed person")
+    check(UsageMetadata.accountAttribution(Account(id: "a", label: "Ada")) == "inferred from local sign-in observation",
+          "An observed account is local sign-in evidence, matching History export")
+    let url = root.appendingPathComponent("attribution.csv")
+    let store = try RequestArchive(url: root.appendingPathComponent("attribution.sqlite"))
+    var row = entry("2026-09-07", id: "attributed")
+    row.account = Account(id: "a", label: "Ada")
+    try store.record(row, admitted: true)
+    _ = try RequestExport.write(archive: store, destination: url, query: UsageQuery(period: 1), catalog: [:], effort: "All levels", now: date("2026-09-10"))
+    let text = try String(contentsOf: url, encoding: .utf8)
+    check(text.contains(UsageMetadata.inferredAccount),
+          "Request CSV uses the History sign-in attribution face")
+}
+print("PASS: request and History account attribution share one local sign-in face")
 
 do {
     let url = root.appendingPathComponent("count-cache.sqlite")
