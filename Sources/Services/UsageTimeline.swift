@@ -142,7 +142,7 @@ enum HistoryTool: String, CaseIterable, Identifiable {
     case codex = "Codex", claude = "Claude Code", grok = "Grok", other = "Other tools", unknown = "Unknown tool"
     var id: String { rawValue }
     static func recorded(_ entry: Entry) -> Self {
-        guard let tool = entry.harness, !tool.isEmpty, tool != "Unattributed" else { return .unknown }
+        guard let tool = entry.harness, !tool.isEmpty, tool != DimensionReport.unattributed else { return .unknown }
         if tool.lowercased().hasPrefix("codex") { return .codex }
         if tool == "Claude Code" { return .claude }
         if tool == "Grok" { return .grok }
