@@ -41,6 +41,8 @@ enum ClaudeQuotaSource {
         if let reset, reset <= now { return nil }
         return QuotaReading(accountID: accountID, bucket: bucket, name: name, window: window, minutes: minutes, used: used, reset: reset, date: date)
     }
+    /// Short Connect panel: the relay is transport, not account quota.
+    static let connectionCaption = "Connect captures local status-line data. Quota uses Claude Code’s account-matched usage cache; relay readings have no account identity."
     static var relayHelp: String {
         """
         Claude Code refreshes its own usage cache at session start, on its usage screen, and when Token Bar asks the installed Claude Code for usage every 15 minutes. \
