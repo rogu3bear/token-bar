@@ -44,7 +44,7 @@ struct ReportFilters: View {
                 }.padding(.top, 8)
             }
             if model.filtering {
-                Text("Updating the report. Previous results remain visible until the selected report is ready. Export is unavailable while updating.")
+                Text(ReportUpdateCopy.filterCaption)
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

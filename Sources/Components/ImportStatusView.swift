@@ -18,8 +18,8 @@ struct ImportStatusView: View {
             }.padding(.horizontal, inset).padding(.vertical, 6)
         } else if model.filtering {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Updating your report…").font(.callout)
-                Text("Showing the previous report until the new one is ready.").font(.caption).foregroundStyle(.secondary)
+                Text(ReportUpdateCopy.title).font(.callout)
+                Text(ReportUpdateCopy.waiting).font(.caption).foregroundStyle(.secondary)
             }.padding(.horizontal, inset).padding(.vertical, 6)
         }
     }

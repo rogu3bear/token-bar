@@ -58,6 +58,15 @@ import Observation
     var catalog: [String: TaskInfo] = [:] { didSet { if oldValue != catalog { catalogRevision &+= 1 } } }
 }
 
+/// In-flight report selection. The dashboard banner and the History/Cost filter
+/// caption are the same claim; export is held only where export exists.
+enum ReportUpdateCopy {
+    static let title = "Updating your report…"
+    static let waiting = "Showing the previous report until the new one is ready."
+    static let exportHold = "Export is unavailable while updating."
+    static var filterCaption: String { "Updating your report. " + waiting + " " + exportHold }
+}
+
 /// One app-owned tick. Views read this only where wall-clock labels need it;
 /// isolated previews continue to supply their explicit evaluation date.
 @Observable final class PresentationClock {

@@ -251,6 +251,11 @@ assert(RateBounds.fitting([]) == RateBounds(lower: 0, upper: 100))
 assert(RateBounds.fitting([10]).upper < narrowBounds.upper)
 print("PASS: second/minute/hour conversion, adaptive lower and upper bounds, expansion, contraction, idle range")
 
+assert(ReportUpdateCopy.filterCaption.contains(ReportUpdateCopy.waiting))
+assert(ReportUpdateCopy.filterCaption.contains(ReportUpdateCopy.exportHold))
+assert(ReportUpdateCopy.title.hasPrefix("Updating your report"))
+print("PASS: in-flight report copy is one face; export is held only in the filter caption")
+
 assert(RateDisplay.compact(128 * RateUnit.minute.multiplier) == "7.7k")
 assert(RateDisplay.compact(128 * RateUnit.hour.multiplier) == "460.8k")
 assert(RateDisplay.compact(1000) == "1k")
