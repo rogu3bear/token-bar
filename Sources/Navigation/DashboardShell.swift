@@ -43,7 +43,7 @@ struct DestinationHost: View {
         case .cost: CostView(model: model)
         case .accounts: AccountsView(model: model, monitor: model.live, signIns: model.signIns)
         case .insights: InsightsView(model: model.insights, home: model.scanner.home, usage: model, trends: model.usageInsights)
-        case .menuBar: MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard)
+        case .menuBar: MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck)
         case .appearance: AppearanceSettingsView(preferences: model.appearance)
         }
         }.environment(\.evaluationDate, model.referenceDate)
