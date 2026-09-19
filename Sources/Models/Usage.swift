@@ -590,9 +590,9 @@ final class UsageScanner {
         errors = []
         otherTools?()
         if Self.contains(changedPaths, root: grokHome) {
-            toolProgress?("Grok", 0, 0)
-            count += scanGrok(historical: historical, poll: now, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths, errors: &errors, progress: { toolProgress?("Grok", $0, $1) })
-            retainErrors(errors, for: "Grok", paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths?.filter { Self.contains([$0], root: grokHome) })
+            toolProgress?(Harness.grok, 0, 0)
+            count += scanGrok(historical: historical, poll: now, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths, errors: &errors, progress: { toolProgress?(Harness.grok, $0, $1) })
+            retainErrors(errors, for: Harness.grok, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths?.filter { Self.contains([$0], root: grokHome) })
             errors = []
         }
         if Self.contains(changedPaths, root: claudeHome) {
@@ -602,9 +602,9 @@ final class UsageScanner {
             errors = []
         }
         if Self.contains(changedPaths, root: openCodeHome) {
-            toolProgress?("OpenCode", 0, 0)
-            count += scanOpenCode(historical: historical, errors: &errors, progress: { toolProgress?("OpenCode", $0, $1) })
-            retainErrors(errors, for: "OpenCode")
+            toolProgress?(OpenCodeUsage.harness, 0, 0)
+            count += scanOpenCode(historical: historical, errors: &errors, progress: { toolProgress?(OpenCodeUsage.harness, $0, $1) })
+            retainErrors(errors, for: OpenCodeUsage.harness)
             errors = []
         }
         errors = Array((ledger.sourceErrors ?? [:]).values)
