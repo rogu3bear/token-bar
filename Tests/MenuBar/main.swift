@@ -508,6 +508,30 @@ let idleIconOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: idleC
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
 assert(idleIconOnly.string == "◈", "Idle Auto without a measured remaining is the app icon: \(idleIconOnly.string)")
 monitor.state.accounts["a"] = savedIdleAccount
+do {
+    let savedAccount = monitor.state.accounts["a"]
+    defer { monitor.state.accounts["a"] = savedAccount }
+    for order: [MenuBarPart] in [[.risk, .quota, .icon], [.quota, .icon, .risk]] {
+        var ordered = MenuBarConfiguration(); ordered.enabled = [.quota, .icon, .risk]; ordered.order = order
+        let savedOrder = ordered.order, savedEnabled = ordered.enabled
+        func line(twoAccounts: Bool) -> String {
+            monitor.state.accounts["a"] = twoAccounts ? savedAccount : LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
+            return MenuBarPresentation.combined(ordered, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+                monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState, riskText: "Quota warning").string
+        }
+        let one = line(twoAccounts: false), two = line(twoAccounts: true), oneAgain = line(twoAccounts: false)
+        assert(one == oneAgain, "One-to-two-to-one retains the existing single-tool face")
+        for text in [one, two] {
+            let markers = order.map { $0 == .risk ? "Quota warning" : $0 == .icon ? "◈" : "remaining" }
+            let positions = markers.map { (text as NSString).range(of: $0).location }
+            assert(positions.allSatisfy { $0 != NSNotFound } && positions == positions.sorted(), "Saved field order must survive idle account-count transitions: \(text)")
+            assert(text.components(separatedBy: "Quota warning").count == 2 && text.components(separatedBy: "◈").count == 2)
+        }
+        assert(two.contains("Codex") && two.contains("Claude") && !one.contains("Codex"))
+        assert(ordered.order == savedOrder && ordered.enabled == savedEnabled)
+    }
+    print("PASS: reordered icon, grouped remaining and warning retain saved order across one-to-two-to-one idle accounts")
+}
 print("PASS: idle Auto names measured Codex and Claude remaining and keeps unused zeros off the bar")
 print("PASS: unused zeros stay off Auto; remaining you still have is named; Claude-at-zero does not join a working line")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex],

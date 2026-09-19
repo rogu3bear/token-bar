@@ -91,30 +91,30 @@ struct MenuBarPresentation {
                                   tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
             }
             if named.count > 1 {
-                quiet.enabled.remove(.risk)
                 let result = NSMutableAttributedString()
-                if quiet.enabled.contains(.icon) {
-                    var iconOnly = quiet
-                    iconOnly.enabled = [.icon]
-                    result.append(attributed(iconOnly, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
-                                             claudeQuota: claudeQuota, grokQuota: grokQuota))
-                }
-                var pieces = quiet
-                pieces.enabled.remove(.icon)
                 let glue = NSAttributedString(string: settings.separator, attributes: [
                     .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular),
                     .foregroundColor: NSColor.labelColor
                 ])
-                for tool in named {
+                func append(_ face: NSAttributedString) {
                     if result.length > 0 { result.append(glue) }
-                    result.append(attributed(pieces, meter: Tachometer(), monitor: monitor, now: now,
-                                             accent: NSColor(tool.color(in: palette)),
-                                             tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota))
+                    result.append(face)
                 }
-                if settings.enabled.contains(.risk), let riskText {
-                    let join = result.length == 0 ? "" : settings.separator
-                    result.append(NSAttributedString(string: join + riskText,
-                        attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
+                for part in quiet.order where quiet.enabled.contains(part) {
+                    if part == .risk && riskText == nil { continue }
+                    var field = quiet
+                    field.enabled = [part]
+                    if part == .quota {
+                        for tool in named {
+                            append(attributed(field, meter: Tachometer(), monitor: monitor, now: now,
+                                              accent: NSColor(tool.color(in: palette)), tool: tool,
+                                              claudeQuota: claudeQuota, grokQuota: grokQuota))
+                        }
+                    } else {
+                        append(attributed(field, meter: Tachometer(), monitor: monitor, now: now,
+                                          accent: NSColor(palette.accent), claudeQuota: claudeQuota,
+                                          grokQuota: grokQuota, riskText: riskText))
+                    }
                 }
                 return result
             }
