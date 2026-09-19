@@ -49,6 +49,11 @@ print("PASS: legacy tool colors remain stored, never override the app accent, an
 let claudeProgress = ImportProgress.work(title: "Reading Claude history", completed: 25, total: 100, unit: "files")
 assert(claudeProgress.fraction == 0.25 && claudeProgress.detail.contains("75 remaining"))
 assert(ImportProgress.work(title: "Reading Claude history", completed: 0, total: 0, unit: "files").fraction == nil)
+assert(ImportProgress.codex(completed: 25, total: 100).detail == claudeProgress.detail,
+       "Codex file remaining uses the same checked-count face as other tools")
+let undiscovered = ImportProgress.work(title: "Reading Claude history", completed: 0, total: 0, unit: "files")
+assert(ImportProgress.codex(completed: 0, total: 0).detail == undiscovered.detail,
+       "A Codex stage with no files yet is still finding work, not 0 remaining")
 print("PASS: measured work shows actual completed fraction and remaining count; undiscovered work has no percentage")
 
 // The canonical preset is complete even when an older profile has competing colors.

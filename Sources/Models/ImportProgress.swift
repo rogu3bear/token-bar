@@ -15,13 +15,17 @@ enum ImportProgress: Equatable {
     }
     var detail: String {
         switch self {
-        case let .work(_, completed, total, unit): return total == 0 ? "Finding \(unit) to check…" : "\(completed.formatted()) of \(total.formatted()) \(unit) checked · \(max(0, total - completed).formatted()) remaining."
+        case let .work(_, completed, total, unit): return Self.checked(completed: completed, total: total, unit: unit)
         case .discovering: return "Finding files. The amount of new usage is not known yet."
-        case let .codex(completed, total): return "\(completed.formatted()) of \(total.formatted()) files checked · \(max(0, total - completed).formatted()) remaining."
+        case let .codex(completed, total): return Self.checked(completed: completed, total: total, unit: "files")
         case .otherTools: return "Reading Claude, Grok, and OpenCode files. The remaining file count is not known yet."
         case .costDetails: return "Adding missing pricing details to recorded usage. This does not add tokens."
         case .catalog: return "History has been checked. Updating task names and report totals."
         }
+    }
+    /// Known remaining is only a count when the stage has a total. Zero total is still finding work, not 0 remaining.
+    private static func checked(completed: Int, total: Int, unit: String) -> String {
+        total == 0 ? "Finding \(unit) to check…" : "\(completed.formatted()) of \(total.formatted()) \(unit) checked · \(max(0, total - completed).formatted()) remaining."
     }
     var fraction: Double? {
         let completed: Int, total: Int
