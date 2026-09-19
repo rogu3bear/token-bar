@@ -30,8 +30,7 @@ enum CoverageAudit {
         // Records held back are part of the honest answer, not a footnote.
         object["heldBack"] = scannerIntegrity?.quarantined ?? [:]
         object["repaired"] = scannerIntegrity?.repaired ?? [:]
-        try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]).write(to: destination, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+        try PrivateCache.write(JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]), to: destination)
         if let error = result.error { throw RequestArchive.failure("Coverage is partial: " + error) }
     }
 }
