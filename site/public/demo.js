@@ -1,3 +1,4 @@
+const GITHUB_DOWNLOAD_PREFIX = "https://github.com/rogu3bear/token-bar/releases/download/";
 fetch("/release.json")
   .then((response) => (response.ok ? response.json() : null))
   .then((release) => {
@@ -5,9 +6,7 @@ fetch("/release.json")
     document.querySelector("#release-status").textContent = release.status;
     if (
       release.available &&
-      release.url.startsWith(
-        "https://github.com/rogu3bear/token-bar/releases/download/",
-      )
+      release.url.startsWith(GITHUB_DOWNLOAD_PREFIX)
     ) {
       const link = document.querySelector("#download");
       link.href = release.url;
