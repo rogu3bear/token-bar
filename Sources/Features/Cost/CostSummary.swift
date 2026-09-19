@@ -9,7 +9,7 @@ struct CostSummary: View {
     var sourceError: String?
     var sourceAvailable = true
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             if refreshing {
                 Text(report.calculatedAt == nil ? "Loading cost results…" : "Refreshing… Previous calculation remains visible until the new result is ready.")
                     .foregroundStyle(.secondary)

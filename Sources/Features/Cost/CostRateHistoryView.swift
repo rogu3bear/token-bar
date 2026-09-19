@@ -10,7 +10,7 @@ struct CostRateHistoryView: View {
         CostRateHistory.versions.filter { $0.rule.model == activeModel }.sorted { $0.effectiveFrom < $1.effectiveFrom }
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             Text("Published standard API base prices · USD per million tokens. These are the shipped historical sources, separate from your usage and subscription allowance. The last verification was September 9, 2026; later market changes may be absent.")
                 .font(.callout).foregroundStyle(.secondary)
             if selectedModel == "All models" {

@@ -37,7 +37,7 @@ struct CostView: View {
                             ForEach(report.issues.keys.sorted(), id: \.self) { reason in
                                 HStack { Text(reason); Spacer(); Text(compact(report.issues[reason] ?? 0) + " tokens").monospacedDigit() }
                             }
-                        }.font(.callout).padding(16).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }.font(.callout).padding(PageStyle.related).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 DetailSheet("Report details and exports") {
@@ -105,7 +105,7 @@ struct CostView: View {
     private var contributions: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("What contributes to the estimate").font(PageStyle.sectionTitle)
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: PageStyle.related) {
                 component("Input", report.amounts.input)
                 component("Cache reads", report.amounts.cached)
                 component("Cache writes", report.amounts.cacheWrite)
@@ -138,7 +138,7 @@ struct CostView: View {
         }
     }
     private var method: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             Text("API-equivalent estimates and evidence").font(PageStyle.sectionTitle)
             Text("Historical rates use dated, sourced versions and leave unsupported intervals unpriced. Reference rates apply the \(CostRateCard.reference.observedOn) card to any period for comparison. Recorded tier uses only a tier present in usage metadata; Standard and Fast are explicit scenarios. Neither establishes a charge. Subscriptions, credits, taxes, regional uplifts, and tool fees are excluded.")
             Text("Effort is the setting recorded for a turn. It is not inferred from reasoning-token counts and does not multiply prices. Missing effort stays Unknown; models with no verified price stay unpriced.")
