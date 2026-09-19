@@ -115,7 +115,7 @@ struct HistoricalPlanChart: View {
     @Environment(\.evaluationDate) private var evaluationDate
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Plans found in local history").font(.title2.bold())
+            Text("Plans found in local history").font(PageStyle.sectionTitle)
             Chart(plans) { observation in
                 PointMark(x: .value("Observed", observation.firstSeen), y: .value("Plan", observation.plan.uppercased()))
                     .foregroundStyle(accent).symbolSize(24)
