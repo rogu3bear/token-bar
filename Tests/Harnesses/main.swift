@@ -205,7 +205,7 @@ _ = migrating!.scan(historical: true)
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.output } == 100, "Legacy first-wins history gains exactly missing output")
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 1502, "Repeated input is not charged again")
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.eventCount } == 1, "An increase is not another message")
-let originalID = UsageScanner.foreignIdentity(harness: "Claude Code", messageID: "growth")
+let originalID = UsageScanner.foreignIdentity(harness: ClaudeCodeUsage.harness, messageID: "growth")
 let retainedOriginal = try migrating!.requestArchive!.entry(id: originalID)
 check(retainedOriginal?.tokens.output == 10, "Original admitted detail remains immutable")
 migrating = nil
