@@ -112,7 +112,7 @@ private struct ContributionBar: View {
     var selected: Bool
     @Environment(\.appAccent) private var accent
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
             HStack {
                 Text(title).lineLimit(1)
                 Spacer(minLength: 16)
