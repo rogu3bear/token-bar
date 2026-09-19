@@ -72,8 +72,7 @@ struct QuotaGuardDecision: Identifiable, Equatable, Codable {
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
     var windowLabel: String {
-        guard let r = reading else { return "Account allowance" }
-        return r.minutes % 1440 == 0 ? "\(r.minutes / 1440)-day" : r.minutes % 60 == 0 ? "\(r.minutes / 60)-hour" : "\(r.minutes)-minute"
+        reading?.windowLabel ?? "Account allowance"
     }
     var title: String { tool.label + " · " + windowLabel + (reading.map { " · " + $0.name } ?? "") }
     var riskLabel: String {

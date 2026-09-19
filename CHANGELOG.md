@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Now, Accounts, and Quota Guard name the same allowance window. Exact day or hour multiples keep those units; a 2000-minute reading stays 2000-minute, not a truncated day. Reset clocks share one date-time face; a missing reset stays unavailable.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 
