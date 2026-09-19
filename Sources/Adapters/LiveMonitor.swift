@@ -60,6 +60,8 @@ struct Runway {
     /// `horizon` is how old a reading may be and still count as current. Codex polls
     /// every 30 seconds; a tool that refreshes its own cache less often passes its cadence.
     static let defaultHorizon: TimeInterval = 120
+    /// Remaining-burn observations kept for forecasts. Not Claude remaining display, Guard snooze, or Fable pace span.
+    static let lookback: TimeInterval = 1800
     /// A reading older than the shared two-minute horizon says so beside its read time.
     static func ageLabel(_ reading: QuotaReading, now: Date) -> String {
         let seconds = now.timeIntervalSince(reading.date)
@@ -80,7 +82,7 @@ struct Runway {
         guard let reset = latest.reset else {
             return Runway(remaining: remaining, message: "Reset unavailable")
         }
-        let relevant = samples.filter { $0.id == latest.id && $0.reset == latest.reset && $0.date >= now.addingTimeInterval(-1800) && $0.date <= latest.date }.sorted { $0.date < $1.date }
+        let relevant = samples.filter { $0.id == latest.id && $0.reset == latest.reset && $0.date >= now.addingTimeInterval(-lookback) && $0.date <= latest.date }.sorted { $0.date < $1.date }
         // A quota decrease can be a manual reset or adjustment. Discard the old slope.
         var boundary = 0
         for index in relevant.indices.dropFirst() where relevant[index].used < relevant[index - 1].used { boundary = index }
