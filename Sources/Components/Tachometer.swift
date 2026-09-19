@@ -195,9 +195,10 @@ struct RollingRate: View {
     var unit: RateUnit = .second
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        let amount = RateDisplay.amount(value, compactThousands: compactThousands)
         Group {
-            if available && compactThousands && value >= 1000 {
-                Text("~" + RateDisplay.compact(value))
+            if available && compactThousands && value >= 1_000 {
+                Text("~" + amount)
                     .font(.system(size: size, weight: .semibold, design: .rounded)).monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: value)
@@ -206,13 +207,13 @@ struct RollingRate: View {
                 RateOdometer(value: value.rounded(), size: size)
                     .animation(.smooth(duration: 1.2, extraBounce: 0), value: value.rounded())
             } else {
-                Text(available ? "~" + String(format: "%.0f", value) : "—")
+                Text(available ? "~" + amount : "—")
                     .font(.system(size: size, weight: .semibold, design: .rounded)).monospacedDigit()
                     .frame(width: size * 5.2, height: size * 1.25)
             }
         }.animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: available)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(available ? "Approximately " + String(format: "%.0f", value) + " output tokens per " + unit.label : "Awaiting token reports")
+            .accessibilityLabel(available ? "Approximately " + amount + " output tokens per " + unit.label : "Awaiting token reports")
     }
 }
 
@@ -259,5 +260,10 @@ enum RateDisplay {
         let suffix = divisor == 1000 ? "k" : "M"
         let number = String(format: "%.1f", value / divisor)
         return (number.hasSuffix(".0") ? String(number.dropLast(2)) : number) + suffix
+    }
+
+    /// Digits Now shows and VoiceOver names. Compact thousands stay compact; smaller rates stay whole tokens.
+    static func amount(_ value: Double, compactThousands: Bool) -> String {
+        compactThousands && value >= 1_000 ? compact(value) : String(format: "%.0f", value)
     }
 }
