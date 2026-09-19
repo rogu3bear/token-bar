@@ -128,7 +128,7 @@ struct AccountAllowanceDisclosure: View {
                 .padding(.top, 8)
         } label: {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: PageStyle.labelGap) {
                     if showsIdentity {
                         Text(tool.label).font(.subheadline.weight(.semibold))
                     }
