@@ -384,7 +384,7 @@ let preciseDay = MeteringComparison.build(history: meterHistory, windowID: windo
     source: meterSource + [previousDayBucket], query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
 check(preciseDay.coarseRecords == 1 && preciseDay.intervals.allSatisfy { $0.tokensPerPoint != nil },
       "A coarse bucket on another day cannot invalidate precise intervals")
-var foreign = unbound; foreign.provider = "anthropic"; foreign.harness = "Claude Code"
+var foreign = unbound; foreign.provider = "anthropic"; foreign.harness = ClaudeCodeUsage.harness
 check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
     source: meterSource + [foreign], query: UsageQuery(period: 1), effort: "All levels", now: meterNow).intervals[0].tokensPerPoint == 1100,
     "Known foreign usage is outside the unknown Codex attribution denominator")
