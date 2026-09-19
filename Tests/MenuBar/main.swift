@@ -97,7 +97,7 @@ func cacheData(account: String = "a", signedIn: String = "a", used: Double = 58,
 }
 let freshClaude = try JSONDecoder().decode(ClaudeQuotaCache.self, from: cacheData()).readings(now: cacheNow)
 assert(freshClaude.count == 1 && freshClaude[0].used == 58 && freshClaude[0].accountID.hasPrefix("claude:"))
-for data in [try cacheData(account: "other"), try cacheData(age: 1800), try cacheData(age: -1), try cacheData(used: -1), try cacheData(used: 101)] {
+for data in [try cacheData(account: "other"), try cacheData(age: ClaudeQuotaSource.horizon), try cacheData(age: -1), try cacheData(used: -1), try cacheData(used: 101)] {
     let decoded = try JSONDecoder().decode(ClaudeQuotaCache.self, from: data)
     assert(decoded.readings(now: cacheNow).isEmpty)
 }
@@ -111,7 +111,7 @@ assert(claudeValues[.quota] == "Claude 42% remaining")
 assert(claudeValues[.zero] != "Zero —")
 let laterClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(120), tool: .claude, claudeQuota: ownQuota)
 assert(laterClaude[.quota] == "Claude 42% remaining", "Claude Code refreshes on demand; two minutes is Codex's horizon, not Claude's")
-let staleClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(1800), tool: .claude, claudeQuota: ownQuota)
+let staleClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(ClaudeQuotaSource.horizon), tool: .claude, claudeQuota: ownQuota)
 assert(staleClaude[.quota] == "Claude quota unavailable" && staleClaude[.zero] == "Zero —")
 let codexHorizon = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: Runway.defaultHorizon)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(120), tool: .claude, claudeQuota: codexHorizon)[.quota] == "Claude quota unavailable")
@@ -168,12 +168,12 @@ func relayData(used: Double = 41, week: Double? = 12, age: Double = 0, resetIn: 
 let relayRoot = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-relay-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: relayRoot, withIntermediateDirectories: true)
 let cacheFile = relayRoot.appendingPathComponent("claude.json"), relayFile = relayRoot.appendingPathComponent("claude-statusline.json")
-try cacheData(age: 3600).write(to: cacheFile)
+try cacheData(age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
 assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "stale cache and no relay file")
 try relayData().write(to: relayFile)
 let fromFiles = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow)
 assert(fromFiles.isEmpty, "an identity-free relay cannot replace a stale account-bound cache")
-try cacheData(account: "a", signedIn: "b", age: 3600).write(to: cacheFile)
+try cacheData(account: "a", signedIn: "b", age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
 assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "account A relay cannot become account B quota")
 // A new monitor/read after a restart has the same files and must also reject it.
 let restarted = ClaudeQuotaMonitor(cacheURL: cacheFile, relayURL: relayFile)
