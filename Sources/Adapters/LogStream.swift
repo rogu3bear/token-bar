@@ -35,7 +35,7 @@ final class LogStream {
             if dropped {
                 for root in roots where path == root.path || path.hasPrefix(root.path + "/") { files.insert(root) }
             }
-            if path.hasPrefix(self.home.appendingPathComponent("state_5.sqlite").path) { files.insert(URL(fileURLWithPath: path)) }
+            if path.hasPrefix(CodexCatalog.database(in: self.home).path) { files.insert(URL(fileURLWithPath: path)) }
             if let openCode = self.openCodeHome,
                ["opencode.db", "opencode.db-wal", "opencode.db-shm"].contains(URL(fileURLWithPath: path).lastPathComponent),
                path.hasPrefix(openCode.path + "/") { files.insert(URL(fileURLWithPath: path)) }
