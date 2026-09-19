@@ -475,3 +475,16 @@ do {
     check(scanner.persistenceCount == recoveryWrites && !scanner.needsSave, "Recovered durable metadata retries without re-encoding")
 }
 print("PASS: cost recovery settles pending checkpoint and persists recovered metadata through retryable phases")
+
+check(CostRateHistory.percentChange(from: 5, to: 4) == "-20.0%",
+      "Sol input reduction is a signed tenth-percent, not an invented 0%")
+check(CostRateHistory.percentChange(from: 30, to: 20) == "-33.3%",
+      "Output reduction keeps tenths")
+check(CostRateHistory.percentChange(from: 0, to: 4) == "Unavailable",
+      "A zero prior published rate is unavailable, not 0%")
+let solBefore = CostRateRule.modern("gpt-5.6-sol", input: "5", cached: "0.5", output: "30")
+let solAfter = CostRateRule.modern("gpt-5.6-sol", input: "4", cached: "0.4", output: "20")
+check(CostRateHistory.changeCaption(from: solBefore, to: solAfter)
+      == "Change from previous: input -20.0% · cache read -20.0% · output -33.3%",
+      "Input, cache, and output changes share one caption")
+print("PASS: published rate-history changes share one signed-percent face")
