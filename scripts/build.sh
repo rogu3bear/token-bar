@@ -15,6 +15,10 @@ if [ -z "$build_number" ] || [ "$build_number" -le 0 ]; then
   exit 1
 fi
 require_swift_toolchain || exit 1
+if [[ -z "${BUNDLE_IDENTIFIER:-}" ]]; then
+  echo 'build.sh: BUNDLE_IDENTIFIER missing from sources.sh' >&2
+  exit 1
+fi
 mkdir -p "$PWD/build"
 output="$PWD/build/Token Bar.app"
 stage=$(mktemp -d "$PWD/build/.token-bar-build.XXXXXX")
@@ -46,7 +50,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>TokenBar</string>
-<key>CFBundleIdentifier</key><string>local.star.CodexTokenBar</string>
+<key>CFBundleIdentifier</key><string>$BUNDLE_IDENTIFIER</string>
 <key>CFBundleName</key><string>Token Bar</string>
 <key>CFBundleIconFile</key><string>TokenBar</string>
 <key>CFBundleVersion</key><string>$build_number</string>

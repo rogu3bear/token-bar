@@ -15,6 +15,11 @@
 
 SOURCE_ROOT="$PWD/Sources"
 
+# Shipping bundle identity. build.sh writes it into Info.plist; package.sh
+# reads that plist. DuplicateScan.identifier must match so Spotlight still
+# finds every copy. Tests/SingleInstance/main.swift compares the two spellings.
+BUNDLE_IDENTIFIER="local.star.CodexTokenBar"
+
 # The single application entry point. It carries @main and therefore can never
 # link into a test group, which uses Tests/<group>/main.swift as its entry.
 APP_ENTRY="App.swift"
