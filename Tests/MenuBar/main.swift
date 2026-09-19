@@ -693,7 +693,7 @@ do {
     var exhaustedQuota = current; exhaustedQuota.readings[0].used = 100
     let empty = AccountAllowancePresentation(quota: exhaustedQuota, now: now)
     assert(empty.remaining == "0%" && empty.qualifier == "Exhausted")
-    var stale = current; stale.readings[0].date = now.addingTimeInterval(-3600)
+    var stale = current; stale.readings[0].date = now.addingTimeInterval(-Runway.defaultHorizon)
     assert(AccountAllowancePresentation(quota: stale, now: now).remaining == "—")
     assert(AccountAllowancePresentation(quota: stale, now: now).detail.contains("Stale"))
     var expired = current; expired.readings[0].reset = now
