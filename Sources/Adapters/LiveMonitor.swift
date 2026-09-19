@@ -13,6 +13,15 @@ struct QuotaReading: Codable, Identifiable, Equatable {
     var reset: Date?
     var date: Date
     var id: String { accountID + "|" + bucket + "|" + window }
+    /// Guard, Now, and Accounts name the same window. Day and hour only when
+    /// the duration is an exact multiple; otherwise keep minutes.
+    var windowLabel: String {
+        minutes % 1440 == 0 ? "\(minutes / 1440)-day" : minutes % 60 == 0 ? "\(minutes / 60)-hour" : "\(minutes)-minute"
+    }
+    /// Clock text only. Callers add Reset/resets grammar.
+    var resetWhen: String? {
+        reset.map { $0.formatted(date: .abbreviated, time: .shortened) }
+    }
 }
 struct LiveAccount: Codable, Identifiable {
     var id: String

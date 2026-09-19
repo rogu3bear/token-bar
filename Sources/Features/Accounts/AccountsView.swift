@@ -85,7 +85,7 @@ struct QuotaTrendCard: View {
     private var points: [QuotaPlotPoint] { QuotaPlotPoint.build(history + [quota], for: quota.id) }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(quota.name + " · " + (quota.minutes >= 1440 ? "\(quota.minutes / 1440) days" : "\(quota.minutes / 60) hours")).font(.headline)
+            Text(quota.name + " · " + quota.windowLabel).font(.headline)
             HStack(alignment: .firstTextBaseline) {
                 Text(String(format: "%.0f%%", max(0, 100 - quota.used))).font(PageStyle.title)
                 Text(current ? "remaining at last reading" : "remaining when last observed").font(.caption).foregroundStyle(.secondary)
@@ -98,7 +98,7 @@ struct QuotaTrendCard: View {
                         .foregroundStyle(accent).symbolSize(10)
                 }.chartYScale(domain: 0...100).chartLegend(.hidden).frame(height: 130)
             } else { Text("History begins with this reading. More samples will appear automatically.").font(.callout).foregroundStyle(.secondary).frame(minHeight: 90) }
-            Text(quota.reset.map { "Reset " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Reset unavailable").font(.caption).foregroundStyle(.secondary)
+            Text(quota.resetWhen.map { "Reset " + $0 } ?? "Reset unavailable").font(.caption).foregroundStyle(.secondary)
             if current {
                 let estimate = Runway.estimate(quota, samples: samples, now: evaluationDate ?? Date())
                 Text(estimate.message).font(.caption).foregroundStyle(.secondary)
