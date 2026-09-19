@@ -71,6 +71,7 @@ if [ -z "$ONLY" ] || [ "$ONLY" = "single-instance" ]; then
     xcrun swiftc -swift-version 5 "$SI" Tests/SingleInstance/main.swift -o build/tests/single-instance
     build/tests/single-instance "$SI"
     python3 Tests/SingleInstance/installer.py
+    python3 Tests/SingleInstance/postinstall.py
     python3 Tests/SingleInstance/release.py
 fi
 
