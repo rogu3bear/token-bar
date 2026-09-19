@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep idle Auto and the popover focused on measured Codex/Claude remaining, with no invented speed field; preserve working-only Now columns and each tool’s gauge alignment.
+- Share remaining and speed copy across Now, Accounts, the status item and VoiceOver. Apply the same account, source-failure and freshness checks before displaying allowance, while qualifying speed and reset time independently.
+
+## Unreleased
+
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 

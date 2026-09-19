@@ -65,29 +65,58 @@ struct MenuBarPresentation {
         func meter(_ tool: LiveTool) -> Tachometer { tool == .grok ? grok : tool == .claude ? claude : codex }
         let working = LiveTool.active(codex: codex, claude: claude, grok: grok)
         let tools = auto ? working : [selected]
-        func remainingZero(_ tool: LiveTool) -> Bool {
+        func remainingValue(_ tool: LiveTool) -> Double? {
             AccountAllowancePresentation(
                 quota: quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota),
                 now: now
-            ).measuredZero
+            ).estimate?.remaining
         }
         func appendQuota(_ result: NSMutableAttributedString, tools: [LiveTool]) {
             guard settings.enabled.contains(.quota) else { return }
             for tool in tools {
                 if auto && tool == .grok && !hasQuotaReading(.grok, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) { continue }
                 let text = values(settings, meter: meter(tool), monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota)[.quota] ?? ""
-                result.append(NSAttributedString(string: settings.separator + text,
+                let glue = result.length == 0 ? "" : settings.separator
+                result.append(NSAttributedString(string: glue + text,
                     attributes: [.foregroundColor: NSColor(tool.color(in: palette)), .font: NSFont.systemFont(ofSize: 12)]))
             }
         }
         if auto && working.isEmpty {
             var quiet = settings
             quiet.enabled.subtract([.rate, .dial, .activity, .zero, .fable, .fablePace])
-            // Claude at a measured-zero remaining is the one named idle-Auto exception, not a list to grow.
-            if remainingZero(.claude) {
+            let named = settings.enabled.contains(.quota) ? LiveTool.idleNamed(remaining: remainingValue) : []
+            if named.count == 1, let tool = named.first {
                 return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now,
-                                  accent: NSColor(LiveTool.claude.color(in: palette)),
-                                  tool: .claude, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+                                  accent: NSColor(tool.color(in: palette)),
+                                  tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+            }
+            if named.count > 1 {
+                quiet.enabled.remove(.risk)
+                let result = NSMutableAttributedString()
+                if quiet.enabled.contains(.icon) {
+                    var iconOnly = quiet
+                    iconOnly.enabled = [.icon]
+                    result.append(attributed(iconOnly, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
+                                             claudeQuota: claudeQuota, grokQuota: grokQuota))
+                }
+                var pieces = quiet
+                pieces.enabled.remove(.icon)
+                let glue = NSAttributedString(string: settings.separator, attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular),
+                    .foregroundColor: NSColor.labelColor
+                ])
+                for tool in named {
+                    if result.length > 0 { result.append(glue) }
+                    result.append(attributed(pieces, meter: Tachometer(), monitor: monitor, now: now,
+                                             accent: NSColor(tool.color(in: palette)),
+                                             tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota))
+                }
+                if settings.enabled.contains(.risk), let riskText {
+                    let join = result.length == 0 ? "" : settings.separator
+                    result.append(NSAttributedString(string: join + riskText,
+                        attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
+                }
+                return result
             }
             quiet.enabled.remove(.quota)
             return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
@@ -128,26 +157,24 @@ struct MenuBarPresentation {
         if tool == .grok { return grokQuota ?? ToolQuotaState() }
         if tool == .claude { return claudeQuota ?? ToolQuotaState() }
         let account = monitor.currentID.flatMap { monitor.state.accounts[$0] }
-        return ToolQuotaState(readings: account?.quotas ?? [], samples: monitor.state.samples)
+        return ToolQuotaState(readings: account?.quotas ?? [], samples: monitor.state.samples, guardAccountID: monitor.currentID)
     }
     static func hasQuotaReading(_ tool: LiveTool, monitor: LiveMonitor, now: Date, claudeQuota: ToolQuotaState?, grokQuota: ToolQuotaState? = nil) -> Bool {
         let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
-        return Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon) != nil
+        return AccountAllowancePresentation(quota: state, now: now).estimate != nil
     }
     static func values(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, labelQuota: Bool = true) -> [MenuBarPart: String] {
         let unit = RateUnit(rawValue: settings.unit) ?? meter.unit
         let amount = meter.rawRate * unit.multiplier
-        let formatted = unit != .second && amount >= 1_000
-            ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
-        let rate = meter.hasRate ? "~" + formatted : "—"
+        let rate = CompactLiveCopy.rate(meter.hasRate, amount: amount, unit: unit)
         let activity = meter.activity
         let counts = "\(activity.chatCount)c \(activity.agentCount)a"
             + (activity.unknownCount > 0 ? " \(activity.unknownCount)?" : "")
             + (activity.uncertain > 0 ? " \(activity.uncertain) unconfirmed" : "")
         let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
-        let quota = Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon)
-        let estimate = quota.map { Runway.estimate($0, samples: state.samples, now: now, horizon: state.horizon) }
-        let remaining = estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
+        let allowance = AccountAllowancePresentation(quota: state, now: now)
+        let estimate = allowance.estimate
+        let remaining = allowance.remaining
         let zero = estimate?.exhaustion.map { Runway.clockLabel($0, now: now) } ?? "—"
         // A single-tool title already establishes identity for all its fields.
         // Standalone quotas in Auto's mixed-tool readout still need their name.
@@ -158,12 +185,12 @@ struct MenuBarPresentation {
         let paceName = settings.enabled.contains(.fable) ? "" : "Fable "
         return [
             .icon: "◈", .activity: settings.compact && activity.readAt != nil ? counts : meter.status,
-            .rate: rate + " tok/" + unit.rawValue,
+            .rate: rate,
             .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
-            .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue,
+            .zero: "Zero " + zero, .dial: "Speed dial " + rate,
             .fable: {
                 guard let fable, fable.remaining > 0 else { return "" }
-                return String(format: "Fable %.0f%% · ", fable.remaining) + fable.binding
+                return "Fable " + CompactLiveCopy.percent(fable.remaining) + " · " + fable.binding
             }(),
             .fablePace: {
                 guard let pace else { return "" }
@@ -247,7 +274,7 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet when nothing is running, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
+                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet about rate when nothing is running. Idle Auto still names measured Codex and Claude remaining. Unused Codex zeros and idle Grok remaining stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
                 Picker("Rate units", selection: $preferences.configuration.unit) {
                     Text("Follow selected tool").tag("dashboard")
                     Text("Tokens / second").tag("s")

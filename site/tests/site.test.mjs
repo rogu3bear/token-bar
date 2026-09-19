@@ -15,6 +15,16 @@ test("unreleased installer cannot be advertised as a signed public download", as
     assert.equal(release.notarized, true);
   }
 });
+test("every local asset a page references exists in the public tree", async () => {
+  const { access } = await import("node:fs/promises");
+  for (const path of ["index.html", "feedback/index.html", "privacy/index.html", "terms/index.html"]) {
+    const html = await read(path);
+    for (const [, target] of html.matchAll(/(?:src|href|poster)="(\/[^"#?]+)/g)) {
+      if (target.endsWith("/")) continue;
+      await access(new URL(`../public${target}`, import.meta.url));
+    }
+  }
+});
 test("function invocations are restricted to API paths", async () => {
   assert.deepEqual(JSON.parse(await read("_routes.json")).include, ["/api/*"]);
 });

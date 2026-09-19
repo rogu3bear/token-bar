@@ -48,7 +48,6 @@ struct RateBounds: Equatable {
     var reportingCount = 0
     var hasRate = false
     var runningCount: Int { activity.running.count }
-    var speedText: String { hasRate ? "~" + String(format: "%.0f", displayedRate) : "—" }
     var status: String {
         if runningCount > 0 {
             let chats = activity.chatCount, agents = activity.agentCount

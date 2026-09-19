@@ -15,9 +15,22 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         active(codex: codex, claude: claude, grok: grok)
     }
-    /// Popover rows: working tools, plus unused Claude whose remaining is a measured zero.
+    /// Named remaining while nothing is working. Unused Codex/Grok zeros stay off;
+    /// Claude remaining is named even at a measured zero.
+    static func idleNamed(remaining: (LiveTool) -> Double?) -> [LiveTool] {
+        allCases.filter { tool in
+            guard let value = remaining(tool) else { return false }
+            switch tool {
+            case .claude: return true
+            case .codex: return value > 0
+            case .grok: return false
+            }
+        }
+    }
+    /// Popover rows: working tools, idle named remainings, and unused Claude at a measured zero.
     static func compact(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
         let working = Set(active(codex: codex, claude: claude, grok: grok))
+        if working.isEmpty { return idleNamed(remaining: remaining) }
         return allCases.filter { working.contains($0) || ($0 == .claude && remaining($0) == 0) }
     }
     /// Now columns: working tools while any are working; measured remainings only when idle.
@@ -133,8 +146,21 @@ enum CompactLiveCopy {
         let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
         return "~" + number + " tok/" + unit.rawValue
     }
+    /// Non-working rows keep remaining as the only large figure.
+    static func rateHeadline(activity: String, available: Bool, amount: Double, unit: RateUnit) -> String? {
+        guard activity == "Working" else { return nil }
+        return rate(available, amount: amount, unit: unit)
+    }
+    /// Spoken output follows the visible field; idle rows do not claim a missing speed.
+    static func spokenRate(activity: String, available: Bool, amount: Double, unit: RateUnit) -> String {
+        guard activity == "Working" else { return activity }
+        return activity + ", " + (available ? rate(true, amount: amount, unit: unit) : "rate unavailable")
+    }
+    static func percent(_ remaining: Double) -> String {
+        String(format: "%.0f%%", remaining)
+    }
     static func remaining(_ estimate: Runway?) -> String {
-        estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
+        estimate.map { percent($0.remaining) } ?? "—"
     }
     static func detail(reading: QuotaReading?, estimate: Runway?, now: Date) -> String {
         if let estimate {

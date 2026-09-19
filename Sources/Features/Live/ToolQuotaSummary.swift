@@ -17,12 +17,12 @@ struct ToolQuotaSummary: View {
             if !detailsOnly {
                 if embedded && !compact {
                     VStack(spacing: 8) {
-                        decisionValue("Remaining", text: estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—")
+                        decisionValue("Remaining", text: CompactLiveCopy.remaining(estimate))
                         decisionValue("Projected zero", text: estimate?.exhaustion.map { Runway.clockLabel($0, now: now) } ?? "—")
                     }
                 } else {
                     HStack(alignment: .top, spacing: 16) {
-                        value(tool.label + " remaining", text: estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—")
+                        value(tool.label + " remaining", text: CompactLiveCopy.remaining(estimate))
                         if !compact || estimate?.exhaustion != nil {
                             value("Projected zero", text: estimate?.exhaustion.map { Runway.clockLabel($0, now: now) } ?? "—")
                         }

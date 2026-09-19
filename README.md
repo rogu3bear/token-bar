@@ -6,15 +6,19 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar menu bar showing Codex estimated output speed in tok/s and remaining account allowance](site/public/menu-bar-demo.png)
 
+**Idle menu bar**
+
+![Token Bar menu bar while idle: named Codex and Claude remaining](site/public/menu-bar-idle.png)
+
 **Dashboard**
 
 ![Token Bar native dashboard showing estimated Codex output speed and account allowance](site/public/dashboard-demo.png)
 
 **Idle popover**
 
-![Token Bar popover while idle: no unused tools listed, Quota Guard, and saved Today history](site/public/popover-idle.png)
+![Token Bar popover while idle: named remaining, Quota Guard, and saved Today history](site/public/popover-idle.png)
 
-*Native Token Bar previews with synthetic sample data.*
+*Native previews of the current source candidate with synthetic sample data. The public installer below remains v0.1.9.*
 
 Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
@@ -28,10 +32,12 @@ saved measurements on your Mac and updates them as new records arrive.
 
 - **See what is working.** Active tools appear in the menu bar and dashboard,
   with estimated output rates labeled in tok/s, tok/m or tok/h. When nothing is
-  running, Auto stays quiet: unused tools stay off the menu bar and popover.
-- **Keep account allowance in view.** Supported account readings stay on Now,
-  with remaining quota, reset times and an estimated time to exhaustion when
-  enough observations exist. Unused remaining does not occupy Auto.
+  running, Auto stays quiet about speed: unused zeros stay off the menu bar and
+  popover.
+- **Keep account allowance in view.** Supported Codex and Claude remaining stays
+  on the menu bar and on Now, with reset times and an estimated time to
+  exhaustion when enough observations exist. Unused Codex zeros and idle Grok
+  remaining stay off Auto.
 - **Explore saved history.** Filter by tool, task, model, project, account or day;
   export the matching records to CSV.
 - **Pick up where you left off.** Collected data persists between launches.

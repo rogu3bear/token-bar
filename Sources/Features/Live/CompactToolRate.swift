@@ -11,16 +11,15 @@ struct CompactToolRate: View {
     var body: some View {
         let allowance = AccountAllowancePresentation(quota: quota, now: now)
         let activity = CompactLiveCopy.activity(meter)
-        let idle = activity == "Idle"
         CompactToolFace(
             title: tool.label,
             tint: accent,
-            rate: idle ? "Idle" : CompactLiveCopy.rate(meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
+            rate: CompactLiveCopy.rateHeadline(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             activity: activity,
             remaining: allowance.remaining,
             remainingAvailable: allowance.estimate != nil,
             detail: expanded ? allowance.detail : allowance.estimate == nil ? allowance.qualifier : nil,
-            accessibilityRate: activity + ", " + (meter.hasRate ? meter.speedText + " per " + meter.unit.label : "rate unavailable"),
+            accessibilityRate: CompactLiveCopy.spokenRate(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             expanded: expanded
         )
     }
@@ -30,7 +29,7 @@ private struct CompactToolFace: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var title: String
     var tint: Color
-    var rate: String
+    var rate: String?
     var activity: String
     var remaining: String
     var remainingAvailable: Bool
@@ -40,22 +39,32 @@ private struct CompactToolFace: View {
     var body: some View {
         chrome(content: numbers)
     }
+    private var remainingNumber: some View {
+        Text(remaining).font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
+            .contentTransition(.numericText())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: remaining)
+            .foregroundStyle(remainingAvailable ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
+            .frame(minWidth: 44, alignment: .trailing)
+    }
     private var numbers: some View {
         HStack(spacing: 10) {
             Circle().fill(tint).frame(width: 8, height: 8)
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(tint)
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(rate).font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: rate)
-                if activity != "Idle" { Text(activity + (rate == "—" ? " · rate unavailable" : "")).font(.caption).foregroundStyle(.secondary) }
+            if let rate {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(rate).font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: rate)
+                    Text(activity + (rate == "—" ? " · rate unavailable" : "")).font(.caption).foregroundStyle(.secondary)
+                }
+                remainingNumber
+            } else {
+                VStack(alignment: .trailing, spacing: 2) {
+                    remainingNumber
+                    Text(activity).font(.caption).foregroundStyle(.secondary)
+                }
             }
-            Text(remaining).font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: remaining)
-                .foregroundStyle(remainingAvailable ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
-                .frame(minWidth: 44, alignment: .trailing)
         }
     }
     private func chrome<Content: View>(content: Content) -> some View {
@@ -67,7 +76,7 @@ private struct CompactToolFace: View {
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title + ", " + accessibilityRate + ", " + remaining + " remaining" + (detail.map { ", " + $0 } ?? ""))
+        .accessibilityLabel(title + ", " + accessibilityRate + ", " + (remainingAvailable ? remaining + " remaining" : "remaining unavailable") + (detail.map { ", " + $0 } ?? ""))
         .accessibilityValue(expanded ? "Expanded" : "Collapsed")
         .accessibilityHint(expanded ? "Hides remaining details" : "Shows remaining details")
         .accessibilityAddTraits(.isButton)
