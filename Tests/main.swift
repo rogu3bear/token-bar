@@ -1130,3 +1130,16 @@ do {
 }
 if !continuityFailures.isEmpty { fflush(stdout); exit(1) }
 print("PASS: Codex scan continuity live/history matrix, disjoint interval recovery, legacy no-anchor resumption, aliases, races, account boundaries and checkpoint restarts")
+
+do {
+    let zulu = EventTime.parse("2026-09-12T12:00:00Z")
+    assert(zulu != nil && zulu?.ISO8601Format() == "2026-09-12T12:00:00Z", "Plain Z timestamps must parse")
+    let fractional = EventTime.parse("2026-09-07T12:00:00.123Z")
+    assert(fractional != nil && EventTime.parse("2026-09-07T12:00:00.123Z" as Any?) == fractional, "Fractional stamps parse from strings and JSON values")
+    assert(EventTime.parse("2026-09-12T02:00:40+00:00") != nil, "Offset timestamps must parse")
+    assert(ProviderUsage.dayDate("2026-09-09")?.ISO8601Format() == "2026-09-09T00:00:00Z", "Provider day bounds use the same parser")
+    assert(EventTime.parse("not a date") == nil)
+    assert(EventTime.parse(nil as Any?) == nil)
+    assert(EventTime.parse(1 as Any?) == nil)
+}
+print("PASS: event timestamps share one ISO-8601 parse; missing stamps stay unavailable")

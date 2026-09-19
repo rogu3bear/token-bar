@@ -104,17 +104,7 @@ enum ClaudeCodeUsage {
         return result
     }
 
-    private static let iso: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    private static let plainISO = ISO8601DateFormatter()
-
-    static func date(_ raw: Any?) -> Date? {
-        guard let value = raw as? String else { return nil }
-        return iso.date(from: value) ?? plainISO.date(from: value)
-    }
+    static func date(_ raw: Any?) -> Date? { EventTime.parse(raw) }
 
     private static func branch(_ raw: Any?) -> String? {
         guard let value = raw as? String else { return nil }

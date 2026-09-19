@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Process-local fixture settings. Never installed in the user's preferences.
 enum PreviewFixture {
-    static let date = ISO8601DateFormatter().date(from: "2026-09-12T12:00:00Z")!
+    static let date = EventTime.parse("2026-09-12T12:00:00Z")!
     static func prepare() {
         setenv("TZ", "UTC", 1)
         tzset()
