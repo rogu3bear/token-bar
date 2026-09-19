@@ -190,8 +190,7 @@ final class PromptIndex {
                     for value in fact.languages { analysis.languages[value.label, default: 0] += value.count }
                     for value in fact.typos { analysis.typos[value.label, default: 0] += value.count }
                     for value in fact.verbs { analysis.verbs[value.label, default: 0] += value.count }
-                    let hour = Calendar.current.component(.hour, from: fact.date)
-                    analysis.hours[String(format: "%02d:00–%02d:00", hour, (hour + 1) % 24), default: 0] += 1
+                    analysis.hours[InsightAnalysis.hourBucket(fact.date), default: 0] += 1
                     if let key = fact.repeatKey { analysis.repeats[key, default: 0] += 1; repeatSources[key] = (path, fact) }
                 }
                 if chat.offset != chat.stamp.size { skipped += 1 }

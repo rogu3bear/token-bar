@@ -5,7 +5,9 @@ import Combine
 @Observable final class InsightsModel {
     private(set) var state = PromptReadState()
     var busy: Bool { state.loading }
-    private let queue = DispatchQueue(label: "local.codex-token-bar.insights", qos: .background, autoreleaseFrequency: .workItem)
+    /// Utility, not background: an open Insights page is on-screen work. Background
+    /// QoS can wait for process idle, so the read never leaves "Reading…".
+    private let queue = DispatchQueue(label: "local.codex-token-bar.insights", qos: .utility, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var nextRead = Date.distantPast
     private let clock: () -> Date
     private let index: PromptIndex

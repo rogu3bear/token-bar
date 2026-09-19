@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give Insights hour-of-day labels one bucket face. The live sample and the checkpointed read can no longer disagree on `23:00–00:00`.
+- Run Insights reads at utility QoS so an open Insights page can finish instead of waiting for process-idle background work.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 

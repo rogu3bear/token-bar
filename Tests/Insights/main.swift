@@ -89,20 +89,24 @@ readState.succeed(r)
 assert(!readState.failed && readState.result?.prompts == r.prompts)
 print("PASS: unavailable, loading, first failure, successful zero, partial sample, retained age, failed refresh and recovery")
 
-@MainActor func awaitRead(_ model: InsightsModel) async {
-    let deadline = Date().addingTimeInterval(5)
-    while model.busy && Date() < deadline { try? await Task.sleep(nanoseconds: 10_000_000) }
+func waitUntil(_ deadline: Date, _ ready: () -> Bool) {
+    while !ready() && Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+}
+func awaitRead(_ model: InsightsModel) {
+    waitUntil(Date().addingTimeInterval(5)) { !model.busy }
     assert(!model.busy, "The synthetic reader must complete")
 }
 let readModel = InsightsModel()
 let absentHome = folder.appendingPathComponent("absent")
-readModel.refresh(home: absentHome, force: true); await awaitRead(readModel)
+readModel.refresh(home: absentHome, force: true); awaitRead(readModel)
 assert(readModel.state.failed && readModel.state.result == nil)
-readModel.refresh(home: folder, force: true); await awaitRead(readModel)
+readModel.refresh(home: folder, force: true); awaitRead(readModel)
 assert(readModel.state.completed && !readModel.state.failed)
 let retainedPrompts = readModel.state.result!.prompts
 let retainedDate = readModel.state.result!.readAt
-readModel.refresh(home: absentHome, force: true); await awaitRead(readModel)
+readModel.refresh(home: absentHome, force: true); awaitRead(readModel)
 assert(readModel.state.failed && readModel.state.result?.prompts == retainedPrompts && readModel.state.result?.readAt == retainedDate)
 print("PASS: asynchronous model first-read failure, successful reader recovery and stale retained result")
 
@@ -122,19 +126,19 @@ print("PASS: exact sampled-file progress includes unreadable files and advances 
 // Automatic retries share the success cooldown; a failed catalog never loops on every update.
 var lazyNow = Date()
 let lazyModel = InsightsModel(clock: { lazyNow })
-lazyModel.refresh(home: absentHome); await awaitRead(lazyModel)
+lazyModel.refresh(home: absentHome); awaitRead(lazyModel)
 assert(lazyModel.state.failed)
 lazyModel.refresh(home: folder)
 assert(!lazyModel.busy && lazyModel.state.failed, "Automatic failure retry must wait")
 lazyNow = lazyNow.addingTimeInterval(301)
-lazyModel.refresh(home: folder); await awaitRead(lazyModel)
+lazyModel.refresh(home: folder); awaitRead(lazyModel)
 assert(lazyModel.state.completed && !lazyModel.state.failed)
 let lazyDate = lazyModel.state.result!.readAt
 assert(lazyDate == lazyNow, "Injected evaluation clock must reach the completed read timestamp")
 lazyModel.refresh(home: absentHome)
 assert(!lazyModel.busy && lazyModel.state.result?.readAt == lazyDate, "Completed results stay usable without a reread")
 lazyNow = lazyNow.addingTimeInterval(301)
-lazyModel.refresh(home: absentHome); await awaitRead(lazyModel)
+lazyModel.refresh(home: absentHome); awaitRead(lazyModel)
 assert(lazyModel.state.failed && lazyModel.state.result?.readAt == lazyDate)
 print("PASS: quiet automatic refresh, failure cooldown, eventual retry and retained-result age")
 
@@ -205,13 +209,13 @@ print("PASS: partial-tail restart, complete-line admission and per-file replacem
 
 let warmModel = InsightsModel(storageURL: indexDirectory, home: folder)
 let restoreDeadline = Date().addingTimeInterval(3)
-while warmModel.state.result == nil && Date() < restoreDeadline { try? await Task.sleep(nanoseconds: 10_000_000) }
+waitUntil(restoreDeadline) { warmModel.state.result != nil }
 assert(warmModel.state.result?.prompts == added.prompts && !warmModel.busy, "Saved numeric insights appear before source work")
 for i in 0..<3 {
     try FileManager.default.moveItem(at: folder.appendingPathComponent("log\(i).jsonl"),
                                     to: folder.appendingPathComponent("log\(i).unavailable"))
 }
-warmModel.refresh(home: folder, force: true); await awaitRead(warmModel)
+warmModel.refresh(home: folder, force: true); awaitRead(warmModel)
 assert(warmModel.state.failed && warmModel.state.result?.prompts == added.prompts)
 let afterUnavailable = try PromptIndex(directory: indexDirectory).restoreSummary(home: folder)
 assert(afterUnavailable?.prompts == added.prompts, "An unreadable refresh must not overwrite durable successful results with empty data")
@@ -273,7 +277,14 @@ assert(afterRecovery.bytesRead == 0, "Write recovery persists retained facts wit
 let summaryObstruction = blockedCache.appendingPathComponent("summary.json")
 try FileManager.default.createDirectory(at: summaryObstruction, withIntermediateDirectories: false)
 let summaryFailureModel = InsightsModel(clock: { now }, storageURL: blockedCache, home: folder)
-summaryFailureModel.refresh(home: folder, force: true); await awaitRead(summaryFailureModel)
+summaryFailureModel.refresh(home: folder, force: true); awaitRead(summaryFailureModel)
 assert(!summaryFailureModel.state.failed && matchesReadable(summaryFailureModel.state.result!))
 assert(summaryFailureModel.state.result?.cacheWarning?.contains("summary could not be saved") == true)
 print("PASS: corrupt/incompatible checkpoints rebuild one chat; failed cache writes retain results and retry without replay; summary write failure stays separate from source availability")
+
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(secondsFromGMT: 0)!
+assert(InsightAnalysis.hourBucket(Date(timeIntervalSince1970: 0), calendar: utc) == "00:00–01:00")
+assert(InsightAnalysis.hourBucket(Date(timeIntervalSince1970: 23 * 3600), calendar: utc) == "23:00–00:00")
+assert(InsightAnalysis.hourBucket(Date(timeIntervalSince1970: 12 * 3600), calendar: utc) == "12:00–13:00")
+print("PASS: Insights hour buckets pad hours and wrap midnight")
