@@ -63,10 +63,7 @@ enum DataStatePreview {
             let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host
             host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.5)); host.layoutSubtreeIfNeeded()
-            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-            AppearanceRendering.capture(host, to: bitmap)
-            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-            try png.write(to: directory.appendingPathComponent(surface + "-" + name + ".png"))
+            try PreviewModelScope.png(host, to: directory.appendingPathComponent(surface + "-" + name + ".png"))
             window.close()
             }
         }
