@@ -9,7 +9,7 @@ enum FirstRunAccess {
 
 struct LocalAccessExplanation: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             explanation("Local history", "Reads supported tool logs on this Mac and saves token counts in your Application Support folder. Source logs are not changed. Prompt patterns save derived statistics and checkpoints for a limited Codex sample; prompt text stays in memory.")
             explanation("Account allowance", "Uses your installed Codex app-server and Grok agent with existing sign-ins for account and quota readings. Claude remaining comes from Claude Code itself: its usage cache, and its status line after every turn once you choose Connect Claude Code. These tools may contact their services. Claude quota comes from its local cache. You do not enter passwords or API keys here.")
             explanation("Permissions", "Token Bar does not require Accessibility, Screen Recording, or Full Disk Access for its standard locations. If macOS asks for file access, allow only the folder you intend to read. Unreadable sources remain unavailable.")
@@ -30,23 +30,23 @@ struct FirstRunWelcome: View {
     var start: () -> Void
     var quit: () -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: PageStyle.section) {
             Text("Welcome to Token Bar").font(.system(size: 26, weight: .semibold, design: .rounded))
             Text("Token Bar reads local tool history and saves usage counts on this Mac. Account allowance uses existing Codex and Grok sign-ins; those tools may contact their services. No passwords or API keys are needed here.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button { showPrivacy = true } label: { Text("Data & privacy").foregroundStyle(accent) }.buttonStyle(.link)
                 .popover(isPresented: $showPrivacy) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: PageStyle.related) {
                         LocalAccessExplanation()
                         HStack { Spacer(); Button("Done") { showPrivacy = false }.keyboardShortcut(.defaultAction) }
-                    }.padding(24).frame(width: 520).onExitCommand { showPrivacy = false }
+                    }.padding(PageStyle.section).frame(width: 520).onExitCommand { showPrivacy = false }
                 }
             HStack {
                 Button("Quit", action: quit).keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Start local monitoring", action: start).keyboardShortcut(.defaultAction)
             }
-        }.padding(28).frame(width: 600)
+        }.padding(PageStyle.gutter).frame(width: 600)
             .background(Color(nsColor: .windowBackgroundColor))
     }
     @MainActor static func present() -> Bool {
