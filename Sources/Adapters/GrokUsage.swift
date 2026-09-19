@@ -49,7 +49,9 @@ enum GrokUsage {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: trimmed)
     }
-    /// Map Grok counters onto Codex's split. Missing keys stay absent rather than invented zeros.
+    /// Map Grok counters onto Codex's split. A reported total that equals
+    /// input+cache+output uses TokenConvention.cacheBesideInput; missing keys
+    /// stay absent rather than invented zeros.
     static func tokens(_ json: [String: Any]) -> (Tokens, [String]) {
         var raw: [String: Any] = [:]
         if let value = int(json, "inputTokens", "input_tokens") { raw["input_tokens"] = value }
@@ -67,7 +69,16 @@ enum GrokUsage {
         if let total = int(json, "totalTokens", "total_tokens") {
             let cached = tokens.cached, writes = tokens.cacheWrite ?? 0
             if total == tokens.input + cached + writes + tokens.output, total != tokens.input + tokens.output {
-                tokens.input += cached + writes
+                let recordedWrite = tokens.cacheWrite
+                tokens = Tokens.canonical(
+                    input: tokens.input,
+                    cacheRead: cached,
+                    cacheWrite: recordedWrite ?? 0,
+                    output: tokens.output,
+                    reasoning: tokens.reasoning,
+                    convention: .cacheBesideInput)
+                // Missing cache-write stays unavailable; a recorded zero stays a recorded zero.
+                tokens.cacheWrite = recordedWrite
             }
         }
         return (tokens, UsageMetadata.fields.filter { raw[$0] as? Int != nil })
