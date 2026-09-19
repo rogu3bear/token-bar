@@ -16,7 +16,7 @@ struct AccountsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Accounts & plans", subtitle: "Supported account observations: Codex. Claude’s current cached quota appears on Now; Claude account and plan history is not available here.") {
+                PageHeader(.accounts, subtitle: "Supported account observations: Codex. Claude’s current cached quota appears on Now; Claude account and plan history is not available here.") {
                     if monitor.busy { ProgressView().controlSize(.small) }
                 }
                 if let error = monitor.error { ErrorNotice(message: error) }

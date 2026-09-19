@@ -71,7 +71,7 @@ struct HistoryView: View {
         }
     }
     private var header: some View {
-        PageHeader("History", subtitle: model.snapshot.historyImportedAt.map { "Local history checked " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Local history is being gathered automatically") {
+        PageHeader(.history, subtitle: model.snapshot.historyImportedAt.map { "Local history checked " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Local history is being gathered automatically") {
             Button("Refresh history") { model.refresh(history: true) }.disabled(model.busy)
             Button("Export CSV") { model.export() }.disabled(model.filtering || model.busy)
         }

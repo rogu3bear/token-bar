@@ -14,7 +14,7 @@ struct LiveOverview: View {
         Group {
             ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Now") {
+                PageHeader(.now) {
                     if monitor.busy { ProgressView().controlSize(.small) }
                 }
                 QuotaGuardSummary(coordinator: model.quotaGuard)

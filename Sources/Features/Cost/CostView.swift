@@ -55,7 +55,7 @@ struct CostView: View {
         .sheet(isPresented: $showMethod) { method }
     }
     private var header: some View {
-        PageHeader("Cost", subtitle: "What the selected usage is worth under these pricing assumptions.") {
+        PageHeader(.cost, subtitle: "What the selected usage is worth under these pricing assumptions.") {
             Button("Recover details") { model.refresh(history: true, recoverCosts: true) }.disabled(model.busy)
             Button("Export CSV") { model.exportCosts() }.disabled(model.filtering || model.busy || report.lines.isEmpty)
             MethodButton(title: "How cost is calculated") { showMethod = true }
