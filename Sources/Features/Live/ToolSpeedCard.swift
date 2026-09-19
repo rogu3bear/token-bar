@@ -20,12 +20,17 @@ struct ToolSpeedHeader: View {
             RateReadout(measured: meter.rawRate, hasRate: meter.hasRate, unit: $meter.unit, size: rateSize)
             Text(meter.hasRate ? "Estimated · \(meter.reportingCount) of \(meter.runningCount) reporting" : "Speed unavailable")
                 .font(.caption).foregroundStyle(.secondary)
-            if let date = meter.lastReport {
-                Text("Rate report " + date.formatted(date: .omitted, time: .standard))
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("No current rate report").font(.caption).foregroundStyle(.secondary)
-            }
+            Group {
+                if let date = meter.lastReport {
+                    HStack(spacing: 4) {
+                        Text("Rate report")
+                        RelativeAgeText(date: date)
+                        Text("ago")
+                    }
+                } else {
+                    Text(RateReportCopy.missing)
+                }
+            }.font(.caption).foregroundStyle(.secondary)
         }.accessibilityElement(children: .contain)
             .accessibilityLabel(tool.label + " activity and speed")
             .sheet(isPresented: $showActivity) {

@@ -73,3 +73,11 @@ struct ReportMagnitudeStyle: ProgressViewStyle {
         }.frame(height: 10)
     }
 }
+
+/// Now speed freshness. A missing report is not an invented clock.
+enum RateReportCopy {
+    static let missing = "No current rate report"
+    static func caption(_ date: Date, now: Date) -> String {
+        "Rate report " + RelativeAgeText.label(from: date, to: now) + " ago"
+    }
+}
