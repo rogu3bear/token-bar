@@ -21,6 +21,21 @@ func entry(input: Int = 100, cached: Int = 10, output: Int = 20, reasoning: Int 
 check(Integrity.violations(entry(), fingerprint: good).isEmpty, "a well-formed record must be admissible")
 print("PASS: a well-formed record passes every invariant")
 
+do {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-private-cache-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let url = folder.appendingPathComponent("cache.json")
+    try PrivateCache.write(Data("secret".utf8), to: url)
+    let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as! NSNumber
+    check(permissions.intValue == 0o600, "Published private cache must be 0600, not chmod after a world-readable write")
+    let body = try String(contentsOf: url, encoding: .utf8)
+    check(body == "secret", "Published bytes must match")
+    let leftovers = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasPrefix(".pending-") }
+    check(leftovers.isEmpty, "A successful publish must not leave the pending file")
+}
+print("PASS: private cache publish is 0600 without a leftover pending file")
+
 // Each invariant refuses its own violation ---------------------------------
 func refuses(_ row: Entry, _ expected: IntegrityViolation, _ fingerprint: String = good) -> Bool {
     Integrity.violations(row, fingerprint: fingerprint).contains(expected)
