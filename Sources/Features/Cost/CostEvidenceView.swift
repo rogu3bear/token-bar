@@ -17,13 +17,13 @@ struct CostEvidenceView: View {
                 ForEach(coverage.dimensions) { dimension in
                     GridRow {
                         Text(dimension.title)
-                        Text(dimension.tokenFraction(total: coverage.totalTokens).map { String(format: "%.2f%%", $0 * 100) } ?? "—")
+                        Text(CostPricing.percent(dimension.tokenFraction(total: coverage.totalTokens)))
                         Text("\(dimension.knownRecords.formatted()) / \(coverage.records.formatted())")
                     }
                 }
                 GridRow {
                     Text("Price available")
-                    Text(model.costReport.coverage.map { String(format: "%.2f%%", $0 * 100) } ?? "—")
+                    Text(model.costReport.coverageText)
                     Text("Depends on date, model, fields and chosen service")
                 }
             }.font(.callout).monospacedDigit()

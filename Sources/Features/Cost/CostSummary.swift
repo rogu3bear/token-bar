@@ -28,7 +28,7 @@ struct CostSummary: View {
             }
             HStack(alignment: .top, spacing: PageStyle.related) {
                 metric("ESTIMATED API EQUIVALENT", report.hasPricedRecords ? CostPricing.dollars(report.amounts.total) : "—", "USD · API equivalent")
-                metric("PRICING COVERAGE", report.coverage.map { String(format: "%.1f%%", $0 * 100) } ?? "—",
+                metric("PRICING COVERAGE", report.coverageText,
                        report.calculatedAt == nil ? "Awaiting calculation" : report.lines.isEmpty ? "No selected usage" : "\(compact(report.unpricedTokens)) tokens unpriced")
                 metric("UNKNOWN REASONING LEVEL", report.lines.isEmpty ? "—" : compact(report.unknownEffortTokens), "tokens with no recorded effort")
             }

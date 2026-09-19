@@ -17,7 +17,7 @@ struct CostOutputComparison: View {
                               value: output.inputPerOutput.map { NSDecimalNumber(decimal: $0).doubleValue.formatted(.number.precision(.fractionLength(2))) + "×" } ?? "—",
                               detail: "Includes cached input · same records")
             }
-            Text("\(compact(output.output)) output tokens priced · \(compact(output.unpricedOutput)) output tokens unpriced · \(output.outputCoverage.map { String(format: "%.1f%%", $0 * 100) } ?? "—") of recorded output priced")
+            Text("\(compact(output.output)) output tokens priced · \(compact(output.unpricedOutput)) output tokens unpriced · \(CostPricing.percent(output.outputCoverage)) of recorded output priced")
                 .font(.caption).foregroundStyle(.secondary)
             if output.missingOutputRecords > 0 {
                 Text("\(output.missingOutputRecords.formatted()) records have no output counter and are excluded from output coverage.")
@@ -53,7 +53,7 @@ struct CostOutputComparison: View {
                             Text(day.date.formatted(date: .abbreviated, time: .omitted))
                             Text(day.output.usdPerMillionOutput.map(CostPricing.dollars) ?? "—")
                             Text(compact(day.output.output))
-                            Text(day.output.outputCoverage.map { String(format: "%.1f%%", $0 * 100) } ?? "—")
+                            Text(CostPricing.percent(day.output.outputCoverage))
                         }
                     }
                 }.font(.callout).monospacedDigit().padding(.top, 8)
