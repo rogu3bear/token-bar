@@ -19,17 +19,13 @@ struct UsageInsightsView: View {
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recorded output change").font(.headline)
-                    if let change = summary.outputChangePercent {
-                        Text(change == 0 ? "Unchanged between recorded periods" :
-                                String(format: "%.1f%% %@ the prior period", abs(change), change > 0 ? "above" : "below"))
-                            .font(.title2).monospacedDigit()
-                        Text("\(compact(summary.recentOutput)) output tokens in the last seven full days · \(compact(summary.previousOutput)) in the preceding seven.")
-                    } else if summary.recentRecords == 0 || summary.previousRecords == 0 {
-                        Text("Comparison unavailable: one or both periods have no local records.")
-                    } else if summary.comparisonMissingOutput > 0 {
-                        Text("Comparison unavailable: \(summary.comparisonMissingOutput.formatted()) records lack explicit output counters.")
+                    if case .changed = summary.outputChangeClaim {
+                        Text(summary.outputChangeHeadline(compactTokens: compact)).font(.title2).monospacedDigit()
+                        if let evidence = summary.outputChangeEvidence(compactTokens: compact) {
+                            Text(evidence)
+                        }
                     } else {
-                        Text("\(compact(summary.recentOutput)) recorded output tokens after a prior period with zero recorded output. A percentage change is undefined.")
+                        Text(summary.outputChangeHeadline(compactTokens: compact))
                     }
                     Text("Two complete seven-day periods ending yesterday. This compares recorded output, not productivity or quota burn. Missing logs and changes in source coverage can affect the comparison.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -37,12 +33,11 @@ struct UsageInsightsView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Context utilization evidence").font(.headline)
-                    if let peak = summary.peakContext {
-                        Text(String(format: "Highest measured request occupancy: %.0f%%", peak * 100))
-                            .font(.title3).monospacedDigit()
-                        Text("\(summary.contextSamples.formatted()) of \(summary.report.entries.count.formatted()) records contain measurable request context. This is a recorded maximum, not an anomaly threshold or a forecast.")
+                    if case .measured = summary.peakContextClaim {
+                        Text(summary.peakContextHeadline).font(.title3).monospacedDigit()
+                        if let evidence = summary.peakContextEvidence { Text(evidence) }
                     } else {
-                        Text("Context utilization unavailable: no records contain both request input and a known context window.")
+                        Text(summary.peakContextHeadline)
                     }
                     Text("Last 30 days. Records without measurable context remain in usage totals; they cannot establish context occupancy.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -55,9 +50,7 @@ struct UsageInsightsView: View {
                     if let first = summary.earliest {
                         Text("Available records begin " + first.formatted(date: .abbreviated, time: .omitted) + ".")
                     }
-                    if let share = summary.cacheShare {
-                        Text(String(format: "%.1f%% of recorded input was cached. Cached input is included in input; this is not a cost-savings estimate.", share * 100))
-                    }
+                    if let caption = summary.cacheShareCaption { Text(caption) }
                     ProvenanceNotice(provenance: .deduplicated, notices: notices)
                     ProvenanceNotice(provenance: .converted, notices: notices)
                     Text("Usage totals count processing passes, not unique written text. Cached input is part of input and reasoning is part of output.")

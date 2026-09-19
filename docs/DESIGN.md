@@ -588,7 +588,7 @@ Insights owns derived changes and evidence conditions, not another usage browser
 | --- | --- | --- |
 | Insights usage timeline vs History timeline (`UsageInsightsView`) | REMOVE from Insights | History already supports period, measure and tool scope; the second chart added no inference. |
 | Insights top working directories vs History project comparison (`UsageInsightsView`) | REMOVE from Insights | Project attribution is a distribution question; History retains it with unattributed usage. |
-| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. No percentage for missing periods, unknown output counters or a zero baseline. |
+| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. `UsageInsightsSummary` owns the claim: no percentage for missing periods, unknown output counters or a zero baseline; the view only renders it. |
 | Insights active days and busiest day (`UsageInsightsView`) | REMOVE | Descriptive summaries of the same History series, without evidence of an unusual condition. |
 | Insights peak context in counting details (`UsageInsightsView`) | MOVE to main evidence section | Known request context and its measurable-record count help interpret coverage. A maximum does not establish anomaly or predict exhaustion. |
 | Insights cached-input share (`UsageInsightsView`) | MOVE to counting details | Mechanism/context, not a primary insight or a savings claim. |
