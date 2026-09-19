@@ -10,11 +10,15 @@ import hashlib
 import json
 import plistlib
 import shlex
+import sys
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import uuid
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bundle_layout import EXECUTABLE_NAME, built_app, built_executable
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("output", type=Path, help="New disposable .app path")
@@ -29,12 +33,12 @@ if args.accounts:
     preview_arguments = ["--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "populated",
                          "--sample-spark-accounts", "--sample-account-history"]
 root = Path(__file__).resolve().parent.parent
-source = root / "build/Token Bar.app"
+source = built_app(root)
 output = args.output.absolute()
 receipt = output.with_suffix(".receipt.json")
 if output.suffix != ".app" or output.exists() or output.is_symlink() or receipt.exists() or receipt.is_symlink():
     parser.error("Output must be a new .app path with no existing receipt")
-binary = source / "Contents/MacOS/TokenBar"
+binary = built_executable(root)
 subprocess.run(["codesign", "--verify", "--deep", "--strict", str(source)], check=True)
 identity = "local.star.TokenBarPreview." + uuid.uuid4().hex
 shutil.copytree(source, output)
@@ -46,18 +50,18 @@ launcher = output / "Contents/MacOS/PreviewLauncher"
 launcher.write_text('''#!/bin/sh
 set -eu
 preview_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$preview_dir/TokenBar" ''' + shlex.join(preview_arguments) + "\n")
+exec "$preview_dir/''' + EXECUTABLE_NAME + '''" ''' + shlex.join(preview_arguments) + "\n")
 launcher.chmod(0o755)
 # The copied Mach-O's signature bound the original Info.plist. Reseal this
 # disposable copy after changing the bundle identity, then sign its launcher.
-fixture_binary = output / "Contents/MacOS/TokenBar"
+fixture_binary = output / "Contents/MacOS" / EXECUTABLE_NAME
 subprocess.run(["codesign", "--force", "--sign", "-", str(fixture_binary)], check=True)
 subprocess.run(["codesign", "--force", "--sign", "-", str(output)], check=True)
 subprocess.run(["codesign", "--verify", "--deep", "--strict", str(output)], check=True)
 sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
 def unsigned_sha(path):
     with tempfile.TemporaryDirectory(prefix="tokenbar-preview-signature-") as directory:
-        copy = Path(directory) / "TokenBar"
+        copy = Path(directory) / EXECUTABLE_NAME
         shutil.copy2(path, copy)
         subprocess.run(["codesign", "--remove-signature", str(copy)], check=True)
         return sha(copy)

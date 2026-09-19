@@ -15,6 +15,9 @@ import sys
 import subprocess
 import xml.etree.ElementTree as ET
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bundle_layout import BUNDLE_NAME, payload_executable
+
 PAGE = 0x4000
 # A signature is kilobytes; anything beyond this is not signing residue.
 SIGNATURE_SLACK = 0x100000
@@ -55,7 +58,7 @@ def inventory(root):
     result = {}
     for path in sorted(root.rglob('*')):
         relative = path.relative_to(root)
-        if relative.parts[:3] == ('Token Bar.app', 'Contents', '_CodeSignature'):
+        if relative.parts[:3] == (BUNDLE_NAME, 'Contents', '_CodeSignature'):
             continue
         mode = path.lstat().st_mode
         kind = stat.S_IFMT(mode)
@@ -87,9 +90,9 @@ def compare(left, right):
     for root in (left, right):
         if {p.name for p in root.iterdir()} - allowed:
             raise ValueError('Unexpected package component')
-        if not (root / 'Payload/Token Bar.app/Contents/MacOS/TokenBar').is_file():
+        if not payload_executable(root).is_file():
             raise ValueError('Expected Token Bar executable is missing')
-        if {p.name for p in (root / 'Payload').iterdir()} != {'Token Bar.app'}:
+        if {p.name for p in (root / 'Payload').iterdir()} != {BUNDLE_NAME}:
             raise ValueError('Unexpected top-level payload')
     for part in ('Payload', 'Scripts'):
         a, b = inventory(left / part), inventory(right / part)
@@ -99,7 +102,7 @@ def compare(left, right):
     def bom(root):
         # Size, checksum and mtime vary with signing/build time. Ownership and modes do not.
         return sorted(line for line in subprocess.check_output(['lsbom', '-p', 'fmug', str(root / 'Bom')], text=True).splitlines()
-                      if Path(line.split('\t')[0]).parts[:3] != ('Token Bar.app', 'Contents', '_CodeSignature'))
+                      if Path(line.split('\t')[0]).parts[:3] != (BUNDLE_NAME, 'Contents', '_CodeSignature'))
     if bom(left) != bom(right):
         raise ValueError('Installer bill-of-materials paths, modes or ownership differ')
     if package_info(left / 'PackageInfo') != package_info(right / 'PackageInfo'):

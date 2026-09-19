@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 output=${1:?Usage: bash scripts/verify-product-previews.sh new-output-directory}
 [[ ! -e "$output" ]] || { echo 'Output directory must be new' >&2; exit 1; }
 mkdir -p "$output/first" "$output/second"
-binary='build/Token Bar.app/Contents/MacOS/TokenBar'
+binary=$(python3 scripts/bundle_layout.py executable)
 for pass in first second; do
   "$binary" --render-preview "$output/$pass/now.png"
   "$binary" --render-cost-preview "$output/$pass/cost.png"
