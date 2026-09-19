@@ -11,14 +11,7 @@ struct ProvenanceBadge: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let badge = provenance.badge {
-                Text(badge)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(.quaternary, in: Capsule())
-                    .accessibilityLabel("Approximate")
-            }
+            ProvenanceApproxMark(provenance: provenance)
             Button { showing.toggle() } label: {
                 Image(systemName: "questionmark.circle")
                     .font(.caption)
@@ -35,6 +28,21 @@ struct ProvenanceBadge: View {
                 .padding(16).frame(width: 320)
                 .textSelection(.enabled)
             }
+        }
+    }
+}
+
+/// The approx. capsule. Only approximate figures render it; VoiceOver says Approximate, not the abbreviation.
+struct ProvenanceApproxMark: View {
+    var provenance: Provenance
+    var body: some View {
+        if let badge = provenance.badge {
+            Text(badge)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 5).padding(.vertical, 1)
+                .background(.quaternary, in: Capsule())
+                .accessibilityLabel("Approximate")
         }
     }
 }
@@ -56,11 +64,7 @@ struct ProvenanceNotice: View {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle.fill").foregroundStyle(accent)
                     Text(provenance.title).font(.headline)
-                    if let badge = provenance.badge {
-                        Text(badge).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
-                    }
+                    ProvenanceApproxMark(provenance: provenance)
                 }
                 Text(provenance.explanation)
                     .font(.callout).foregroundStyle(.secondary)
