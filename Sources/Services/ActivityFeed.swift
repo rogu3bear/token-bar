@@ -11,12 +11,10 @@ struct ActivitySource {
 }
 struct ActivitySources {
     static func read(home: URL) throws -> [ActivitySource] {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(home.appendingPathComponent("state_5.sqlite").path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            if let db { sqlite3_close(db) }; throw CocoaError(.fileReadUnknown)
+        guard let db = CodexCatalog.openReadOnly(CodexCatalog.database(in: home)) else {
+            throw CocoaError(.fileReadUnknown)
         }
         defer { sqlite3_close(db) }
-        sqlite3_busy_timeout(db, 100)
         var statement: OpaquePointer?
         let query = "SELECT id, rollout_path, source, thread_source, COALESCE(NULLIF(name,''), substr(title,1,120)), agent_nickname, model, COALESCE(created_at_ms, created_at * 1000) FROM threads WHERE archived=0 AND updated_at >= ? ORDER BY updated_at DESC"
         guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK else { throw CocoaError(.fileReadCorruptFile) }
