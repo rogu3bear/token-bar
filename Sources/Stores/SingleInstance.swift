@@ -102,10 +102,11 @@ enum DuplicateScan {
         var path: String
         var version: String?
         var build: String?
-        var isInstalled: Bool { path == "/Applications/Token Bar.app" }
+        var isInstalled: Bool { path == DuplicateScan.installedPath }
     }
 
     static let identifier = "local.star.CodexTokenBar"
+    static let installedPath = "/Applications/Token Bar.app"
 
     /// Ask Spotlight for bundles carrying this identifier.
     static func find() -> [Copy] {
