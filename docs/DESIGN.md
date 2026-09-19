@@ -183,7 +183,11 @@ Tools join with stable identity and a restrained transition; when nothing is act
 the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unused idle Codex and Grok rows are not listed. Idle Auto keeps the status item to the app icon, except Claude at a measured-zero remaining. Unused Codex or Grok zeros stay off Auto. Codex appears in Auto only while it is running or has a measured rate. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
 Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools and unused Claude whose remaining is a measured zero, with explicit `tok/s`, `tok/m`, or `tok/h` units. No tool's
-speed is labeled as another tool or silently pooled into it.
+speed is labeled as another tool or silently pooled into it. `CompactLiveCopy.rate`
+owns the compact `~N tok/unit` face, including compact thousands. The menu bar,
+Now's per-task list, and popover VoiceOver use that face. A missing speed is an
+em dash on screen and "rate unavailable" when spoken. The dial readout still
+splits its number from the unit label so the unit picker can sit beside it.
 
 Menu bar settings offer Codex, Claude, Grok, and Auto. Auto shows a named
 single tool or Total when several tools are active, and stays quiet when none

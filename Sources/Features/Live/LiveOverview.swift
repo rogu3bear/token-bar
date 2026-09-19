@@ -70,7 +70,7 @@ struct RunningDetails: View {
                                     .font(.caption).foregroundStyle(age >= 300 ? Color.orange : Color.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             if let sample = snapshot.measurements[task.session], now.timeIntervalSince(sample.date) < sample.lifetime, age < 300 {
-                                Text(String(format: "~%.0f tok/", sample.rate * unit.multiplier) + unit.rawValue).monospacedDigit().font(.caption)
+                                Text(CompactLiveCopy.rate(true, amount: sample.rate * unit.multiplier, unit: unit)).monospacedDigit().font(.caption)
                             } else { Text("Awaiting usage").font(.caption).foregroundStyle(.secondary) }
                         }
                     }

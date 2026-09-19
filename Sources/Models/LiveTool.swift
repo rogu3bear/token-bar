@@ -133,6 +133,10 @@ enum CompactLiveCopy {
         let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
         return "~" + number + " tok/" + unit.rawValue
     }
+    /// VoiceOver names the same compact face; a missing speed is spoken, not an em dash.
+    static func spokenRate(activity: String, available: Bool, amount: Double, unit: RateUnit) -> String {
+        activity + ", " + (available ? rate(true, amount: amount, unit: unit) : "rate unavailable")
+    }
     static func remaining(_ estimate: Runway?) -> String {
         estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
     }
