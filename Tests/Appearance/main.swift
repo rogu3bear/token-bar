@@ -349,6 +349,12 @@ MainActor.assumeIsolated {
     print("PASS: shipping allowance rows and expanded popover evidence render with intrinsic sizing in dark/light/custom accent")
 }
 
+assert(compact(999) == "999")
+assert(compact(TokenFormatting.thousand) == "1.0K")
+assert(compact(TokenFormatting.million) == "1.00M")
+assert(compact(TokenFormatting.billion) == "1.00B")
+print("PASS: History and Cost compact counts share TokenFormatting magnitude cutovers")
+
 // Measure native layout boxes and retained SwiftUI identity, not a screenshot's
 // pixels or a duplicate arithmetic implementation of the layout.
 private final class ProviderLayoutProbes {
