@@ -91,7 +91,9 @@ waits up to ten seconds, and refuses to replace a still-running copy. It does
 not request Apple Events permission or terminate development copies by name.
 Installation on a non-startup volume is refused. `postinstall` re-registers the
 installed bundle with Launch Services so the identifier resolves to
-`/Applications` and not to a stale copy elsewhere.
+`/Applications` and not to a stale copy elsewhere, then opens the installed app
+in the console user's session, since `preinstall` quit their previous copy. A
+missing console user or a failed open leaves the install successful and silent.
 
 The installer never deletes anything outside `/Applications`. Removing a
 person's files is not an installer's job, so the app reports other copies

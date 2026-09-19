@@ -3,6 +3,7 @@
 ## 0.1.10 — Release candidate
 
 - Popover rows for a tool that is not working but reads Unconfirmed keep remaining as the only large figure with Unconfirmed as the caption; the rate-sized dash was only for working tools. VoiceOver names unavailable remaining as unavailable instead of reading a dash. Copy now says idle Grok remaining stays off the menu bar and popover, matching the shipped rule, not just Grok zeros.
+- The installer reopens Token Bar for the signed-in user after it replaces a running copy, so an upgrade does not end with an empty menu bar.
 - Check for updates when Token Bar starts. The app reads the public release list once at launch over an ephemeral request with no usage, account or version attached, orders versions numerically, and names a newer notarized installer in the popover and Menu bar settings with a Download button that opens the GitHub release asset. Off and on in Menu bar settings; previews never check. Nothing installs automatically.
 - Default accent follows the macOS control accent and System appearance. A saved custom hex is unchanged; marketing stills still use Dark/Lime.
 - Idle Auto names measured Codex and Claude remaining in the menu bar and popover. Speed stays off when nothing is running; unused Codex and Grok zeros stay off. Idle popover remaining is the large figure; Idle stays caption. Mixed idle remaining on the status item reuses each tool’s single-tool remaining face.
