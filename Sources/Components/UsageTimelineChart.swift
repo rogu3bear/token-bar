@@ -52,7 +52,7 @@ struct UsageTimelineChart: View {
             Text(timeline.minuteResolution ? "Cumulative recorded tokens · minute resolution · local time" : "Daily recorded tokens · local time")
                 .font(.caption).foregroundStyle(.secondary)
             if timeline.dailyOnly.total > 0 {
-                Text("\(compact(metric.amount(timeline.dailyOnly))) additional tokens have daily totals only; minute timing is unavailable.")
+                Text(UsageTimeline.dailyOnlyCaption(compact(metric.amount(timeline.dailyOnly)), additionalTokens: true))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -38,6 +38,12 @@ struct UsageTimeline {
         }
         return result
     }
+    /// History token charts and Cost dollar charts share this unavailable-timing face.
+    static func dailyOnlyCaption(_ amount: String, additionalTokens: Bool) -> String {
+        additionalTokens
+            ? "\(amount) additional tokens have daily totals only; minute timing is unavailable."
+            : "\(amount) has daily totals only; minute timing is unavailable."
+    }
     /// Today’s recorded usage for the compact popover. Empty when nothing was admitted today.
     static func compact(entries: [Entry], now: Date, calendar: Calendar = .current) -> CompactUsage {
         let query = UsageQuery(period: 0)
