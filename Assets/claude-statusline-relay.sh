@@ -34,17 +34,21 @@ if [ "$#" -gt 0 ]; then
   exit 0
 fi
 # Default line: model, context, Claude five-hour remaining. jq if present, else JXA.
+# Remaining leftover is max(0, 100 - used), shown as a whole percent. Missing used
+# is omitted, never NaN or a guessed zero. jq and JXA must not drift.
 if command -v jq >/dev/null 2>&1; then
   printf '%s' "$input" | jq -r '[(.model.display_name // .model.id // empty),
     (.context_window.used_percentage | select(. != null) | "ctx \(floor)%"),
-    (.rate_limits.five_hour.used_percentage | select(. != null) | "Claude 5h \(100 - . | floor)% left")]
+    (.rate_limits.five_hour.used_percentage | select(. != null) | "Claude 5h \([0, 100 - .] | max | . + 0.5 | floor)% left")]
     | join(" · ")' 2>/dev/null
 elif command -v osascript >/dev/null 2>&1; then
   TOKEN_BAR_STATUS_JSON="$input" osascript -l JavaScript -e '
     const d = JSON.parse($.NSProcessInfo.processInfo.environment.objectForKey("TOKEN_BAR_STATUS_JSON").js);
     const p = d.context_window && d.context_window.used_percentage;
     const r = d.rate_limits && d.rate_limits.five_hour;
+    const used = r && r.used_percentage;
+    const remaining = used == null ? null : Math.round(Math.max(0, 100 - used));
     [d.model && (d.model.display_name || d.model.id), p != null ? "ctx " + Math.floor(p) + "%" : null,
-     r ? "Claude 5h " + Math.floor(Math.max(0, 100 - r.used_percentage)) + "% left" : null].filter(Boolean).join(" · ")' 2>/dev/null
+     remaining != null ? "Claude 5h " + remaining + "% left" : null].filter(Boolean).join(" · ")' 2>/dev/null
 fi
 exit 0
