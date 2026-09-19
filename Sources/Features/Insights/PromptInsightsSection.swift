@@ -33,7 +33,7 @@ struct PromptInsightsSection: View {
                             Text("Exact repeats after normalizing case and spacing; up to 300 characters. Repetition alone does not establish a recurring task.")
                                 .font(.caption).foregroundStyle(.secondary)
                             ForEach(Array(result.repeats.prefix(3))) { fact in
-                                HStack(alignment: .top, spacing: 16) {
+                                HStack(alignment: .top, spacing: PageStyle.related) {
                                     Text(fact.label).font(.callout).textSelection(.enabled)
                                     Spacer(minLength: 8)
                                     Text("\(fact.count) times").font(.callout.monospacedDigit()).foregroundStyle(.secondary)

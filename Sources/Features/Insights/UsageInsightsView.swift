@@ -7,7 +7,7 @@ struct UsageInsightsView: View {
     /// Records held back from the totals on this screen.
     var integrity: IntegrityReport?
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: PageStyle.section) {
             Text("Changes and evidence").font(PageStyle.sectionTitle)
             Text("Last 30 days · all locally recorded tools · independent of History and Cost filters. Today is still in progress.").font(.callout).foregroundStyle(.secondary)
             if let integrity, !integrity.isClean {
@@ -51,7 +51,7 @@ struct UsageInsightsView: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             DetailSheet("How usage is counted") {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: PageStyle.related) {
                     if let first = summary.earliest {
                         Text("Available records begin " + first.formatted(date: .abbreviated, time: .omitted) + ".")
                     }
