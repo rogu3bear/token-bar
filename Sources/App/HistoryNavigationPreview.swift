@@ -14,6 +14,17 @@ enum HistoryNavigationPreview {
                                                   userInfo: [NSLocalizedDescriptionKey: message]) }
             receipts.append(message)
         }
+        var million = Tokens()
+        million.input = 1_000_000
+        million.output = 1_000_000
+        try require(UsageMetric.total.rawValue.uppercased() == "TOTAL PROCESSED",
+                    "History total card title is UsageMetric.total")
+        try require(UsageMetric.output.rawValue.uppercased() == "OUTPUT",
+                    "History output card title is UsageMetric.output")
+        try require(UsageMetric.output.formatted(million) == "1.00M",
+                    "History output compact uses TokenFormatting")
+        try require(UsageMetric.total.formatted(million) == "2.00M",
+                    "History total compact uses TokenFormatting")
         func settle() throws {
             let deadline = Date().addingTimeInterval(15)
             repeat { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
