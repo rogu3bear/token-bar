@@ -98,7 +98,7 @@ struct CostView: View {
                 .overlay { if report.timeline.isEmpty { Text("No timestamped priceable usage in this period").foregroundStyle(.secondary) } }
             Text(report.minuteResolution ? "Cumulative API-equivalent estimate · minute resolution · local time. Unpriced usage is excluded." : "Daily totals. Unpriced usage is excluded from dollar bars and retained in the selected report and coverage.").font(.caption).foregroundStyle(.secondary)
             if report.dailyOnlyAmount.total > 0 {
-                Text(CostPricing.dollars(report.dailyOnlyAmount.total) + " has daily totals only; minute timing is unavailable.").font(.caption).foregroundStyle(.secondary)
+                Text(UsageTimeline.dailyOnlyCaption(CostPricing.dollars(report.dailyOnlyAmount.total), additionalTokens: false)).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
