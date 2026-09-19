@@ -48,6 +48,7 @@ import ServiceManagement
     let menuBarPreferences: MenuBarPreferences
     let appearance: AppearancePreferences
     let provenanceNotices: ProvenanceNotices
+    let updateCheck: UpdateCheck
     private let reportQueue = DispatchQueue(label: "local.codex-token-bar.report", qos: .utility, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var reportPending = false
@@ -133,6 +134,7 @@ import ServiceManagement
         menuBarPreferences = MenuBarPreferences(defaults: defaults)
         appearance = AppearancePreferences(defaults: defaults)
         provenanceNotices = ProvenanceNotices(defaults: defaults)
+        updateCheck = UpdateCheck(defaults: defaults)
         let home = previewRoot ?? ProcessInfo.processInfo.environment["CODEX_HOME"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
         let grokHome = previewRoot.map { $0.appendingPathComponent("grok") }
@@ -453,6 +455,9 @@ struct QuickLiveView: View {
                 }
                 QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
                 ToolActivityErrors(model: model)
+                if let release = model.updateCheck.availableRelease {
+                    UpdateAvailableNotice(check: model.updateCheck, release: release)
+                }
                 CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: model.showHistory)
                 if let error = monitor.error { ErrorNotice(message: error) }
                 HStack {
@@ -532,6 +537,8 @@ struct QuickLiveView: View {
         model.claudeQuota.refresh()
         model.claudeConnection.refresh(relayObserved: model.claudeQuota.relayObserved)
         model.grokQuota.refresh()
+        // One optional manifest read per launch; previews never reach here with a live model.
+        if model.allowsSystemSettings { model.updateCheck.checkAtLaunch() }
         providerTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -633,7 +640,7 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Menu bar settings"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard) })
+            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
             window.isReleasedWhenClosed = false
             window.center(); settingsWindow = window
         }

@@ -13,7 +13,7 @@ struct LocalAccessExplanation: View {
             explanation("Local history", "Reads supported tool logs on this Mac and saves token counts in your Application Support folder. Source logs are not changed. Prompt patterns save derived statistics and checkpoints for a limited Codex sample; prompt text stays in memory.")
             explanation("Account allowance", "Uses your installed Codex app-server and Grok agent with existing sign-ins for account and quota readings. Claude remaining comes from Claude Code itself: its usage cache, and its status line after every turn once you choose Connect Claude Code. These tools may contact their services. Claude quota comes from its local cache. You do not enter passwords or API keys here.")
             explanation("Permissions", "Token Bar does not require Accessibility, Screen Recording, or Full Disk Access for its standard locations. If macOS asks for file access, allow only the folder you intend to read. Unreadable sources remain unavailable.")
-            explanation("Your choice", "No telemetry or automatic uploads. Exports and feedback are initiated by you. Launch at login is optional in Menu bar settings. Quit Token Bar to stop monitoring; your saved history stays on this Mac.")
+            explanation("Your choice", "No telemetry or automatic uploads. Exports and feedback are initiated by you. Launch at login is optional in Menu bar settings, as is the update check, which reads only the public release list when the app starts. Quit Token Bar to stop monitoring; your saved history stays on this Mac.")
         }
     }
     private func explanation(_ title: String, _ detail: String) -> some View {

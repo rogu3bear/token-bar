@@ -6,6 +6,7 @@ const read = (path) =>
 test("unreleased installer cannot be advertised as a signed public download", async () => {
   const release = JSON.parse(await read("release.json"));
   assert.equal(typeof release.available, "boolean");
+  assert.match(release.version, /^\d+\.\d+\.\d+$/, "the app's update check orders major.minor.patch numerically");
   if (release.available) {
     assert.match(
       release.url,
@@ -13,7 +14,12 @@ test("unreleased installer cannot be advertised as a signed public download", as
     );
     assert.match(release.sha256, /^[a-f0-9]{64}$/);
     assert.equal(release.notarized, true);
+    assert.ok(release.url.includes(`/v${release.version}/`), "the asset URL names the manifest version");
   }
+  const version = (await readFile(new URL("../../VERSION", import.meta.url), "utf8")).trim();
+  const [a, b] = [release.version, version].map((text) => text.split(".").map(Number));
+  const behindOrEqual = a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] <= b[2])));
+  assert.ok(behindOrEqual, `release.json ${release.version} may not run ahead of VERSION ${version}`);
 });
 test("every local asset a page references exists in the public tree", async () => {
   const { access } = await import("node:fs/promises");

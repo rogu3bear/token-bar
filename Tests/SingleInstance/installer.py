@@ -52,6 +52,8 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
     assert code == 0 and log.startswith("-TERM 123\n"), "A legacy 2.x development build is replaced"
     code, log, _ = run(installed, installed="30105", incoming="30105")
     assert code == 0, "Reinstalling the same build repairs in place"
+    code, log, _ = run(installed, installed="30110", incoming="30111")
+    assert code == 0 and log.startswith("-TERM 123\n"), "The successor can replace the installed development build"
     code, log, error = run(installed, installed="30106", incoming="30105")
     assert code == 1 and "newer Token Bar" in error and "30106" in error and not log, "Refuse a downgrade loudly, before touching processes"
     code, log, _ = run(installed, installed=None, incoming="30105")

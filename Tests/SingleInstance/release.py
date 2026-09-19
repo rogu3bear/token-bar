@@ -210,26 +210,35 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-gate-test-') as temporary:
     sidecar = Path(str(package) + '.sha256')
     digest = subprocess.run(['shasum', '-a', '256', package.name], cwd=root,
                             capture_output=True, text=True).stdout.split()[0]
-    def gate():
-        return subprocess.run([str(verifier), 'HEAD', str(package)], capture_output=True, text=True)
+    def gate(*options):
+        return subprocess.run([str(verifier), *options, 'HEAD', str(package)], capture_output=True, text=True)
     for text, expected in [
         (f'{digest}  {package}\n', 'not the installer basename'),
         (f'{digest}  {package.name}\n{digest}  other\n', 'not a single line'),
         (f'{"0" * 64}  {package.name}\n', 'does not match the package bytes'),
     ]:
         sidecar.write_text(text)
-        result = gate()
-        assert result.returncode == 1 and expected in result.stderr, (expected, result.stderr)
-        assert 'PASS: checksum sidecar' not in result.stdout
+        for options in ((), ('--development',)):
+            result = gate(*options)
+            assert result.returncode == 1 and expected in result.stderr, (expected, result.stderr)
+            assert 'PASS: checksum sidecar' not in result.stdout
     # A correct sidecar passes this gate; the synthetic package then fails the signature gate.
     sidecar.write_text(f'{digest}  {package.name}\n')
     result = gate()
     assert 'PASS: checksum sidecar' in result.stdout and 'Developer ID installer certificate' in result.stderr
+    # Development mode skips only distribution gates, never malformed payloads.
+    result = gate('--development')
+    assert result.returncode == 1 and 'could not be expanded' in result.stderr, result.stderr
+    assert 'DEVELOPMENT: checking source binding only' in result.stdout
+    assert 'Not release approval' in result.stdout and 'contents reproduce' not in result.stdout
+    result = gate('--developmen')
+    assert result.returncode == 2 and 'usage:' in result.stderr, result.stderr
     # Absence is reported, not silently accepted.
     sidecar.unlink()
     result = gate()
     assert 'NOTE: no checksum sidecar' in result.stdout
 print('PASS: verify-release.sh rejects a path-bearing, malformed or stale sidecar before the signature gate and reports an absent one')
+print('PASS: explicit development verification preserves checksum and payload gates; default still rejects unsigned packages')
 
 # Invalid public versions must fail before a build epoch could make them look usable.
 with tempfile.TemporaryDirectory(prefix='tokenbar-version-test-') as temporary:

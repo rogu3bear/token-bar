@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prove that a signed installer was built from a named commit.
+# Prove that an installer was built from a named commit.
 #
 # North Star condition 6 requires a release to be reproducible from a clean
 # clone with the local scripts alone. This performs that proof instead of
@@ -11,14 +11,19 @@
 # difference is expected. Complete unsigned payload files and installer
 # semantics must match; toolchain differences fail closed.
 #
-# Usage: scripts/verify-release.sh <commit-ish> <package.pkg>
+# Usage: scripts/verify-release.sh [--development] <commit-ish> <package.pkg>
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+development=false
+if [ "${1:-}" = "--development" ]; then
+    development=true
+    shift
+fi
 commit="${1:-}"
 package="${2:-}"
-if [ -z "$commit" ] || [ -z "$package" ]; then
-    echo "usage: scripts/verify-release.sh <commit-ish> <package.pkg>" >&2
+if [ "$#" -ne 2 ] || [[ "$commit" = --* ]] || [ -z "$commit" ] || [ -z "$package" ]; then
+    echo "usage: scripts/verify-release.sh [--development] <commit-ish> <package.pkg>" >&2
     exit 2
 fi
 [ -f "$package" ] || { echo "verify-release.sh: no such package: $package" >&2; exit 2; }
@@ -55,24 +60,28 @@ else
 fi
 
 # 2. Distribution properties of the shipped package itself.
-if pkgutil --check-signature "$package" 2>/dev/null | grep -q 'Status: signed by a developer certificate'; then
-    echo "PASS: package carries a Developer ID installer signature"
+if [ "$development" = true ]; then
+    echo "DEVELOPMENT: checking source binding only; Developer ID and notarization gates not evaluated. Not release approval."
 else
-    fail "package is not signed by a Developer ID installer certificate"
+    if pkgutil --check-signature "$package" 2>/dev/null | grep -q 'Status: signed by a developer certificate'; then
+        echo "PASS: package carries a Developer ID installer signature"
+    else
+        fail "package is not signed by a Developer ID installer certificate"
+    fi
+    # stapler distinguishes "no ticket" from "could not check". Exit 68 means it
+    # could not reach Apple, which is a network fault, not evidence about the
+    # package. Reporting that as a missing ticket would fail a good release, so the
+    # three outcomes stay separate.
+    set +e
+    staple_output=$(xcrun stapler validate "$package" 2>&1)
+    staple_status=$?
+    set -e
+    case "$staple_status" in
+        0)  echo "PASS: package carries a stapled notarization ticket" ;;
+        68) fail "notarization could not be checked: stapler cannot reach Apple (exit 68). This is a network fault and says nothing about the package; retry when online" ;;
+        *)  fail "package has no valid stapled notarization ticket (stapler exit $staple_status): $(printf '%s' "$staple_output" | tail -1)" ;;
+    esac
 fi
-# stapler distinguishes "no ticket" from "could not check". Exit 68 means it
-# could not reach Apple, which is a network fault, not evidence about the
-# package. Reporting that as a missing ticket would fail a good release, so the
-# three outcomes stay separate.
-set +e
-staple_output=$(xcrun stapler validate "$package" 2>&1)
-staple_status=$?
-set -e
-case "$staple_status" in
-    0)  echo "PASS: package carries a stapled notarization ticket" ;;
-    68) fail "notarization could not be checked: stapler cannot reach Apple (exit 68). This is a network fault and says nothing about the package; retry when online" ;;
-    *)  fail "package has no valid stapled notarization ticket (stapler exit $staple_status): $(printf '%s' "$staple_output" | tail -1)" ;;
-esac
 
 # 3. Expand the exact component payload; never choose an arbitrary executable.
 pkgutil --expand-full "$package" "$work/shipped" || fail "package could not be expanded"

@@ -24,7 +24,7 @@ CORE="ProviderUsage.swift UsageComparison.swift CostRateHistory.swift CostCovera
       Tachometer.swift SignInTimeline.swift CodexInstallation.swift GrokInstallation.swift GrokQuotaMonitor.swift"
 
 GUARD="QuotaGuardEvaluation.swift QuotaGuardCoordinator.swift QuotaGuardNotifications.swift QuotaGuardViews.swift"
-MENU="MenuBarDial.swift MenuBarSettings.swift FirstRunWelcome.swift ClaudeConnectionControl.swift"
+MENU="MenuBarDial.swift MenuBarSettings.swift FirstRunWelcome.swift ClaudeConnectionControl.swift UpdateCheck.swift UpdateCheckControl.swift"
 
 # build_group <executable> <test entry> <extra swiftc flags> <source names...>
 build_group() {
@@ -53,6 +53,7 @@ build_group quota-guard Tests/QuotaGuard/main.swift "-swift-version 5 -lsqlite3"
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
 build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
 build_group feedback   Tests/Feedback/main.swift   ""                           Feedback.swift CodexInstallation.swift
+build_group update-check Tests/UpdateCheck/main.swift ""                        UpdateCheck.swift
 build_group appearance Tests/Appearance/main.swift "-swift-version 5 -lsqlite3" $CORE ProviderColumnsLayout.swift NowOccupancyStack.swift FirstRunWelcome.swift PreviewFixture.swift UsageMetric.swift UsageTimelineChart.swift TokenFormatting.swift CompactToolRate.swift ToolQuotaSummary.swift ClaudeConnectionControl.swift
 build_group cost       Tests/Cost/main.swift       "-swift-version 5 -lsqlite3" $CORE
 build_group accuracy   Tests/Accuracy/main.swift   "-swift-version 5 -lsqlite3" $CORE
@@ -70,6 +71,7 @@ if [ -z "$ONLY" ] || [ "$ONLY" = "single-instance" ]; then
     xcrun swiftc -swift-version 5 "$SI" Tests/SingleInstance/main.swift -o build/tests/single-instance
     build/tests/single-instance "$SI"
     python3 Tests/SingleInstance/installer.py
+    python3 Tests/SingleInstance/postinstall.py
     python3 Tests/SingleInstance/release.py
 fi
 

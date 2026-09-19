@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.1.11 — Unreleased
 
+- Retain the installed optional launch-time update check, its saved opt-out and privacy disclosures; downloads remain a manual browser action.
+- Prepare development build 30111 above the locally installed 30110, retaining console-user reopen after installation. Public downloads remain on notarized 0.1.9.
+- Verify development package contents against an exact commit with explicit `--development`; the default release verifier still requires Developer ID signing and notarization.
 - Keep idle Auto and the popover focused on measured Codex/Claude remaining, with no invented speed field; preserve working-only Now columns and each tool’s gauge alignment.
 - Share remaining and speed copy across Now, Accounts, the status item and VoiceOver. Apply the same account, source-failure and freshness checks before displaying allowance, while qualifying speed and reset time independently.
-
-## Unreleased
-
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 

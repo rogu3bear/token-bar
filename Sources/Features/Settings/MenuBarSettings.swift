@@ -255,6 +255,7 @@ struct MenuBarSettingsView: View {
     @Bindable var grokQuota: GrokQuotaMonitor
     var claudeConnection: ClaudeConnectionModel? = nil
     var quotaGuard: QuotaGuardCoordinator? = nil
+    var updateCheck: UpdateCheck? = nil
     @State private var launchAtLogin = false
     @State private var loginError: String?
     @State private var reordering = false
@@ -328,6 +329,7 @@ struct MenuBarSettingsView: View {
                         launchAtLogin = SMAppService.mainApp.status == .enabled
                     }
                 if let loginError { ErrorNotice(message: loginError) }
+                if let updateCheck { UpdateCheckControl(check: updateCheck, allowsNetwork: allowsSystemSettings) }
                 if let claudeConnection { ClaudeConnectionControl(model: claudeConnection) }
                 DetailSheet("Local data and permissions") { LocalAccessExplanation().padding(.top, 8) }
                 Button("Restore defaults") { preferences.reset() }

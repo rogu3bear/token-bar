@@ -6,6 +6,10 @@ for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer
 then open Token Bar from Applications. No build tools or reboot are required.
 The installer preserves existing usage history and preferences.
 
+The source candidate is **0.1.11**, build **30111**, above the locally installed
+0.1.10/build 30110 development package. It is not a public release. Public
+download pointers remain on notarized 0.1.9 until a new signed release exists.
+
 The app and installer are separately signed: Developer ID Application for the
 app, Developer ID Installer for the `.pkg`. Maintainers store notarization
 credentials in Keychain; users need none of these to install.
@@ -81,7 +85,10 @@ waits up to ten seconds, and refuses to replace a still-running copy. It does
 not request Apple Events permission or terminate development copies by name.
 Installation on a non-startup volume is refused. `postinstall` re-registers the
 installed bundle with Launch Services so the identifier resolves to
-`/Applications` and not to a stale copy elsewhere.
+`/Applications` and not to a stale copy elsewhere. It then reopens that exact
+bundle in the console user's GUI session, preserving the installed development
+package's behavior. No console user, root console, failed user lookup or failed
+open leaves installation successful; the app can be opened from Applications.
 
 The installer never deletes anything outside `/Applications`. Removing a
 person's files is not an installer's job, so the app reports other copies
@@ -116,6 +123,20 @@ stay page-aligned and within signature slack of the compared file size.
 Unexpected payloads and toolchain differences fail closed. This content check
 is separate from the shipped package signature and notarization checks. A stapler
 exit of 68 means Apple could not be reached, not that a ticket is invalid.
+
+For a local development package, use the same comparison with an explicit mode:
+
+```sh
+env -u APP_SIGNING_IDENTITY -u INSTALLER_SIGNING_IDENTITY \
+  TOKENBAR_DIST_DIR=/absolute/fresh/output ./scripts/package.sh
+./scripts/verify-release.sh --development <commit> /absolute/fresh/output/TokenBar-0.1.11-arm64.pkg
+```
+
+Development mode skips only the Developer ID installer and stapled-ticket
+gates, and labels the result as source binding, not release approval. Checksum,
+strict app signature, exact source rebuild and full package comparison still
+apply. The default command retains every signed-release gate. Keep the installed
+app and its retained package for rollback; verification never installs a payload.
 
 ## GitHub publication
 
