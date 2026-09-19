@@ -46,7 +46,7 @@ enum DataStatePreview {
             }
             for surface in ["cost", "insights"] {
             let host = NSHostingView(rootView: AppearanceHost(preferences: appearance) {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: PageStyle.section) {
                     Text("Sample state: " + name).font(.title.bold())
                     if surface == "cost" {
                     CostSummary(report: cost, basis: .reference, refreshing: refreshing,
@@ -56,7 +56,7 @@ enum DataStatePreview {
                         PromptInsightsSection(state: state)
                     }
                     Spacer(minLength: 0)
-                }.padding(28).frame(width: 1064, height: 1250, alignment: .topLeading)
+                }.padding(PageStyle.gutter).frame(width: 1064, height: 1250, alignment: .topLeading)
                     .background(Color(nsColor: .windowBackgroundColor))
             }.previewStill())
             host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1250)
