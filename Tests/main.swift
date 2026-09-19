@@ -442,14 +442,14 @@ print("PASS: usage trends distinguish unavailable input from completed zero and 
 var historicalCodex = Entry(date: now.addingTimeInterval(-86400), session: "codex-history", model: "sample", tokens: Tokens(["input_tokens": 200, "output_tokens": 100]))
 historicalCodex.harness = "Codex Desktop"
 var historicalClaude = Entry(date: now.addingTimeInterval(-172800), session: "claude-history", model: "sample", tokens: Tokens(["input_tokens": 400, "output_tokens": 300]))
-historicalClaude.harness = "Claude Code"
+historicalClaude.harness = ClaudeCodeUsage.harness
 var unknownTool = historicalClaude; unknownTool.harness = nil
 let historicalTools = UsageReport.build(entries: [historicalCodex, historicalClaude, unknownTool], query: UsageQuery(period: 1), catalog: [:], now: now)
 assert(historicalTools.toolTimelines.count == 3)
 assert(historicalTools.toolTimelines.reduce(Tokens()) { $0 + $1.totals } == historicalTools.totals)
 assert(historicalTools.toolTimelines.allSatisfy { !$0.timeline.minuteResolution }, "Tool subsets must share the whole report's daily resolution")
 assert(historicalTools.toolTimelines.first { $0.tool == .claude }?.totals.output == 300)
-var claudeOnly = UsageQuery(period: 1); claudeOnly.harness = "Claude Code"
+var claudeOnly = UsageQuery(period: 1); claudeOnly.harness = ClaudeCodeUsage.harness
 let filteredTools = UsageReport.build(entries: [historicalCodex, historicalClaude, unknownTool], query: claudeOnly, catalog: [:], now: now)
 assert(filteredTools.toolTimelines.count == 1 && filteredTools.toolTimelines[0].tool == .claude)
 assert(filteredTools.totals == historicalClaude.tokens && filteredTools.entries.count == 1)

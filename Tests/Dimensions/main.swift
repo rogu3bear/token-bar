@@ -270,9 +270,9 @@ check(bucketProjects == ["alpha", "beta"],
       "day buckets must keep projects apart, got \(bucketProjects.sorted())")
 print("PASS: historical day buckets do not merge separate projects")
 
-let toolQuery = UsageQuery(period: 1, harness: "Claude Code")
+let toolQuery = UsageQuery(period: 1, harness: ClaudeCodeUsage.harness)
 let claudeReport = UsageReport.build(entries: four, query: toolQuery, catalog: [:], now: Date().addingTimeInterval(1))
-check(claudeReport.entries.count == 1 && claudeReport.entries[0].harness == "Claude Code", "Tool filter must scope the actual report entries")
+check(claudeReport.entries.count == 1 && claudeReport.entries[0].harness == ClaudeCodeUsage.harness, "Tool filter must scope the actual report entries")
 check(claudeReport.totals == four[2].tokens && claudeReport.harnesses.count == 1, "Tool-scoped totals and breakdown must agree")
 check(claudeReport.timeline.points.last?.tokens == four[2].tokens, "Timeline must use the same tool scope as totals")
 print("PASS: tool filter scopes history totals, breakdowns and timeline together")
