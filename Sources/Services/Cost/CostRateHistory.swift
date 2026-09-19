@@ -65,4 +65,15 @@ enum CostRateHistory {
         result.priceBasis = CostPriceBasis.historical.rawValue
         return result
     }
+    /// Signed tenth-percent change between published base rates. A zero prior
+    /// rate is unavailable, not 0%.
+    static func percentChange(from old: Decimal, to new: Decimal) -> String {
+        guard old > 0 else { return "Unavailable" }
+        return String(format: "%+.1f%%", NSDecimalNumber(decimal: (new - old) / old * 100).doubleValue)
+    }
+    static func changeCaption(from old: CostRateRule, to new: CostRateRule) -> String {
+        "Change from previous: input " + percentChange(from: old.input, to: new.input)
+            + " · cache read " + percentChange(from: old.cached, to: new.cached)
+            + " · output " + percentChange(from: old.output, to: new.output)
+    }
 }

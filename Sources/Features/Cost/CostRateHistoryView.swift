@@ -24,10 +24,7 @@ struct CostRateHistoryView: View {
                     Text("Input " + CostPricing.dollars(version.rule.input) + " · cache read " + CostPricing.dollars(version.rule.cached) + " · output " + CostPricing.dollars(version.rule.output))
                         .monospacedDigit()
                     if index > 0 {
-                        let previous = versions[index - 1].rule
-                        Text("Change from previous: input " + change(previous.input, version.rule.input)
-                             + " · cache read " + change(previous.cached, version.rule.cached)
-                             + " · output " + change(previous.output, version.rule.output))
+                        Text(CostRateHistory.changeCaption(from: versions[index - 1].rule, to: version.rule))
                     }
                     Text("Verified " + version.verifiedOn + (version.transitionDays.isEmpty ? " · earlier rates are not established here" : " · change-day cutover time unknown; that day stays unpriced"))
                         .font(.caption).foregroundStyle(.secondary)
@@ -42,9 +39,5 @@ struct CostRateHistoryView: View {
             Text("These are base rates. Cache writes, Fast service and long context may alter a request's modeled cost; their historical evidence gates still apply. Reference pricing is a fixed comparison card, not a historical observation.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-    }
-    private func change(_ old: Decimal, _ new: Decimal) -> String {
-        guard old > 0 else { return "Unavailable" }
-        return String(format: "%+.1f%%", NSDecimalNumber(decimal: (new - old) / old * 100).doubleValue)
     }
 }
