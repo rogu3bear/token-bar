@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Give Quota Guard notifications one View quota / Snooze 30 min action face. The in-app buttons still spell those titles locally and can switch after that PR merges.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 
