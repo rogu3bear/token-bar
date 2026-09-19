@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Give History and Cost the same Unattributed label as dimension reports. Missing tool, account, or project no longer uses a second spelling of that face.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.
 

@@ -30,9 +30,9 @@ struct UsageQuery: Equatable {
     }
     func matches(_ entry: Entry, catalog: [String: TaskInfo], bounds: (lower: Date, upper: Date, inclusive: Bool)) -> Bool {
         guard entry.date >= bounds.lower && (bounds.inclusive ? entry.date <= bounds.upper : entry.date < bounds.upper) else { return false }
-        guard harness == "All tools" || (entry.harness ?? "Unattributed") == harness else { return false }
+        guard harness == "All tools" || (entry.harness ?? DimensionReport.unattributed) == harness else { return false }
         guard model == "All models" || entry.model == model else { return false }
-        guard account == "All accounts" || (entry.account?.id ?? "Unattributed") == account else { return false }
+        guard account == "All accounts" || (entry.account?.id ?? DimensionReport.unattributed) == account else { return false }
         if search.isEmpty { return true }
         let task = catalog[entry.session]
         return [entry.session, entry.projectPath ?? "", task?.title ?? "", task?.directory ?? ""].contains { $0.localizedCaseInsensitiveContains(search) }
@@ -75,7 +75,7 @@ struct UsageReport {
         func quote(_ s: String) -> String { RequestExport.quote(s) }
         let iso = ISO8601DateFormatter()
         let rows = entries.map { e in
-            [iso.string(from: e.date), e.session, e.model, String(e.tokens.input), String(e.tokens.cached), String(e.tokens.output), String(e.tokens.reasoning), String(e.tokens.total), e.account?.label ?? "Unattributed", e.account == nil ? "unknown" : "inferred from local sign-in observation", e.bucket ?? "event", String(e.eventCount)].map(quote).joined(separator: ",")
+            [iso.string(from: e.date), e.session, e.model, String(e.tokens.input), String(e.tokens.cached), String(e.tokens.output), String(e.tokens.reasoning), String(e.tokens.total), e.account?.label ?? DimensionReport.unattributed, e.account == nil ? "unknown" : "inferred from local sign-in observation", e.bucket ?? "event", String(e.eventCount)].map(quote).joined(separator: ",")
         }
         return (["timestamp,session,model,input,cached_input,output,reasoning_subset,total,account,attribution,granularity,event_count"] + rows).joined(separator: "\n")
     }
@@ -98,11 +98,11 @@ struct UsageReport {
             let day = Calendar.current.startOfDay(for: entry.date)
             days[day] = (days[day] ?? Tokens()) + entry.tokens
             add(&models, key: entry.model, title: entry.model, entry: entry)
-            add(&accounts, key: entry.account?.id ?? "Unattributed", title: entry.account.map { $0.label + " (inferred)" } ?? "Unattributed", entry: entry)
-            add(&projects, key: Project.key(entry.projectPath) ?? "Unattributed",
-                title: Project.name(entry.projectPath) ?? "Unattributed",
+            add(&accounts, key: entry.account?.id ?? DimensionReport.unattributed, title: entry.account.map { $0.label + " (inferred)" } ?? DimensionReport.unattributed, entry: entry)
+            add(&projects, key: Project.key(entry.projectPath) ?? DimensionReport.unattributed,
+                title: Project.name(entry.projectPath) ?? DimensionReport.unattributed,
                 subtitle: entry.projectPath ?? "No working directory recorded for these turns", entry: entry)
-            let harness = entry.harness ?? "Unattributed"
+            let harness = entry.harness ?? DimensionReport.unattributed
             if let provider = entry.provider { harnessProviders[harness, default: []].insert(provider) }
             add(&harnesses, key: harness, title: harness, entry: entry)
             let info = catalog[entry.session]
