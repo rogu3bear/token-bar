@@ -52,14 +52,13 @@ enum OpenCodeUsage {
         var fields = observed.compactMap { name, value in value == nil ? nil : name }
         // Canonical input is fully known only when all disjoint components were reported.
         if raw["input"] == nil || cache["read"] == nil || cache["write"] == nil { fields.removeAll { $0 == "input_tokens" } }
-        var tokens = Tokens.canonical(
+        let tokens = Tokens.canonical(
             input: raw["input"] as? Int ?? 0,
             cacheRead: cache["read"] as? Int ?? 0,
-            cacheWrite: cache["write"] as? Int ?? 0,
+            cacheWrite: cache["write"] as? Int,
             output: raw["output"] as? Int ?? 0,
             reasoning: raw["reasoning"] as? Int ?? 0,
             convention: .cacheBesideInput)
-        if cache["write"] == nil { tokens.cacheWrite = nil }
         guard tokens.total > 0 else { return nil }
         let path = data["path"] as? [String: Any]
         return Turn(messageID: id,
