@@ -185,8 +185,8 @@ let billed = GrokBilling.reading(from: [
         ]
     ]
 ], accountID: "grok:test", now: billedNow)
-check(billed?.used == 49 && billed?.window == "weekly" && billed?.name == "X Premium+", "Grok billing maps used percent, weekly window and plan")
-check(billed?.minutes == 10080, "Weekly start/end become 10080 minutes")
+check(billed?.used == 49 && billed?.window == GrokBilling.windowName("USAGE_PERIOD_TYPE_WEEKLY") && billed?.name == "X Premium+", "Grok billing maps used percent, weekly window and plan")
+check(billed?.minutes == GrokBilling.windowMinutes("USAGE_PERIOD_TYPE_WEEKLY"), "Weekly start/end become 10080 minutes")
 check(GrokBilling.reading(from: [:], accountID: "grok:test", now: billedNow) == nil, "Missing billing fields stay unavailable")
 check(GrokBilling.percent(101) == nil && GrokBilling.percent(-1) == nil, "Out-of-range percents are not a remaining figure")
 check(GrokInstallation.executable(environment: ["GROK_CLI_PATH": "/missing/grok"], isExecutable: { _ in false }) == nil, "A missing Grok binary is absence, not a guessed path")
