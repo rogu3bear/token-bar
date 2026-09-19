@@ -277,7 +277,8 @@ coverage and no estimate; mixed coverage is a partial estimate. Headline and
 evidence views use the same coverage value. Loading retains an existing
 calculation, and a failed source cannot become an empty-selection claim.
 The last successful usage-read time is retained in memory across failed reads
-and shown beside available cost results.
+and shown beside available cost results. Cost, Insights, and prompt-sample results
+share one read-age caption: a prefix, relative age, and absolute clock.
 
 ## Rate-unit and color ownership
 

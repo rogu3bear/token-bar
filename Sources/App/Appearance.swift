@@ -292,4 +292,20 @@ struct RelativeAgeText: View {
         formatter.maximumUnitCount = 1
         return formatter.string(from: max(0, now.timeIntervalSince(date))) ?? "0 seconds"
     }
+    /// Absolute clock after the relative age. Cost, Insights, and prompt results share this suffix.
+    static func captionSuffix(_ date: Date) -> String {
+        "ago · " + date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+/// Prefix, relative age, and absolute clock for a successful local read.
+struct ReadAgeCaption: View {
+    var date: Date
+    var prefix: String
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(prefix)
+            RelativeAgeText(date: date)
+            Text(RelativeAgeText.captionSuffix(date))
+        }
+    }
 }
