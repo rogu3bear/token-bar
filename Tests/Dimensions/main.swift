@@ -14,6 +14,30 @@ func entry(harness: String?, provider: String?, project: String?, model: String 
     return row
 }
 
+check(ModelIdentity.unknown == "Unknown model", "missing model names share one explicit label")
+let unnamedModel = entry(harness: "OpenCode", provider: "lmstudio", project: "/Users/x/dev/alpha", model: ModelIdentity.unknown)
+let namedModel = entry(harness: "OpenCode", provider: "lmstudio", project: "/Users/x/dev/alpha")
+check(CostCoverage.build([unnamedModel]).dimensions.first { $0.id == "model" }?.knownRecords == 0,
+      "an omitted model is not counted as a known model")
+check(CostCoverage.build([namedModel]).dimensions.first { $0.id == "model" }?.knownRecords == 1,
+      "a named model is counted as known")
+check(CostCoverage.build([entry(harness: nil, provider: nil, project: nil)]).byHarness[DimensionReport.unattributed] != nil,
+      "coverage groups a missing tool under the same unattributed label as dimension reports")
+do {
+    var data: [String: Any] = [
+        "role": "assistant", "providerID": "lmstudio",
+        "tokens": ["input": 10, "output": 2, "reasoning": 0, "cache": ["read": 0, "write": 0]],
+        "path": ["cwd": "/Users/x/dev/alpha"], "cost": 0,
+        "time": ["created": 1_769_555_059_217]
+    ]
+    check(OpenCodeUsage.turn(id: "m", session: "s", data: data)?.model == ModelIdentity.unknown,
+          "OpenCode without a model id uses the shared unknown-model label")
+    data["modelID"] = ""
+    check(OpenCodeUsage.turn(id: "m", session: "s", data: data)?.model == ModelIdentity.unknown,
+          "an empty OpenCode model id is unknown, not a blank model")
+}
+print("PASS: omitted models and tools use the shared unknown and unattributed labels")
+
 // A harness that is not a provider ------------------------------------------
 // One harness reaching several providers is the fact the single `provider`
 // field could not express. This is the reason the dimension exists.

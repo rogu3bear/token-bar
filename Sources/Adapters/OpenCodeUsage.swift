@@ -65,7 +65,7 @@ enum OpenCodeUsage {
         return Turn(messageID: id,
                     session: session,
                     provider: (data["providerID"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "unknown",
-                    model: (data["modelID"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Unknown model",
+                    model: (data["modelID"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? ModelIdentity.unknown,
                     tokenFields: fields, tokens: tokens,
                     date: date,
                     projectPath: Project.path(path?["cwd"]) ?? Project.path(path?["root"]),
