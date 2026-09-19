@@ -131,6 +131,8 @@ synthetic activity between records. Daily aggregates stay outside minute lines
 unless retained request details reconcile exactly with their counters, event
 counts, and attribution. Unavailable minute timing and unpriced usage remain
 explicit, and daily summaries remain available for multi-day comparisons.
+History’s updated caption and contribution last-activity use relative age; a
+missing report stays “Loading…”, not an invented clock.
 
 The compact Today timeline spans local 12:01 AM to the current time, using the
 whole plot width. Before 12:01 AM it starts at midnight with a nonzero domain.

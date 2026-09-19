@@ -56,7 +56,15 @@ struct HistoryView: View {
                 HStack {
                     MethodButton(title: "How history is counted") { showMethod = true }
                     Spacer()
-                    Text(model.snapshot.updated.map { "Updated " + $0.formatted(date: .omitted, time: .shortened) } ?? "Loading…").font(.caption).foregroundStyle(.secondary)
+                    if let updated = model.snapshot.updated {
+                        HStack(spacing: 4) {
+                            Text("Updated")
+                            RelativeAgeText(date: updated)
+                            Text("ago")
+                        }.font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text(RelativeFreshnessCopy.loading).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 if let message = model.message { Text(message).font(.callout).foregroundStyle(.secondary) }
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())

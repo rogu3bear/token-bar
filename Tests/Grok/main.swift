@@ -371,3 +371,15 @@ do {
     check(updated.first?.kind == .agent && updated.first?.output == 20, "Usage update preserves metadata-only agent and new output")
 }
 print("PASS: Grok metadata-only child classification survives usage events and metadata-before-summary order")
+
+do {
+    let now = Date(timeIntervalSince1970: 1_000_000_000)
+    let stamp = now.addingTimeInterval(-600)
+    check(RelativeFreshnessCopy.caption("Updated", date: stamp, now: now) == "Updated 10 minutes ago",
+          "History report age is relative, not only a clock")
+    check(RelativeFreshnessCopy.caption("Last activity", date: stamp, now: now) == "Last activity 10 minutes ago",
+          "Contribution last-activity uses the same relative face")
+    check(RelativeFreshnessCopy.loading == "Loading…",
+          "A missing History report is not an invented timestamp")
+}
+print("PASS: History updated and contribution last-activity share one relative-age face")
