@@ -21,8 +21,8 @@ struct LiveToolPanels: View {
                 AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },
                                         now: now, connection: model.claudeConnection,
                                         sourcesKnown: !model.accountTools.isEmpty)
-                if seats.isEmpty {
-                    Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                if let empty = NowOccupancyCopy.noneWorkingLine(sourcesKnown: !model.accountTools.isEmpty, occupied: !seats.isEmpty) {
+                    Text(empty).foregroundStyle(.secondary).padding(16)
                 }
             } else {
                 NowOccupancyStack(working: tools, remaining: { tool in
