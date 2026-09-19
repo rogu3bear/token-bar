@@ -1128,5 +1128,65 @@ do {
     continuityCheck(owner.loadError == nil && restarted.entries.reduce(0) { $0 + $1.tokens.input } == 400 && restarted.error != nil,
                     "sustained delayed requests advance exactly once across restart while preserving the gap")
 }
+// A fork's inherited parent metadata is not evidence of replacing the final child session.
+for historical in [false, true] {
+    for kind in ["exact", "legacy", "missing-boundary", "retained-gap"] {
+        let fixture = temp.appendingPathComponent("copied-prefix-\(historical)-\(kind)")
+        let file = fixture.appendingPathComponent("sessions/fork.jsonl")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let date = historical ? oldDate : now
+        let prefix = continuityMeta("parent") + continuityRecord("copied-A", 100, at: date) + continuityMeta("child")
+        let original = prefix + continuityRecord("child-B", 200, at: date)
+        try original.write(to: file)
+        let owner = UsageScanner(home: fixture, stateURL: fixture.appendingPathComponent("ledger.json")); owner.readAccount = false
+        let first = owner.scan(historical: historical, changedPaths: [file])
+        continuityCheck(first.error == nil && first.entries.reduce(0) { $0 + $1.tokens.input } == 200, "copied prefix initial admission")
+        try owner.saveIfNeeded(force: true)
+        let key = owner.codexCursorKey(file, historical: historical)
+        if kind == "legacy" {
+            if historical { owner.ledger.historyCursors?[key]?.continuity = nil }
+            else { owner.ledger.cursors[key]?.continuity = nil }
+        }
+        if kind == "retained-gap" {
+            let gap = "Source continuity is incomplete; retained prior totals and admitted only independently supported requests."
+            if historical { owner.ledger.historyCursors?[key]?.continuityGap = gap }
+            else { owner.ledger.cursors[key]?.continuityGap = gap }
+        }
+        try ((kind == "missing-boundary" ? prefix : original) + continuityRecord("child-C", 300, at: date)).write(to: file, options: .atomic)
+        let recovered = owner.scan(historical: historical, changedPaths: [file])
+        try owner.saveIfNeeded(force: true)
+        continuityCheck(recovered.entries.reduce(0) { $0 + $1.tokens.input } == 300, "copied prefix recovery admits only new request \(kind)")
+        let expectsGap = ["missing-boundary", "retained-gap"].contains(kind)
+        continuityCheck((recovered.error != nil) == expectsGap, "copied prefix \(kind) preserves only supported gap claims")
+        continuityCheck(try owner.requestArchive!.count == 3, "copied prefix archive retains exact request identities")
+        let unchanged = owner.scan(historical: historical, changedPaths: [file])
+        continuityCheck(unchanged.entries.reduce(0) { $0 + $1.tokens.input } == 300 && (unchanged.error != nil) == expectsGap,
+                        "copied prefix unchanged scan neither recounts nor hides a gap")
+        try owner.saveIfNeeded(force: true)
+        owner.eventIndex = nil; owner.requestArchive = nil
+        let reopened = UsageScanner(home: fixture, stateURL: fixture.appendingPathComponent("ledger.json")); reopened.readAccount = false
+        let restarted = reopened.scan(historical: historical, changedPaths: [file])
+        continuityCheck(reopened.loadError == nil && restarted.entries.reduce(0) { $0 + $1.tokens.input } == 300 &&
+                        (restarted.error != nil) == expectsGap, "copied prefix restart preserves counts and qualified gap state")
+        continuityCheck(try reopened.requestArchive!.count == 3, "copied prefix restart keeps exactly three archived identities")
+    }
+}
+// Equivalent source errors must publish the same text, preserving an open detail page.
+do {
+    let root = temp.appendingPathComponent("stable-diagnostic-order")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let owner = UsageScanner(home: root, stateURL: root.appendingPathComponent("ledger.json")); owner.readAccount = false
+    let messages = (0..<40).map { "Synthetic source warning \(String(format: "%02d", $0))." }
+    let expected = messages.sorted().joined(separator: " ")
+    for historical in [true, false] {
+        for order in [messages, Array(messages.reversed())] {
+            owner.ledger.sourceErrors = [:]
+            for message in order { owner.ledger.sourceErrors?[message] = message }
+            let result = owner.scan(historical: historical, changedPaths: [])
+            continuityCheck(result.error == expected, "diagnostic order is stable across equivalent rescans")
+            continuityCheck(owner.ledger.sourceErrors?.count == 40, "stable presentation keeps every source diagnostic")
+        }
+    }
+}
 if !continuityFailures.isEmpty { fflush(stdout); exit(1) }
 print("PASS: Codex scan continuity live/history matrix, disjoint interval recovery, legacy no-anchor resumption, aliases, races, account boundaries and checkpoint restarts")

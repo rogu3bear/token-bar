@@ -343,10 +343,21 @@ extension UsageScanner {
             throw RequestArchive.failure("Session was replaced during reading; retrying without advancing its cursor")
         }
         var accountContinuous = continuous || (cursor.offset == 0 && cursor.previous == nil)
+        // A rewind of a fork can contain parent metadata before the child.
+        // Retain the child's recovery anchor across that prefix only when the
+        // validated batch ends in that same session. Counters must still prove
+        // the exact boundary; matching metadata alone never clears a gap.
+        let replaySession: String? = !continuous ? records.reversed().lazy.compactMap { record -> String? in
+            guard record.range(of: Data("session_meta".utf8)) != nil,
+                  let root = try? JSONSerialization.jsonObject(with: record) as? [String: Any],
+                  root["type"] as? String == "session_meta",
+                  let payload = root["payload"] as? [String: Any] else { return nil }
+            return payload["id"] as? String
+        }.first : nil
         for record in records {
             let previousSession = next.sourceSession
             consume(record, session: session, cursor: &next, account: account, poll: poll,
-                    historical: historical, continuous: accountContinuous)
+                    historical: historical, continuous: accountContinuous, replaySession: replaySession)
             if previousSession != nil && previousSession != next.sourceSession { accountContinuous = false }
             if let loadError { throw RequestArchive.failure(loadError) }
         }

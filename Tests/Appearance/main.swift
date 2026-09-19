@@ -467,3 +467,35 @@ MainActor.assumeIsolated {
     }
     print("PASS: Now remaining occupies the same provider column as its speed header and gauge")
 }
+
+let largeNotice = NoticeContent(PreviewFixture.sourceDiagnostics)
+assert(largeNotice.needsDetails && largeNotice.continuityCount == 2359)
+assert(largeNotice.summary.contains("coverage remains incomplete"))
+assert((0..<largeNotice.pageCount).map { largeNotice.page($0) }.joined() == PreviewFixture.sourceDiagnostics)
+assert((0..<largeNotice.pageCount).allSatisfy { largeNotice.page($0).count <= NoticeContent.pageSize })
+let unicodeNotice = NoticeContent(String(repeating: "🧑🏽‍💻é\n", count: 4000))
+assert((0..<unicodeNotice.pageCount).map { unicodeNotice.page($0) }.joined() == unicodeNotice.message)
+assert(!NoticeContent("Connection unavailable.").needsDetails)
+assert(NoticeContent("Connection unavailable.").summary == "Connection unavailable.")
+assert(NoticeContent("").summary.isEmpty)
+let mixedNotice = NoticeContent(PreviewFixture.sourceDiagnostics + " Account service unavailable.")
+assert(mixedNotice.summary.contains("include") && mixedNotice.summary.contains("all reported issues"))
+assert(mixedNotice.page(mixedNotice.pageCount - 1).hasSuffix("Account service unavailable."))
+assert(NoticeContent(String(repeating: "line\n", count: 12)).needsDetails)
+print("PASS: bounded diagnostic summary counts warning occurrences; all original text survives paging, including Unicode")
+
+// A retained diagnostic set must not push a normal page's content out of reach.
+MainActor.assumeIsolated {
+    for width in [360.0, 820.0] {
+    let host = NSHostingView(rootView: ErrorNotice(message: PreviewFixture.sourceDiagnostics).frame(width: width))
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    let height = host.fittingSize.height
+    print("Synthetic diagnostic notice: \(PreviewFixture.sourceDiagnostics.count) characters; height \(height)"); fflush(stdout)
+    precondition(height <= 180, "Source diagnostics must leave room for page content")
+    }
+}
+print("PASS: thousands of retained source diagnostics leave normal page content reachable")

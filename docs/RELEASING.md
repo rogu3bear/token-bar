@@ -6,8 +6,8 @@ for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer
 then open Token Bar from Applications. No build tools or reboot are required.
 The installer preserves existing usage history and preferences.
 
-The source candidate is **0.1.11**, build **30111**, above the locally installed
-0.1.10/build 30110 development package. It is not a public release. Public
+The source candidate is **0.1.12**, build **30112**, above the locally installed
+0.1.11/build 30111 development package. It is not a public release. Public
 download pointers remain on notarized 0.1.9 until a new signed release exists.
 
 The app and installer are separately signed: Developer ID Application for the
@@ -129,7 +129,7 @@ For a local development package, use the same comparison with an explicit mode:
 ```sh
 env -u APP_SIGNING_IDENTITY -u INSTALLER_SIGNING_IDENTITY \
   TOKENBAR_DIST_DIR=/absolute/fresh/output ./scripts/package.sh
-./scripts/verify-release.sh --development <commit> /absolute/fresh/output/TokenBar-0.1.11-arm64.pkg
+./scripts/verify-release.sh --development <commit> /absolute/fresh/output/TokenBar-0.1.12-arm64.pkg
 ```
 
 Development mode skips only the Developer ID installer and stapled-ticket

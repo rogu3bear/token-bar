@@ -238,6 +238,11 @@ enum CostPreview {
             model.insights.refresh(home: root, force: true)
             try PreviewFixture.settle("failed prompt read") { !model.insights.busy }
         }
+        if arguments.contains("--sample-many-diagnostics") {
+            model.snapshot.error = PreviewFixture.sourceDiagnostics
+            // Exercise other consumers of the same shared notice without a live provider.
+            model.live.error = "Synthetic account service unavailable."
+        }
         if state != "empty" {
             let observed = PreviewFixture.date.addingTimeInterval(state == "failed" ? -600 : 0)
             let quota = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Codex", window: "primary", minutes: 300, used: 36, reset: PreviewFixture.date.addingTimeInterval(3600), date: observed)

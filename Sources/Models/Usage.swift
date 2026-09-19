@@ -326,21 +326,28 @@ final class UsageScanner {
         historicalIndex = [:]
         for (index, entry) in ledger.entries.enumerated() where entry.bucket == "day" { historicalIndex[historyKey(entry)] = index }
     }
-    func consume(_ data: Data, session: String, cursor: inout Cursor, account: Account?, poll: Date, historical: Bool = false, continuous: Bool = true) {
+    func consume(_ data: Data, session: String, cursor: inout Cursor, account: Account?, poll: Date, historical: Bool = false, continuous: Bool = true, replaySession: String? = nil) {
         // Ignore prompt-bearing records without decoding them.
         guard ["token_count", "turn_context", "session_meta"].contains(where: { data.range(of: Data($0.utf8)) != nil }) else { return }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let payload = root["payload"] as? [String: Any] else { return }
         if root["type"] as? String == "session_meta" {
             let sourceSession = payload["id"] as? String
+            let recovery = cursor.reconciliation
+            let retainedBoundary = cursor.admittedBoundary
+            let inheritedPrefix = replaySession != nil && replaySession == recovery?.session
             if let prior = cursor.sourceSession, sourceSession != prior {
                 let offset = cursor.offset, continuity = cursor.continuity, aliasWitness = cursor.aliasWitness
-                let gap = cursor.continuityGap ?? (cursor.reconciliation == nil ? nil : "Source continuity is incomplete across a session change; prior totals retained.")
+                let gap = cursor.continuityGap ?? (cursor.reconciliation == nil || inheritedPrefix ? nil : "Source continuity is incomplete across a session change; prior totals retained.")
                 cursor = Cursor(offset: offset)
                 cursor.continuity = continuity; cursor.continuityGap = gap; cursor.aliasWitness = aliasWitness
+                if inheritedPrefix {
+                    cursor.reconciliation = recovery
+                    cursor.admittedBoundary = retainedBoundary
+                }
             }
             cursor.sourceSession = sourceSession
-            if let sourceSession, let prior = cursor.reconciliation?.session, sourceSession != prior {
+            if !inheritedPrefix, let sourceSession, let prior = cursor.reconciliation?.session, sourceSession != prior {
                 cursor.continuityGap = "Source was replaced by a different session; prior totals retained."
                 cursor.reconciliation = nil
                 cursor.admittedBoundary = nil
@@ -375,7 +382,7 @@ final class UsageScanner {
         let recoveredBoundary = cursor.reconciliation.map { recovery in
             let matches = recovery.fingerprint.map { $0 == fingerprint && recovery.session == cursor.sourceSession } ??
                 ((ledger.eventIDs?.contains(fingerprint) == true || eventIndex?.contains(fingerprint) == true))
-            return matches && recovery.previous == total &&
+            return matches && (recovery.session == nil || recovery.session == cursor.sourceSession) && recovery.previous == total &&
                 (recovery.covered.map { total.input >= $0.total.input && total.output >= $0.total.output && date >= $0.date } ?? true)
         } ?? false
         if recoveredBoundary { cursor.reconciliation = nil }
@@ -469,6 +476,9 @@ final class UsageScanner {
         }
     }
     private func rememberCodexBoundary(_ total: Tokens, date: Date, fingerprint: String, cursor: inout Cursor, allowReset: Bool = false) {
+        // A copied parent's known identity cannot replace the child's retained
+        // recovery anchor before the child's own boundary is verified.
+        if let session = cursor.reconciliation?.session, session != cursor.sourceSession { return }
         if let old = cursor.admittedBoundary, old.session == cursor.sourceSession,
            (date < old.date || (!allowReset && (total.input < old.total.input || total.output < old.total.output))) { return }
         let boundary = CodexCounterBoundary(session: cursor.sourceSession, total: total, date: date, fingerprint: fingerprint)
@@ -612,7 +622,7 @@ final class UsageScanner {
             markMetadataDirty()
             ledger.dedupVersion = 1
             ledger.historyImportedAt = Date()
-            ledger.historyError = errors.isEmpty ? nil : Array(Set(errors)).joined(separator: " ")
+            ledger.historyError = errors.isEmpty ? nil : Set(errors).sorted().joined(separator: " ")
         }
         if let loadError { return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, account: account, error: loadError) }
         do { try requestArchive?.commit() }
@@ -625,6 +635,6 @@ final class UsageScanner {
             try saveIfNeeded(now: now, force: historical)
         } catch { errors.append("Usage history could not be saved: \(error.localizedDescription)") }
         return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, quotas: ledger.quotas.values.sorted { $0.name < $1.name }, account: account,
-            updated: now, started: ledger.started, error: errors.isEmpty ? ledger.historyError : Array(Set(errors)).joined(separator: " "), files: count, historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values).sorted { $0.lastSeen > $1.lastSeen }, accounts: Array((ledger.accounts ?? [:]).values).sorted { $0.label < $1.label }, additions: historical ? [] : Array(ledger.entries.dropFirst(initialCount)), integrity: ledger.integrity)
+            updated: now, started: ledger.started, error: errors.isEmpty ? ledger.historyError : Set(errors).sorted().joined(separator: " "), files: count, historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values).sorted { $0.lastSeen > $1.lastSeen }, accounts: Array((ledger.accounts ?? [:]).values).sorted { $0.label < $1.label }, additions: historical ? [] : Array(ledger.entries.dropFirst(initialCount)), integrity: ledger.integrity)
     }
 }

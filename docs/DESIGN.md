@@ -479,7 +479,14 @@ calendar/time-zone changes also invalidate cached selections. Saved usage loads
 before monitoring; settled source cursors remain independent of page navigation.
 No prompt text is added to persistent state. Shared status notices use red for
 read failures and orange for degraded evidence, with explicit explanatory text
-and accessible severity. Errors can be dismissed for the current presentation
+and accessible severity. Large diagnostic sets use a bounded shared summary
+and an explicit View diagnostic details action. Known continuity warnings are
+counted as warning occurrences, not unique sources; the summary keeps incomplete
+coverage visible and directs the reader to all reported issues. Details preserve
+the complete original text in selectable 3,000-character sections, with
+Previous, Next, Done and Escape. No full diagnostic text layout occurs before
+details are requested. Small ordinary errors keep their original copy.
+Errors can be dismissed for the current presentation
 without clearing the underlying error; invalid date ranges and incomplete-data
 warnings remain visible while applicable. Compact integrity indicators retain
 their existing persistent, non-banner treatment. Notice entrance/removal motion

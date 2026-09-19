@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 — Unreleased
+
+- Keep History, Cost and Insights usable with thousands of retained source warnings: show a compact incomplete-coverage summary and selectable details on demand, without deleting diagnostics.
+- Keep diagnostic ordering stable across refreshes and let native selectable text expose its own accessibility label, avoiding recursive accessibility reads when navigating to Cost.
+- Avoid a false replacement warning when replaying a fork log containing copied parent metadata before the original child. Recovery still requires the child’s exact counter boundary; genuine and previously retained gaps stay explicit.
+
 ## 0.1.11 — Unreleased
 
 - Retain the installed optional launch-time update check, its saved opt-out and privacy disclosures; downloads remain a manual browser action.

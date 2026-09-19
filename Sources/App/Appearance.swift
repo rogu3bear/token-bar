@@ -187,40 +187,6 @@ enum NoticeSeverity: String {
     var color: Color { self == .error ? .red : .orange }
 }
 
-/// One presentation for failures and degraded evidence; dismissal never clears source state.
-struct StatusNotice: View {
-    var message: String
-    var severity: NoticeSeverity
-    var dismissible = true
-    @State private var dismissed: String?
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var body: some View {
-        VStack(spacing: 0) {
-            if appeared && dismissed != message {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: severity.symbol).foregroundStyle(severity.color).accessibilityHidden(true)
-                    Text(message).font(.callout).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel(severity.rawValue + ": " + message)
-                    if dismissible {
-                        Button { dismissed = message } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.plain).accessibilityLabel("Dismiss " + severity.rawValue.lowercased()).help("Dismiss this notice")
-                    }
-                }.padding(12).background(severity.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            }
-        }.animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: appeared)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: dismissed)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: message)
-            .onAppear { appeared = true }
-    }
-}
-
-struct ErrorNotice: View {
-    var message: String
-    var body: some View { StatusNotice(message: message, severity: .error) }
-}
-
 /// Resolve AppKit dynamic colors in the same appearance as the hosted SwiftUI tree.
 /// Every bitmap renderer uses this boundary, including AppKit menu attachments.
 enum AppearanceRendering {
