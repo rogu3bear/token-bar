@@ -605,7 +605,8 @@ quota-burn claim is inferred without an appropriate comparable local baseline.
 ### Now decision hierarchy
 
 Each live tool leads with activity and a numeric estimated output rate with its
-native s/m/h control, followed by reporting coverage and the report timestamp.
+native s/m/h control, followed by reporting coverage and relative report age.
+A missing rate report stays “No current rate report”, not an invented clock.
 Remaining lives in that tool's provider column with the rate and dial, not on a
 full-bleed row above the gauges. The rate stays the large figure. Projected zero,
 the quota reading timestamp, reset, projection limitations and account/estimate
