@@ -521,3 +521,16 @@ let selectedPoints = try scopedDetails.recover(points, intervals: intervals, acc
 check(selectedPoints.map { $0.date.timeIntervalSince(meterNow) } == [-500, -300, -200, -50, 0],
       "Merged interval lookup preserves open starts, closed ends, overlaps and excluded gaps")
 print("PASS: merged interval scope boundaries and indexed physical archive read work")
+
+do {
+    let stamp = Date(timeIntervalSince1970: 1_000_000_000)
+    let idle = UsageComparisonStore.calculatedCaption(stamp, updating: false)
+    check(idle == "Calculated " + stamp.formatted(date: .abbreviated, time: .standard),
+          "Idle comparison caption is the absolute calculation clock")
+    check(UsageComparisonStore.calculatedCaption(stamp, updating: true)
+          == idle + " · previous result while updating",
+          "A refresh labels the retained calculation instead of implying a new one")
+    check(UsageComparisonStore().calculatedCaption == nil,
+          "An uncalculated comparison has no calculated-at caption")
+}
+print("PASS: account-total and allowance-window comparisons share one calculated-at caption")

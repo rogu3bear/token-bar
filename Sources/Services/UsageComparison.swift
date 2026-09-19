@@ -174,6 +174,14 @@ final class ComparisonDetails {
     private(set) var metering: [String: MeteringComparison] = [:]
     private(set) var busy = false
     private(set) var calculatedAt: Date?
+    /// Account-total and allowance-window sheets share this calculated-at face.
+    static func calculatedCaption(_ date: Date, updating: Bool) -> String {
+        "Calculated " + date.formatted(date: .abbreviated, time: .standard)
+            + (updating ? " · previous result while updating" : "")
+    }
+    var calculatedCaption: String? {
+        calculatedAt.map { Self.calculatedCaption($0, updating: busy) }
+    }
     private(set) var builds = 0
     private(set) var recoveryError: String?
     @ObservationIgnored private var desired: Key?
