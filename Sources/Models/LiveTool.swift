@@ -146,9 +146,10 @@ enum CompactLiveCopy {
         let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
         return "~" + number + " tok/" + unit.rawValue
     }
-    /// Idle remaining rows keep remaining as the only large figure.
+    /// Non-working rows keep remaining as the only large figure; Idle and
+    /// Unconfirmed are captions, never a rate-sized dash.
     static func rateHeadline(activity: String, available: Bool, amount: Double, unit: RateUnit) -> String? {
-        guard activity != "Idle" else { return nil }
+        guard activity == "Working" else { return nil }
         return rate(available, amount: amount, unit: unit)
     }
     static func remaining(_ estimate: Runway?) -> String {

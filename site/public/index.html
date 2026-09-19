@@ -62,7 +62,7 @@
         <div class="menu-preview">
           <div class="surface-heading">
             <h3>Menu bar</h3>
-            <p>A dial, your speed, and what’s left.</p>
+            <p>Remaining is the instrument. Speed only while a tool is working.</p>
           </div>
           <div class="menu-viewport" tabindex="0" role="region" aria-label="Enlarged menu-bar preview">
             <div class="recording-frame native-menu">
@@ -96,11 +96,20 @@
         </div>
         <div class="surface-heading dashboard-heading">
           <h3>Quiet when nothing is running</h3>
+          <p>Remaining stays named on the menu bar. Unused zeros stay off.</p>
+        </div>
+        <div class="menu-preview">
+          <div class="menu-viewport" tabindex="0" role="region" aria-label="Idle menu-bar remaining">
+            <img class="native-menu" src="/menu-bar-idle.png?v=019-remaining" width="560" height="40" alt="Token Bar menu bar while idle: named Codex and Claude remaining, no speed line" />
+          </div>
+        </div>
+        <div class="surface-heading dashboard-heading">
+          <h3>Closer look</h3>
           <p>Unused zeros stay off the popover. Measured Codex and Claude remaining stay named.</p>
         </div>
         <div class="popover-preview">
           <img src="/popover-idle.png?v=019-remaining" width="440" height="411" loading="lazy" alt="Token Bar popover while idle: named remaining, Quota Guard, and saved Today history" />
-          <p class="recording-note">Open the popover for remaining allowance, current activity and saved usage. Unused Codex and Grok zeros stay off this list. Quota Guard shows available evidence; no warning does not guarantee remaining capacity. Notifications are optional and off by default.</p>
+          <p class="recording-note">Open the popover for remaining allowance, current activity and saved usage. Unused Codex zeros and idle Grok remaining stay off this list. Quota Guard shows available evidence; no warning does not guarantee remaining capacity. Notifications are optional and off by default.</p>
         </div>
       </section>
       <section class="details wrap" id="how">
@@ -115,7 +124,7 @@
           </div></article>
           <article><span class="index mono">02</span><div>
             <h3>What allowance remains?</h3>
-            <p>Now keeps supported account allowances visible even when tools are idle. Idle Auto names measured Codex and Claude remaining; unused Codex and Grok zeros stay off Auto and the popover. Quota Guard identifies fresh, account-bound risks; stale and unavailable readings stay explicit. Forecasts use account observations, independently of output speed.</p>
+            <p>Now keeps supported account allowances visible even when tools are idle. Idle Auto names measured Codex and Claude remaining; unused Codex zeros and idle Grok remaining stay off Auto and the popover. Quota Guard identifies fresh, account-bound risks; stale and unavailable readings stay explicit. Forecasts use account observations, independently of output speed.</p>
           </div></article>
           <article><span class="index mono">03</span><div>
             <h3>Where did the usage go?</h3>

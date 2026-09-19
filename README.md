@@ -6,6 +6,10 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar menu bar showing Codex estimated output speed in tok/s and remaining account allowance](site/public/menu-bar-demo.png)
 
+**Idle menu bar**
+
+![Token Bar menu bar while idle: named Codex and Claude remaining](site/public/menu-bar-idle.png)
+
 **Dashboard**
 
 ![Token Bar native dashboard showing estimated Codex output speed and account allowance](site/public/dashboard-demo.png)
@@ -32,8 +36,8 @@ saved measurements on your Mac and updates them as new records arrive.
   popover.
 - **Keep account allowance in view.** Supported Codex and Claude remaining stays
   on the menu bar and on Now, with reset times and an estimated time to
-  exhaustion when enough observations exist. Unused Codex and Grok zeros stay
-  off Auto.
+  exhaustion when enough observations exist. Unused Codex zeros and idle Grok
+  remaining stay off Auto.
 - **Explore saved history.** Filter by tool, task, model, project, account or day;
   export the matching records to CSV.
 - **Pick up where you left off.** Collected data persists between launches.

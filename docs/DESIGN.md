@@ -77,7 +77,9 @@ never starts monitoring or reads production history/preferences. Its
 `capture.json` records sample values and frame timestamps. Encode frames at
 those timestamps with FFmpeg; do not invent or smooth a different display.
 The genuine still render remains available through `--render-preview`.
-The motion fixture starts with Codex alone and supplies Claude activity and
+`--render-motion-preview --sample-idle` captures one idle status-item remaining
+still through the same `MenuBarPresentation.combined` owner; it does not replace
+the working Codex-only poster. The motion fixture starts with Codex alone and supplies Claude activity and
 quota together when Claude joins. Its Codex-only frame 105 is the still poster;
 the settled loop retains both tools. Speed readouts place the selected `tok/s`,
 `tok/m`, or `tok/h` beside the number as well as offering the unit selector.
@@ -153,6 +155,8 @@ activity. Remaining you still have is the instrument.
 2. Idle Auto names measured Codex and Claude remaining, including Claude at a
    measured zero. Unused Codex or Grok zeros stay off Auto and the popover.
    Idle Grok remaining stays off Auto. Unavailable readings do not mint a name.
+   Two named remainings concatenate each tool’s single-tool remaining face.
+   Idle Auto does not use Total or the working mixed quota labels.
 3. When Auto has working tools, occupancy follows activity and measured rate
    only. Exhausted Claude may still appear in the popover; it does not join a
    working Auto line as a second occupant. Idle remaining does not sit beside a
@@ -194,8 +198,9 @@ rates in one displayed unit and labels partial reporting; it never adds quota
 percentages or projects a combined exhaustion time. Each remaining allowance
 keeps its tool identity and the shared accent. A single-tool menu-bar readout
 names the tool once at the start; its quota field does not repeat that name,
-including when unavailable. Mixed-tool Auto readouts name each separate quota
-so an allowance cannot be mistaken for the active tool's quota. This is a
+including when unavailable. Idle Auto with more than one remaining concatenates
+those same named remaining faces. Working mixed-tool Auto readouts name each
+separate quota so an allowance cannot be mistaken for the active tool's quota. This is a
 composition rule across all field selections, orders and compactness settings;
 it does not reset saved configuration. The dropdown groups each tool's speed
 with its allowance. Explicit selections preserve single-tool behavior. The default is dial, output rate, and quota, separated by spaces.
@@ -645,6 +650,7 @@ evidence demonstrations.
 | `--render-cost-preview --sample-history` | Same fixture → DashboardRoot / History | Separate secondary image; no startup/import claim. |
 | `--render-compact-preview`, `--preview-tools` | ProductPreview → QuickLiveView or DashboardRoot | Shipping compact/dashboard views; disposable preferences; explicit interactive variant. |
 | `--render-motion-preview` | ProductMotionPreview → DashboardRoot / Now and MenuBarPresentation.combined | Two separate output streams, not a composite; fixed frame-indexed sample times. Real native animation scheduling may differ between hosts. |
+| `--render-motion-preview --sample-idle` | Same owners, one idle frame | Status-item remaining without a speed line; Dark/Lime marketing still. |
 | `--render-pages-preview` | CostPreview → one DashboardRoot destination per PNG | Default populated, fixed report clock; explicit partial/failed demonstrations. |
 | `--layout-matrix`, `--sample-light` | Native layout diagnostics | Explicit Light/Dark alternatives, each in its own image; never a mixed-theme hero. |
 | `--render-history-preview` | HistoryPreview → shipping History | Synthetic saved/import-in-progress behavior diagnostic; distinct from marketing History still. |
@@ -652,6 +658,7 @@ evidence demonstrations.
 | `--render-welcome`, `--preview-welcome` | FirstRunWelcome with AppearanceHost | Isolated onboarding diagnostic, not a dashboard product image. |
 | `scripts/encode-motion-preview.sh` | Native frame encoding only | No redraw or montage; Codex-only native frame 105 is the poster and frame 1359 anchors the settled loop. |
 | `site/public/dashboard-lime.png` | Canonical Now still | Regenerate through ProductPreview; no image-editing pass. |
+| `site/public/menu-bar-idle.png` | Idle status-item remaining | `--render-motion-preview --sample-idle`; Dark/Lime; does not replace the working poster. |
 | `site/public/*-demo.png/mp4` | Native motion frames and encodes | Synthetic recordings only; no site-specific dashboard recreation. |
 
 `bash scripts/verify-product-previews.sh <new-directory>` renders each canonical

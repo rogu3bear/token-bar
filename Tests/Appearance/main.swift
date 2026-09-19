@@ -208,6 +208,7 @@ let motion = try String(contentsOf: sourceRoot.appendingPathComponent("App/Produ
 assert(motion.contains("DashboardRoot(model: model)"))
 assert(motion.contains("MenuBarPresentation.combined("))
 assert(!motion.contains("MenuBarPresentation.attributed("))
+assert(motion.contains("--sample-idle"), "Idle remaining still uses the status-item owner")
 print("PASS: all hosting/capture routes retain the appearance boundary and marketing uses shipping composition")
 
 PreviewFixture.prepare()

@@ -62,7 +62,7 @@ private struct CompactToolFace: View {
             } else {
                 VStack(alignment: .trailing, spacing: 2) {
                     remainingNumber
-                    Text("Idle").font(.caption).foregroundStyle(.secondary)
+                    Text(activity).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -76,7 +76,7 @@ private struct CompactToolFace: View {
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title + ", " + accessibilityRate + ", " + remaining + " remaining" + (detail.map { ", " + $0 } ?? ""))
+        .accessibilityLabel(title + ", " + accessibilityRate + ", " + (remainingAvailable ? remaining + " remaining" : "remaining unavailable") + (detail.map { ", " + $0 } ?? ""))
         .accessibilityValue(expanded ? "Expanded" : "Collapsed")
         .accessibilityHint(expanded ? "Hides remaining details" : "Shows remaining details")
         .accessibilityAddTraits(.isButton)

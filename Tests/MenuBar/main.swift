@@ -485,6 +485,17 @@ let idleClaudeRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex
 assert(idleClaudeRemaining.string.contains("Codex") && idleClaudeRemaining.string.contains("40% remaining"), idleClaudeRemaining.string)
 assert(idleClaudeRemaining.string.contains("Claude") && idleClaudeRemaining.string.contains("60% remaining"), idleClaudeRemaining.string)
 assert(!idleClaudeRemaining.string.contains("Total") && !idleClaudeRemaining.string.contains("tok/"), idleClaudeRemaining.string)
+assert(idleClaudeRemaining.string.hasPrefix(unusedRemaining.string),
+       "Mixed idle remaining reuses the single-tool status-item face: \(idleClaudeRemaining.string)")
+func remainingFaceSize(_ text: NSAttributedString, matching: String) -> CGFloat? {
+    let range = (text.string as NSString).range(of: matching)
+    guard range.location != NSNotFound else { return nil }
+    return (text.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont)?.pointSize
+}
+assert(remainingFaceSize(unusedRemaining, matching: "40% remaining") == 13)
+assert(remainingFaceSize(idleClaudeRemaining, matching: "40% remaining") == 13,
+       "Idle remaining on the status item is the 13pt remaining face, not mixed quota labels")
+assert(remainingFaceSize(idleClaudeRemaining, matching: "60% remaining") == 13)
 let savedIdleAccount = monitor.state.accounts["a"]
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
 let idleClaudeOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
@@ -528,6 +539,8 @@ assert(CompactLiveCopy.rate(false, amount: 0, unit: .second) == "—")
 assert(CompactLiveCopy.rateHeadline(activity: "Idle", available: false, amount: 0, unit: .second) == nil,
        "Idle remaining rows do not put Idle in the rate-sized slot")
 assert(CompactLiveCopy.rateHeadline(activity: "Working", available: true, amount: 7680, unit: .minute) == "~7.7k tok/m")
+assert(CompactLiveCopy.rateHeadline(activity: "Unconfirmed", available: false, amount: 0, unit: .second) == nil,
+       "A non-working Unconfirmed row keeps remaining as the only large figure")
 assert(CompactLiveCopy.remaining(exhausted) == "0%")
 assert(CompactLiveCopy.remaining(nil) == "—")
 assert(CompactLiveCopy.detail(reading: nil, estimate: nil, now: now) == "Unavailable")

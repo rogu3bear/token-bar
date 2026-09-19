@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- Popover rows for a tool that is not working but reads Unconfirmed keep remaining as the only large figure with Unconfirmed as the caption; the rate-sized dash was only for working tools. VoiceOver names unavailable remaining as unavailable instead of reading a dash. Copy now says idle Grok remaining stays off the menu bar and popover, matching the shipped rule, not just Grok zeros.
 - Default accent follows the macOS control accent and System appearance. A saved custom hex is unchanged; marketing stills still use Dark/Lime.
-- Idle Auto names measured Codex and Claude remaining in the menu bar and popover. Speed stays off when nothing is running; unused Codex and Grok zeros stay off. Idle popover remaining is the large figure; Idle stays caption.
+- Idle Auto names measured Codex and Claude remaining in the menu bar and popover. Speed stays off when nothing is running; unused Codex and Grok zeros stay off. Idle popover remaining is the large figure; Idle stays caption. Mixed idle remaining on the status item reuses each tool’s single-tool remaining face.
 - Method copy no longer treats a two-minute-old Claude reading as unavailable. Claude stays current for 30 minutes and shows its age after two minutes.
 - Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.
 - Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero.

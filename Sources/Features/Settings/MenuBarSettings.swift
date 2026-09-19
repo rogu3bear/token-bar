@@ -91,17 +91,29 @@ struct MenuBarPresentation {
                                   tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
             }
             if named.count > 1 {
-                quiet.enabled.remove(.quota)
                 quiet.enabled.remove(.risk)
                 let result = NSMutableAttributedString()
                 if quiet.enabled.contains(.icon) {
-                    result.append(attributed(quiet, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
+                    var iconOnly = quiet
+                    iconOnly.enabled = [.icon]
+                    result.append(attributed(iconOnly, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
                                              claudeQuota: claudeQuota, grokQuota: grokQuota))
                 }
-                appendQuota(result, tools: named)
+                var pieces = quiet
+                pieces.enabled.remove(.icon)
+                let glue = NSAttributedString(string: settings.separator, attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular),
+                    .foregroundColor: NSColor.labelColor
+                ])
+                for tool in named {
+                    if result.length > 0 { result.append(glue) }
+                    result.append(attributed(pieces, meter: Tachometer(), monitor: monitor, now: now,
+                                             accent: NSColor(tool.color(in: palette)),
+                                             tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota))
+                }
                 if settings.enabled.contains(.risk), let riskText {
-                    let glue = result.length == 0 ? "" : settings.separator
-                    result.append(NSAttributedString(string: glue + riskText,
+                    let join = result.length == 0 ? "" : settings.separator
+                    result.append(NSAttributedString(string: join + riskText,
                         attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
                 }
                 return result
@@ -264,7 +276,7 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet about rate when nothing is running. Idle Auto still names measured Codex and Claude remaining. Unused Codex or Grok zeros stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
+                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet about rate when nothing is running. Idle Auto still names measured Codex and Claude remaining. Unused Codex zeros and idle Grok remaining stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
                 Picker("Rate units", selection: $preferences.configuration.unit) {
                     Text("Follow selected tool").tag("dashboard")
                     Text("Tokens / second").tag("s")

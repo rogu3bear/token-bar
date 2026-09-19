@@ -74,6 +74,34 @@ enum ProductMotionPreview {
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         model.menuBarPreferences.configuration = settings
+        if CommandLine.arguments.contains("--sample-idle") {
+            for meter in [model.tachometer, model.claudeMeter, model.grokMeter] {
+                meter.activity = ActivitySnapshot(readAt: now, referenceDate: now)
+                meter.tick(now: now)
+            }
+            model.claudeQuota.quota.samples = [claudeFirst]
+            model.claudeQuota.quota.readings = [claudeQuota]
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            menuHost.rootView = menuView(now: now)
+            dashboard.layoutSubtreeIfNeeded()
+            menuHost.layoutSubtreeIfNeeded()
+            try capture(menuHost, to: directory.appendingPathComponent("menu-idle.png"))
+            try capture(dashboard, to: directory.appendingPathComponent("now-idle.png"))
+            let remaining = MenuBarPresentation.combined(settings, codex: model.tachometer, claude: model.claudeMeter,
+                grok: model.grokMeter, monitor: model.live, now: now, palette: model.appearance.toolPalette,
+                claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota)
+            precondition(remaining.string.contains("Codex") && remaining.string.contains("remaining"), remaining.string)
+            precondition(remaining.string.contains("Claude") && remaining.string.contains("remaining"), remaining.string)
+            precondition(!remaining.string.contains("tok/"), remaining.string)
+            let receipt: [String: Any] = ["synthetic": true, "idle": true, "fixtureDate": now.ISO8601Format(),
+                "dashboard": "DashboardRoot / LiveToolPanels", "menu": "MenuBarPresentation.combined",
+                "appearance": "Dark", "accent": AppearancePreferences.marketingAccent,
+                "statusItem": remaining.string]
+            try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
+                .write(to: directory.appendingPathComponent("capture.json"))
+            print("Evaluated idle remaining on the status item; native raster capture: true; output: \(directory.path)")
+            return
+        }
         // Independent synthetic workloads and quota observations; never production conversion.
         // The website dissolves the settled sample replay while retaining both faces.
         let codexCycle = [128, 131, 127, 130, 125, 129, 132, 128, 126, 130]
