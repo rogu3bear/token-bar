@@ -17,14 +17,6 @@ enum OpenCodeUsage {
     /// intent, not by omission.
     static let permittedTables = ["message"]
 
-    static func databaseURL() -> URL {
-        if let override = ProcessInfo.processInfo.environment["OPENCODE_HOME"], !override.isEmpty {
-            return URL(fileURLWithPath: override).appendingPathComponent("opencode.db")
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local/share/opencode/opencode.db")
-    }
-
     struct Turn {
         var messageID: String
         var session: String
