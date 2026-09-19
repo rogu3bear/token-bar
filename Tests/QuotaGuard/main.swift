@@ -18,6 +18,7 @@ func decision(_ i: QuotaGuardInput, now: Date = base) -> QuotaGuardDecision {
 }
 let low = decision(input(reading()))
 check(low.risk == .low && low.evidence == .insufficient && low.remaining == 8, "fresh low remains actionable while learning")
+check(CompactLiveCopy.percent(low.remaining!) == "8%", "Guard remaining uses the same whole-percent face")
 check(decision(input(reading(used: 100))).risk == .observedExhaustion, "provider 100 percent is observed exhaustion")
 for value in [Double.nan, .infinity, -1, 101] {
     let d = decision(input(reading(used: value)))
@@ -94,6 +95,8 @@ do {
     f.update(reading(30)); check(f.adapter.requests.count == 1, "next fresh low alerts")
     let request = f.adapter.requests[0]
     check(!request.sound && !request.body.contains("synthetic-a") && !request.id.contains("synthetic-a") && request.id.count < 100, "opaque bounded notification without account data")
+    check(request.body.contains("8% remaining") && !request.body.contains("8.0%"), "notification remaining is the whole-percent face")
+    check(f.guardModel.menuText(selection: .auto)?.contains(" 8%") == true, "menu warning remaining is the same face")
     check(f.guardModel.submissionState.contains("delivery not confirmed"), "submitted differs from delivered")
     f.guardModel.tick(); f.update(reading(30)); f.update(reading(60))
     check(f.adapter.requests.count == 1, "ticks duplicates and steady low do not repeat")

@@ -49,7 +49,7 @@ struct QuotaGuardSummary: View {
     private func summaryText(_ decision: QuotaGuardDecision) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(decision.title).font(.caption.weight(.semibold)).lineLimit(2).help(decision.title)
-            Text(decision.riskLabel + (decision.remaining.map { String(format: " · %.0f%% remaining", $0) } ?? "") +
+            Text(decision.riskLabel + (decision.remaining.map { " · " + CompactLiveCopy.percent($0) + " remaining" } ?? "") +
                  (decision.forecast.map { " · " + Runway.clockLabel($0, now: decision.evaluated) } ?? ""))
                 .font(.caption).fixedSize(horizontal: false, vertical: true)
         }.help(decision.reason.label + ". Expand All allowances for source and reset times.")
@@ -66,7 +66,7 @@ struct QuotaGuardSummary: View {
     private func row(_ decision: QuotaGuardDecision) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(decision.title).font(.caption.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            Text(decision.riskLabel + (decision.remaining.map { String(format: " · %.0f%% remaining", $0) } ?? ""))
+            Text(decision.riskLabel + (decision.remaining.map { " · " + CompactLiveCopy.percent($0) + " remaining" } ?? ""))
                 .font(.caption).foregroundStyle(decision.risk == .observedExhaustion ? Color.red : Color.primary)
             if let forecast = decision.forecast { Text("At recent burn: " + Runway.clockLabel(forecast, now: decision.evaluated)).font(.caption) }
             Text(decision.reason.label).font(.caption).foregroundStyle(.secondary)
@@ -87,7 +87,7 @@ struct QuotaGuardDetail: View {
             Text(evidence.title).font(.headline).fixedSize(horizontal: false, vertical: true)
             if coordinator.selectedEvidence == nil { Text("Historical observation: this allowance is no longer current. It has not been redirected to another account or window.").foregroundStyle(.orange) }
             else if !coordinator.selectedIsCurrent { Text("No fresh assessment is available for this allowance.").foregroundStyle(.orange) }
-            Text(evidence.riskLabel + (evidence.remaining.map { String(format: " · %.1f%% remaining", $0) } ?? ""))
+            Text(evidence.riskLabel + (evidence.remaining.map { " · " + CompactLiveCopy.percent($0) + " remaining" } ?? ""))
             Text(evidence.reason.label)
             if let r = evidence.reading {
                 Text("Bucket: " + r.bucket + " · Window: " + r.window)

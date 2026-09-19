@@ -137,9 +137,7 @@ struct MenuBarPresentation {
     static func values(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, labelQuota: Bool = true) -> [MenuBarPart: String] {
         let unit = RateUnit(rawValue: settings.unit) ?? meter.unit
         let amount = meter.rawRate * unit.multiplier
-        let formatted = unit != .second && amount >= 1_000
-            ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
-        let rate = meter.hasRate ? "~" + formatted : "—"
+        let rate = CompactLiveCopy.rate(meter.hasRate, amount: amount, unit: unit)
         let activity = meter.activity
         let counts = "\(activity.chatCount)c \(activity.agentCount)a"
             + (activity.unknownCount > 0 ? " \(activity.unknownCount)?" : "")
@@ -147,7 +145,7 @@ struct MenuBarPresentation {
         let state = quotaState(for: tool, monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota)
         let quota = Runway.priority(state.readings, samples: state.samples, now: now, horizon: state.horizon)
         let estimate = quota.map { Runway.estimate($0, samples: state.samples, now: now, horizon: state.horizon) }
-        let remaining = estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
+        let remaining = CompactLiveCopy.remaining(estimate)
         let zero = estimate?.exhaustion.map { Runway.clockLabel($0, now: now) } ?? "—"
         // A single-tool title already establishes identity for all its fields.
         // Standalone quotas in Auto's mixed-tool readout still need their name.
@@ -158,12 +156,12 @@ struct MenuBarPresentation {
         let paceName = settings.enabled.contains(.fable) ? "" : "Fable "
         return [
             .icon: "◈", .activity: settings.compact && activity.readAt != nil ? counts : meter.status,
-            .rate: rate + " tok/" + unit.rawValue,
+            .rate: rate,
             .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
-            .zero: "Zero " + zero, .dial: "Speed dial " + rate + " tok/" + unit.rawValue,
+            .zero: "Zero " + zero, .dial: "Speed dial " + rate,
             .fable: {
                 guard let fable, fable.remaining > 0 else { return "" }
-                return String(format: "Fable %.0f%% · ", fable.remaining) + fable.binding
+                return "Fable " + CompactLiveCopy.percent(fable.remaining) + " · " + fable.binding
             }(),
             .fablePace: {
                 guard let pace else { return "" }
