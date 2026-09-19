@@ -25,11 +25,10 @@ enum ClaudeUsageRefresh {
     static func executable(environment: [String: String] = ProcessInfo.processInfo.environment,
                            userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
                            isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) -> String? {
-        if let override = environment["CLAUDE_CLI_PATH"] { return isExecutable(override) ? override : nil }
-        let path = (environment["PATH"] ?? "").split(separator: ":").map { String($0) + "/claude" }
-        let extras = [userHome.appendingPathComponent(".local/bin/claude").path, userHome.appendingPathComponent(".claude/local/claude").path,
-                      "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
-        return (path + extras).first(where: isExecutable)
+        CLIExecutable.path(name: "claude", overrideVariable: "CLAUDE_CLI_PATH",
+                           extras: [userHome.appendingPathComponent(".local/bin/claude").path, userHome.appendingPathComponent(".claude/local/claude").path,
+                                    "/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
+                           environment: environment, isExecutable: isExecutable)
     }
     /// Telemetry, error reporting and self-update stay off for this background request.
     static func environment(_ base: [String: String]) -> [String: String] {
