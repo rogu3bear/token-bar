@@ -21,7 +21,7 @@ struct ClaudeConnectionControl: View {
                 }
             }
             if !compact && model.status == .notConnected {
-                Text("Connect captures local status-line data. Quota uses Claude Code’s account-matched usage cache; relay readings have no account identity.")
+                Text(ClaudeQuotaSource.connectionCaption)
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let caveat = model.caveat { Text(caveat).font(.caption).foregroundStyle(.secondary) }

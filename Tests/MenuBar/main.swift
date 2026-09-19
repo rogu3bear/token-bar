@@ -118,6 +118,7 @@ assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: c
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(90)) == "")
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(660)) == " · 11 min ago")
 assert(ClaudeQuotaSource.relayHelp.contains("claude-statusline-relay.sh") && ClaudeQuotaSource.relayHelp.contains("statusLine"))
+assert(ClaudeQuotaSource.connectionCaption.contains("no account identity") && ClaudeQuotaSource.connectionCaption.contains("usage cache"), "Connect panel caption is the quota-source no-identity claim")
 let mixed = Runway.estimate(freshClaude[0], samples: monitor.state.samples + [freshClaude[0]], now: cacheNow)
 assert(mixed.exhaustion == nil, "Codex observations cannot supply Claude's burn slope")
 func cacheUtilization(fiveHour: [String: Any]?, sevenDay: [String: Any]?, account: String = "a", age: Double = 0) throws -> Data {
