@@ -172,7 +172,9 @@ exception.
 `MenuBarPresentation.combined` is the single occupancy owner for the status item
 and the settings preview. `LiveTool.compact` owns popover rows.
 `LiveTool.nowOccupied` owns Now columns. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
-Auto and the popover. A new quiet-exception that is not rule 2 requires changing this section
+Auto and the popover. `CompactLiveCopy.percent` and `CompactLiveCopy.remaining`
+own the remaining-percent face: a whole percent, or unavailable. Quota Guard,
+Now, the popover and the status item do not keep a private tenth. A new quiet-exception that is not rule 2 requires changing this section
 and a MenuBar test that names the tool.
 
 ## Independent tool speeds

@@ -192,7 +192,7 @@ struct QuotaGuardDisk: Codable {
             // Submit only from this fresh source event. Async completions never submit another request.
             submissionState = "Notification evaluated; submission pending"
             adapter?.submit(QuotaNotification(id: requestID, title: decision.tool.label + " allowance warning",
-                body: decision.windowLabel + " allowance " + decision.id.prefix(6) + ": " + String(format: "%.0f%% remaining. ", decision.remaining!) + decision.riskLabel + ". Open Token Bar for the exact allowance and evidence.", sound: settings.sound)) { [weak self] success in
+                body: decision.windowLabel + " allowance " + decision.id.prefix(6) + ": " + CompactLiveCopy.percent(decision.remaining!) + " remaining. " + decision.riskLabel + ". Open Token Bar for the exact allowance and evidence.", sound: settings.sound)) { [weak self] success in
                 guard let self else { return }
                 guard self.disk.episodes[decision.id]?.requestID == requestID else { self.adapter?.remove([requestID]); return }
                 self.disk.episodes[decision.id]?.failed = !success
@@ -225,7 +225,7 @@ struct QuotaGuardDisk: Codable {
     }
     func menuText(selection: MenuBarTool?) -> String? {
         let warning = decisions.first { $0.risk != .none && (selection == nil || selection == .auto || selection?.rawValue == $0.tool.rawValue) }
-        return warning.map { $0.tool.label + " " + $0.windowLabel + " " + String(format: "%.0f%%", $0.remaining ?? 0) + " · " + $0.riskLabel }
+        return warning.map { $0.tool.label + " " + $0.windowLabel + ($0.remaining.map { " " + CompactLiveCopy.percent($0) } ?? "") + " · " + $0.riskLabel }
     }
     func view(_ decision: QuotaGuardDecision) { selected = decision; reveal?() }
     var selectedEvidence: QuotaGuardDecision? {

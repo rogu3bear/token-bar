@@ -133,8 +133,12 @@ enum CompactLiveCopy {
         let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
         return "~" + number + " tok/" + unit.rawValue
     }
+    /// Whole percent. Tenths are not a second remaining face.
+    static func percent(_ remaining: Double) -> String {
+        String(format: "%.0f%%", remaining)
+    }
     static func remaining(_ estimate: Runway?) -> String {
-        estimate.map { String(format: "%.0f%%", $0.remaining) } ?? "—"
+        estimate.map { percent($0.remaining) } ?? "—"
     }
     static func detail(reading: QuotaReading?, estimate: Runway?, now: Date) -> String {
         if let estimate {

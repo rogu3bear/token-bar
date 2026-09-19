@@ -47,7 +47,9 @@ config.unit = "h"
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == "~7.2k tok/h")
 assert(meter.unit == .minute, "Independent menu units must not alter dashboard units")
 meter.hasRate = false
-assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == "— tok/h")
+assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == "—",
+       "Unavailable speed is not a tok/h reading")
+assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == CompactLiveCopy.rate(false, amount: 0, unit: .hour))
 let quota = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 60, reset: now.addingTimeInterval(86400), date: now)
 monitor.currentID = "a"
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [quota])
@@ -491,6 +493,9 @@ assert(CompactLiveCopy.rate(true, amount: 7680, unit: .minute) == "~7.7k tok/m")
 assert(CompactLiveCopy.rate(false, amount: 0, unit: .second) == "—")
 assert(CompactLiveCopy.remaining(exhausted) == "0%")
 assert(CompactLiveCopy.remaining(nil) == "—")
+assert(CompactLiveCopy.percent(8.3) == "8%", "Remaining is a whole percent; tenths are not a second face")
+assert(CompactLiveCopy.percent(8.7) == "9%")
+assert(CompactLiveCopy.remaining(Runway(remaining: 8.3, message: "fixture")) == CompactLiveCopy.percent(8.3))
 assert(CompactLiveCopy.detail(reading: nil, estimate: nil, now: now) == "Unavailable")
 assert(CompactLiveCopy.detail(reading: QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 100, reset: now.addingTimeInterval(86400), date: now), estimate: exhausted, now: now).contains("Exhausted"))
 print("PASS: compact popover remaining copy stays short and does not invent a figure")
@@ -629,7 +634,7 @@ do {
     assert(abs((halfway.attribute(MenuBarDial.position, at: 0, effectiveRange: nil) as! Double) - 0.5) < 0.001)
     let other = presentation(0.9, "Claude ~90 tok/s", id: "claude")
     assert(MenuBarValueAnimator.signature(MenuBarValueAnimator.frame(from: first, to: other, progress: 0)).isEqual(to: MenuBarValueAnimator.signature(other)), "New tools never inherit another tool's needle")
-    let missing = presentation(0, "Codex — tok/s", available: false)
+    let missing = presentation(0, "Codex —", available: false)
     assert(MenuBarValueAnimator.signature(MenuBarValueAnimator.frame(from: first, to: missing, progress: 0.5)).isEqual(to: MenuBarValueAnimator.signature(missing)), "Unavailable data cannot retain an animated measurement")
     assert(MenuBarValueAnimator.signature(first).isEqual(to: MenuBarValueAnimator.signature(presentation(0.2, "Codex ~20 tok/s"))), "Fresh image objects do not cause unchanged-value animation")
     _ = NSApplication.shared
@@ -663,7 +668,10 @@ do {
     RunLoop.main.run(until: Date().addingTimeInterval(0.08))
     assert(!detached.isAnimating, "Releasing a presentation owner cancels its animation timer")
     var compactSettings = MenuBarConfiguration(); compactSettings.compact = true
+    meter.hasRate = true
     assert(MenuBarPresentation.values(compactSettings, meter: meter, monitor: monitor, now: now)[.rate]!.contains(" tok/"))
+    meter.hasRate = false
+    assert(MenuBarPresentation.values(compactSettings, meter: meter, monitor: monitor, now: now)[.rate] == "—")
 }
 print("PASS: native menu animation preserves measured text/units, tool identity, missing values, reduced motion, retargeting and timer cleanup")
 

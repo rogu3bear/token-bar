@@ -87,7 +87,7 @@ struct QuotaTrendCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(quota.name + " · " + (quota.minutes >= 1440 ? "\(quota.minutes / 1440) days" : "\(quota.minutes / 60) hours")).font(.headline)
             HStack(alignment: .firstTextBaseline) {
-                Text(String(format: "%.0f%%", max(0, 100 - quota.used))).font(PageStyle.title)
+                Text(CompactLiveCopy.percent(max(0, 100 - quota.used))).font(PageStyle.title)
                 Text(current ? "remaining at last reading" : "remaining when last observed").font(.caption).foregroundStyle(.secondary)
             }
             if points.count >= 2 {
