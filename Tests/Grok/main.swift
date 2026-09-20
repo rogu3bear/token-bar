@@ -400,3 +400,10 @@ do {
     check(updated.first?.kind == .agent && updated.first?.output == 20, "Usage update preserves metadata-only agent and new output")
 }
 print("PASS: Grok metadata-only child classification survives usage events and metadata-before-summary order")
+
+do {
+    let now = Date(timeIntervalSince1970: 1_000_000_000)
+    let stamp = now.addingTimeInterval(-600)
+    check(RelativeAgeText.label(from: stamp, to: now) == "10 minutes", "History and contribution captions use the shared relative age")
+}
+print("PASS: History updated and contribution last-activity share one relative-age face")

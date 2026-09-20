@@ -32,6 +32,15 @@ enum PreviewModelScope {
         try result.get()
     }
 
+    /// One PNG still: cache the hosted view in its window appearance, then write atomically.
+    @MainActor static func png(_ view: NSView, to destination: URL) throws {
+        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw CocoaError(.fileWriteUnknown) }
+        AppearanceRendering.capture(view, to: bitmap)
+        guard let data = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: destination, options: .atomic)
+    }
+
     /// Closed AppKit windows can remain retained by the application. Detach only
     /// fixture-owned hosting content before allowing its disposable model to die.
     @MainActor static func close(_ window: NSWindow?) {

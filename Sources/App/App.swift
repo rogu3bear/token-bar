@@ -287,7 +287,7 @@ import ServiceManagement
                 case .other, .unknown: break
                 }
             }
-            availableTools = Array(Set(result.entries.map { $0.harness ?? "Unattributed" })).sorted()
+            availableTools = Array(Set(result.entries.map { $0.harness ?? DimensionReport.unattributed })).sorted()
             availableModels = Array(Set(result.entries.map(\.model))).sorted()
             availableAccounts = Dictionary(result.entries.compactMap { $0.account }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }).values.sorted { $0.label < $1.label }
             availableEfforts = Array(Set(result.entries.map { $0.effort ?? "Unknown" })).sorted()
@@ -448,10 +448,8 @@ struct QuickLiveView: View {
                         CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: model.quota(for: tool), now: now, expanded: expanded == tool)
                     }.buttonStyle(.plain)
                 }
-                if tools.isEmpty {
-                    Text(model.accountTools.isEmpty
-                         ? "No account sources detected yet. Open a supported tool to begin."
-                         : "No tools working right now").foregroundStyle(.secondary)
+                if let empty = NowOccupancyCopy.line(sourcesKnown: !model.accountTools.isEmpty, occupied: !tools.isEmpty) {
+                    Text(empty).foregroundStyle(.secondary)
                 }
                 QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
                 ToolActivityErrors(model: model)

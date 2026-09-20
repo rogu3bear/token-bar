@@ -316,3 +316,46 @@ check(fixedInsights.hasResult && fixedInsights.evaluatedAt == evaluationClock, "
 fixedInsights.refresh(entries: [], catalog: [:])
 check(!fixedInsights.busy, "Unchanged fixed-clock input must remain settled")
 print("PASS: fixed evaluation clock survives asynchronous usage-insight publication and cache reuse")
+
+do {
+    let now = Date(), calendar = Calendar.current
+    let today = calendar.startOfDay(for: now)
+    func record(_ days: Int, _ output: Int, fields: [String] = ["output_tokens"]) -> Entry {
+        var entry = Entry(date: calendar.date(byAdding: .day, value: days, to: today)!,
+                          session: "comparison", model: "synthetic", tokens: Tokens(["output_tokens": output]))
+        entry.tokenFields = fields
+        return entry
+    }
+    func summary(_ entries: [Entry]) -> UsageInsightsSummary {
+        UsageInsightsSummary.build(entries: entries, catalog: [:], now: now)
+    }
+    let prior = record(-14, 100), recent = record(-7, 150)
+    let changed = summary([prior, recent])
+    check(changed.outputChangeClaim == .changed(percent: 50, recent: 150, previous: 100),
+          "A complete pair of weeks is a percent claim, not a reconstructed view branch")
+    check(changed.outputChangeHeadline { "\($0)" } == "50.0% above the prior period",
+          "Percent copy is owned by the claim")
+    check(changed.outputChangeEvidence { "\($0)" } == "150 output tokens in the last seven full days · 100 in the preceding seven.",
+          "Supporting totals remain evidence under the percent")
+    check(summary([prior, record(-1, 100)]).outputChangeHeadline { "\($0)" } == "Unchanged between recorded periods",
+          "A measured zero change is unchanged, not unavailable")
+    check(summary([prior]).outputChangeClaim == .missingPeriod,
+          "A missing week is not a zero percent")
+    check(summary([prior]).outputChangeHeadline { "\($0)" }
+          == "Comparison unavailable: one or both periods have no local records.",
+          "Missing-period copy stays unavailable")
+    var missing = recent; missing.tokenFields = ["input_tokens"]
+    check(summary([prior, missing]).outputChangeClaim == .missingOutput(1),
+          "Unknown output counters are not a percent")
+    check(summary([record(-8, 0), recent]).outputChangeClaim == .zeroBaseline(recent: 150),
+          "A zero baseline is undefined, not 0%")
+    check(summary([record(-8, 0), recent]).outputChangeHeadline { "\($0)" }
+          == "150 recorded output tokens after a prior period with zero recorded output. A percentage change is undefined.",
+          "Zero-baseline copy keeps the recent total without inventing a percent")
+    check(changed.peakContextClaim == .unavailable, "No measurable context is unavailable, not 0%")
+    check(changed.peakContextHeadline == "Context utilization unavailable: no records contain both request input and a known context window.",
+          "Peak-context copy is owned by the claim")
+    check(changed.peakContextEvidence == nil, "Unavailable peak context has no sample count")
+    check(changed.cacheShareCaption == nil, "Counters without presence metadata cannot establish a cache-share sentence")
+}
+print("PASS: insight claims distinguish percent, missing period, unknown counters, zero baseline and unavailable peak context")

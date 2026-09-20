@@ -45,7 +45,7 @@ enum DataStatePreview {
             }
             for surface in ["cost", "insights"] {
             let host = NSHostingView(rootView: AppearanceHost(preferences: appearance) {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: PageStyle.section) {
                     Text("Sample state: " + name).font(.title.bold())
                     if surface == "cost" {
                     CostSummary(report: cost, basis: .reference, refreshing: refreshing,
@@ -55,17 +55,14 @@ enum DataStatePreview {
                         PromptInsightsSection(state: state)
                     }
                     Spacer(minLength: 0)
-                }.padding(28).frame(width: 1064, height: 1250, alignment: .topLeading)
+                }.padding(PageStyle.gutter).frame(width: 1064, height: 1250, alignment: .topLeading)
                     .background(Color(nsColor: .windowBackgroundColor))
             }.previewStill())
             host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1250)
             let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host
             host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.5)); host.layoutSubtreeIfNeeded()
-            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-            AppearanceRendering.capture(host, to: bitmap)
-            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-            try png.write(to: directory.appendingPathComponent(surface + "-" + name + ".png"))
+            try PreviewModelScope.png(host, to: directory.appendingPathComponent(surface + "-" + name + ".png"))
             window.close()
             }
         }

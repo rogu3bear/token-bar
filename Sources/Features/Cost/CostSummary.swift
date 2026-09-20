@@ -9,7 +9,7 @@ struct CostSummary: View {
     var sourceError: String?
     var sourceAvailable = true
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             if refreshing {
                 Text(report.calculatedAt == nil ? "Loading cost results…" : "Refreshing… Previous calculation remains visible until the new result is ready.")
                     .foregroundStyle(.secondary)
@@ -20,15 +20,12 @@ struct CostSummary: View {
             }
             if !refreshing || report.calculatedAt != nil { Text(report.statusMessage(sourceAvailable: sourceAvailable)).foregroundStyle(.secondary) }
             if let sourceDate {
-                HStack(spacing: 4) {
-                    Text("Last successful usage read")
-                    RelativeAgeText(date: sourceDate)
-                    Text("ago · " + sourceDate.formatted(date: .abbreviated, time: .shortened))
-                }.font(.caption).foregroundStyle(.secondary)
+                ReadAgeCaption(date: sourceDate, prefix: "Last successful usage read")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             HStack(alignment: .top, spacing: PageStyle.related) {
                 metric("ESTIMATED API EQUIVALENT", report.hasPricedRecords ? CostPricing.dollars(report.amounts.total) : "—", "USD · API equivalent")
-                metric("PRICING COVERAGE", report.coverage.map { String(format: "%.1f%%", $0 * 100) } ?? "—",
+                metric("PRICING COVERAGE", report.coverageText,
                        report.calculatedAt == nil ? "Awaiting calculation" : report.lines.isEmpty ? "No selected usage" : "\(compact(report.unpricedTokens)) tokens unpriced")
                 metric("UNKNOWN REASONING LEVEL", report.lines.isEmpty ? "—" : compact(report.unknownEffortTokens), "tokens with no recorded effort")
             }

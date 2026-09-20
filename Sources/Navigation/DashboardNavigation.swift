@@ -27,6 +27,18 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+extension PageHeader {
+    init(_ destination: Destination, subtitle: String? = nil, @ViewBuilder actions: @escaping () -> Actions) {
+        self.init(destination.title, subtitle: subtitle, actions: actions)
+    }
+}
+
+extension PageHeader where Actions == EmptyView {
+    init(_ destination: Destination, subtitle: String? = nil) {
+        self.init(destination.title, subtitle: subtitle)
+    }
+}
+
 /// A shared selection capsule moves between destinations; page content stays still.
 struct DashboardNavigation: View {
     @Binding var selection: Destination

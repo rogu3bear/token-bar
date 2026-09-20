@@ -241,3 +241,11 @@ MainActor.assumeIsolated {
     window.close()
 }
 print("PASS: all integrity states render compactly; mixed details retain every explanation and count")
+
+check(UsageTimeline.dailyOnlyCaption("1.1K", additionalTokens: true)
+      == "1.1K additional tokens have daily totals only; minute timing is unavailable.",
+      "History names extra tokens whose minute timing is unavailable")
+check(UsageTimeline.dailyOnlyCaption("$1.23", additionalTokens: false)
+      == "$1.23 has daily totals only; minute timing is unavailable.",
+      "Cost names extra dollars whose minute timing is unavailable")
+print("PASS: History and Cost share one daily-only unavailable-timing caption")

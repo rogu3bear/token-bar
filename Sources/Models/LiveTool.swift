@@ -137,7 +137,7 @@ enum CompactLiveCopy {
     }
     static func rate(_ available: Bool, amount: Double, unit: RateUnit) -> String {
         guard available else { return "—" }
-        let number = unit != .second && amount >= 1000 ? RateDisplay.compact(amount) : String(format: "%.0f", amount)
+        let number = RateDisplay.amount(amount, compactThousands: unit != .second)
         return "~" + number + " tok/" + unit.rawValue
     }
     /// Non-working rows keep remaining as the only large figure.

@@ -8,15 +8,20 @@ let suite = "local.codex-token-bar.appearance-test." + UUID().uuidString
 let defaults = UserDefaults(suiteName: suite)!
 defer { defaults.removePersistentDomain(forName: suite) }
 let style = AppearancePreferences(defaults: defaults)
-assert(style.mode == "System" && style.hex == "65E0BB")
+assert(style.mode == "System" && style.followsSystemAccent)
+assert(sameColor(style.color, Color(nsColor: .controlAccentColor)), "absent accent follows the macOS control accent")
 style.websitePreset()
 let restored = AppearancePreferences(defaults: defaults)
 assert(restored.mode == "Dark" && restored.hex == "D5F566")
 restored.setColor(.init(red: 1, green: 0, blue: 0))
 assert(AppearancePreferences(defaults: defaults).hex == "FF0000")
 defaults.set("invalid", forKey: "appearance.accent")
-assert(AppearancePreferences(defaults: defaults).hex == "65E0BB")
-print("PASS: appearance defaults, website preset, custom accent persistence and invalid-value recovery")
+let recovered = AppearancePreferences(defaults: defaults)
+assert(recovered.followsSystemAccent && sameColor(recovered.color, Color(nsColor: .controlAccentColor)))
+defaults.set("65E0BB", forKey: "appearance.accent")
+let keptMint = AppearancePreferences(defaults: defaults)
+assert(keptMint.hex == "65E0BB" && !keptMint.followsSystemAccent, "a saved Mint hex is not migrated")
+print("PASS: appearance defaults follow macOS accent, website preset, custom persistence, invalid recovery and saved Mint")
 assert(FirstRunAccess.needsExplanation(defaults))
 assert(FirstRunAccess.needsExplanation(defaults), "Viewing or dismissing does not accept local access")
 FirstRunAccess.accept(defaults)
@@ -49,6 +54,11 @@ print("PASS: legacy tool colors remain stored, never override the app accent, an
 let claudeProgress = ImportProgress.work(title: "Reading Claude history", completed: 25, total: 100, unit: "files")
 assert(claudeProgress.fraction == 0.25 && claudeProgress.detail.contains("75 remaining"))
 assert(ImportProgress.work(title: "Reading Claude history", completed: 0, total: 0, unit: "files").fraction == nil)
+assert(ImportProgress.codex(completed: 25, total: 100).detail == claudeProgress.detail,
+       "Codex file remaining uses the same checked-count face as other tools")
+let undiscovered = ImportProgress.work(title: "Reading Claude history", completed: 0, total: 0, unit: "files")
+assert(ImportProgress.codex(completed: 0, total: 0).detail == undiscovered.detail,
+       "A Codex stage with no files yet is still finding work, not 0 remaining")
 print("PASS: measured work shows actual completed fraction and remaining count; undiscovered work has no percentage")
 
 // The canonical preset is complete even when an older profile has competing colors.
@@ -349,6 +359,12 @@ MainActor.assumeIsolated {
     print("PASS: shipping allowance rows and expanded popover evidence render with intrinsic sizing in dark/light/custom accent")
 }
 
+assert(compact(999) == "999")
+assert(compact(TokenFormatting.thousand) == "1.0K")
+assert(compact(TokenFormatting.million) == "1.00M")
+assert(compact(TokenFormatting.billion) == "1.00B")
+print("PASS: History and Cost compact counts share TokenFormatting magnitude cutovers")
+
 // Measure native layout boxes and retained SwiftUI identity, not a screenshot's
 // pixels or a duplicate arithmetic implementation of the layout.
 private final class ProviderLayoutProbes {
@@ -499,3 +515,13 @@ MainActor.assumeIsolated {
     }
 }
 print("PASS: thousands of retained source diagnostics leave normal page content reachable")
+
+
+assert(NowOccupancyCopy.line(sourcesKnown: false, occupied: false) == NowOccupancyCopy.noSources)
+assert(NowOccupancyCopy.line(sourcesKnown: true, occupied: false) == NowOccupancyCopy.noneWorking)
+assert(NowOccupancyCopy.line(sourcesKnown: true, occupied: true) == nil)
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: false, occupied: false) == nil,
+       "Dashboard Now must not stack 'not working' on top of missing tools")
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: false) == NowOccupancyCopy.noneWorking)
+assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: true) == nil)
+print("PASS: Now empty occupancy copy distinguishes missing tools from idle-with-sources")

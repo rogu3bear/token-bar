@@ -16,7 +16,7 @@ struct AccountsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Accounts & plans", subtitle: "Supported account observations: Codex. Claude’s current cached quota appears on Now; Claude account and plan history is not available here.") {
+                PageHeader(.accounts, subtitle: "Supported account observations: Codex. Claude’s current cached quota appears on Now; Claude account and plan history is not available here.") {
                     if monitor.busy { ProgressView().controlSize(.small) }
                 }
                 if let error = monitor.error { ErrorNotice(message: error) }
@@ -115,7 +115,7 @@ struct HistoricalPlanChart: View {
     @Environment(\.evaluationDate) private var evaluationDate
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Plans found in local history").font(.title2.bold())
+            Text("Plans found in local history").font(PageStyle.sectionTitle)
             Chart(plans) { observation in
                 PointMark(x: .value("Observed", observation.firstSeen), y: .value("Plan", observation.plan.uppercased()))
                     .foregroundStyle(accent).symbolSize(24)

@@ -11,14 +11,7 @@ struct ProvenanceBadge: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let badge = provenance.badge {
-                Text(badge)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(.quaternary, in: Capsule())
-                    .accessibilityLabel("Approximate")
-            }
+            ProvenanceApproxMark(provenance: provenance)
             Button { showing.toggle() } label: {
                 Image(systemName: "questionmark.circle")
                     .font(.caption)
@@ -32,9 +25,24 @@ struct ProvenanceBadge: View {
                     Text(provenance.title).font(.headline)
                     Text(provenance.explanation).font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(16).frame(width: 320)
+                .padding(PageStyle.related).frame(width: 320)
                 .textSelection(.enabled)
             }
+        }
+    }
+}
+
+/// The approx. capsule. Only approximate figures render it; VoiceOver says Approximate, not the abbreviation.
+struct ProvenanceApproxMark: View {
+    var provenance: Provenance
+    var body: some View {
+        if let badge = provenance.badge {
+            Text(badge)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 5).padding(.vertical, 1)
+                .background(.quaternary, in: Capsule())
+                .accessibilityLabel("Approximate")
         }
     }
 }
@@ -56,11 +64,7 @@ struct ProvenanceNotice: View {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle.fill").foregroundStyle(accent)
                     Text(provenance.title).font(.headline)
-                    if let badge = provenance.badge {
-                        Text(badge).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
-                    }
+                    ProvenanceApproxMark(provenance: provenance)
                 }
                 Text(provenance.explanation)
                     .font(.callout).foregroundStyle(.secondary)
@@ -110,14 +114,14 @@ struct IntegrityBanner: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(status)
                 .sheet(isPresented: $showingDetails) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: PageStyle.related) {
                         Text("Data integrity").font(.title2.bold())
                         ScrollView {
                             IntegrityDetails(report: report)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         SheetDoneButton { showingDetails = false }
-                    }.padding(24).frame(width: 560, height: 440)
+                    }.padding(PageStyle.section).frame(width: 560, height: 440)
                         .onExitCommand { showingDetails = false }
                 }
         }
@@ -127,7 +131,7 @@ struct IntegrityBanner: View {
 struct IntegrityDetails: View {
     var report: IntegrityReport
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             LabeledContent("Records excluded", value: report.total.formatted())
             LabeledContent("Records counted with repaired fields", value: report.repairedTotal.formatted())
             Divider()

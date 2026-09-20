@@ -65,8 +65,8 @@ struct ReportIndex {
         }
         return low
     }
-    func select(_ query: UsageQuery, catalog: [String: TaskInfo], now: Date) -> [Entry] {
-        let bounds = query.timeBounds(now: now)
+    func select(_ query: UsageQuery, catalog: [String: TaskInfo], now: Date, calendar: Calendar = .current) -> [Entry] {
+        let bounds = query.timeBounds(now: now, calendar: calendar)
         let lower = bound(bounds.lower, inclusive: false)
         let upper = bound(bounds.upper, inclusive: bounds.inclusive)
         guard lower < upper else { return [] }
@@ -76,9 +76,9 @@ struct ReportIndex {
             return query.matches(entry, catalog: catalog, bounds: bounds) ? entry : nil
         }
     }
-    func validity(now: Date) -> ReportValidity {
+    func validity(now: Date, calendar: Calendar = .current) -> ReportValidity {
         let next = bound(now, inclusive: true)
-        return ReportValidity(now: now, futureRecord: next < chronological.count ? entries[chronological[next]].date : nil)
+        return ReportValidity(now: now, futureRecord: next < chronological.count ? entries[chronological[next]].date : nil, calendar: calendar)
     }
 }
 
@@ -113,7 +113,7 @@ final class ReportEngine {
     private(set) var costBuilds = 0
 
     func build(source: [Entry], inputs: ReportRevisionInputs, catalog: [String: TaskInfo], now: Date, sourceID: UUID? = nil,
-               expand: (([Entry]) -> [Entry]?)? = nil) -> (UsageReport, CostReport) {
+               calendar: Calendar = .current, expand: (([Entry]) -> [Entry]?)? = nil) -> (UsageReport, CostReport) {
         if revision != inputs.entries {
             var restored = false
             if !triedRestore, let storageURL, let sourceID {
@@ -134,16 +134,14 @@ final class ReportEngine {
             }
         }
         let selectionChanged = previous?.entries != inputs.entries || previous?.catalog != inputs.catalog ||
-            previous?.query != inputs.query || validity?.contains(now) != true
+            previous?.query != inputs.query || validity?.contains(now, calendar: calendar) != true
         if selectionChanged {
             let index = index!
-            selected = index.select(inputs.query, catalog: catalog, now: now)
+            selected = index.select(inputs.query, catalog: catalog, now: now, calendar: calendar)
             context = index.context
-            let bounds = inputs.query.timeBounds(now: now)
-            let oneDay = Set(selected.map { Calendar.current.startOfDay(for: $0.date) }).count == 1
-            let singleDay = oneDay || inputs.query.period == 0 || Calendar.current.isDate(bounds.lower,
-                inSameDayAs: bounds.inclusive ? bounds.upper : bounds.upper.addingTimeInterval(-0.001))
-            if singleDay, selected.contains(where: { $0.bucket == "day" }), let expanded = expand?(selected) {
+            let bounds = inputs.query.timeBounds(now: now, calendar: calendar)
+            if ReportScope.expandsDailyAggregates(selected: selected, query: inputs.query, bounds: bounds, calendar: calendar),
+               selected.contains(where: { $0.bucket == "day" }), let expanded = expand?(selected) {
                 // Expanded request metadata can refine a session tariff. Replace
                 // only selected buckets, retaining out-of-period observations.
                 context = CostContextIndex(source.filter { !inputs.query.matches($0, catalog: catalog, bounds: bounds) } + expanded)
@@ -151,7 +149,7 @@ final class ReportEngine {
             }
             usage = UsageReport.build(entries: selected, query: inputs.query, catalog: catalog, now: now, prefiltered: true)
             usageBuilds += 1
-            validity = index.validity(now: now)
+            validity = index.validity(now: now, calendar: calendar)
         }
         if selectionChanged || previous?.effort != inputs.effort ||
             previous?.service != inputs.service || previous?.basis != inputs.basis {
@@ -162,5 +160,16 @@ final class ReportEngine {
         }
         previous = inputs
         return (usage, costs)
+    }
+}
+
+/// Same-day History/Cost selections expand daily aggregates to request minutes. Today is always that scope.
+enum ReportScope {
+    static func expandsDailyAggregates(selected: [Entry], query: UsageQuery,
+                                       bounds: (lower: Date, upper: Date, inclusive: Bool),
+                                       calendar: Calendar) -> Bool {
+        let days = Set(selected.map { calendar.startOfDay(for: $0.date) })
+        let last = bounds.inclusive ? bounds.upper : bounds.upper.addingTimeInterval(-0.001)
+        return days.count == 1 || query.period == 0 || calendar.isDate(bounds.lower, inSameDayAs: last)
     }
 }

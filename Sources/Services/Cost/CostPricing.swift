@@ -117,4 +117,8 @@ enum CostPricing {
         format.maximumFractionDigits = value > 0 && value < Decimal(string: "0.01")! ? 6 : 2
         return format.string(from: NSDecimalNumber(decimal: value)) ?? "$0.00"
     }
+    /// Pricing and output coverage share one tenth-percent face. Missing is an em dash, not 0%.
+    static func percent(_ fraction: Double?) -> String {
+        fraction.map { String(format: "%.1f%%", $0 * 100) } ?? "—"
+    }
 }

@@ -132,7 +132,8 @@ repeating those timelines. Steps move only when timestamped records arrive; ther
 synthetic activity between records. Daily aggregates stay outside minute lines
 unless retained request details reconcile exactly with their counters, event
 counts, and attribution. Unavailable minute timing and unpriced usage remain
-explicit, and daily summaries remain available for multi-day comparisons.
+explicit: History token charts and Cost dollar charts share one daily-only
+caption, and daily summaries remain available for multi-day comparisons.
 
 The compact Today timeline spans local 12:01 AM to the current time, using the
 whole plot width. Before 12:01 AM it starts at midnight with a nonzero domain.
@@ -294,10 +295,18 @@ before showing counts and retain it when the next source is unavailable.
 zero. An empty selection has no estimate; a supported zero-token record can
 have a measured zero-dollar estimate. Nonzero wholly unpriced usage has 0%
 coverage and no estimate; mixed coverage is a partial estimate. Headline and
-evidence views use the same coverage value. Loading retains an existing
+evidence views use the same coverage value and the same tenth-percent face;
+a missing coverage is an em dash. Loading retains an existing
 calculation, and a failed source cannot become an empty-selection claim.
 The last successful usage-read time is retained in memory across failed reads
-and shown beside available cost results.
+and shown beside available cost results. Cost, Insights, and prompt-sample results
+share one read-age caption: a prefix, relative age, and absolute clock. History,
+contribution activity, and rate reports use its relative-only form. A missing
+report stays unavailable rather than inventing a timestamp. Account-total and
+allowance-window comparisons share one calculated-at caption; a refresh in
+flight labels the retained clock as a previous result while updating. Published
+rate-history changes use one signed tenth-percent face; a zero prior rate stays
+unavailable, not 0%.
 
 ## Rate-unit and color ownership
 
@@ -617,7 +626,7 @@ Insights owns derived changes and evidence conditions, not another usage browser
 | --- | --- | --- |
 | Insights usage timeline vs History timeline (`UsageInsightsView`) | REMOVE from Insights | History already supports period, measure and tool scope; the second chart added no inference. |
 | Insights top working directories vs History project comparison (`UsageInsightsView`) | REMOVE from Insights | Project attribution is a distribution question; History retains it with unattributed usage. |
-| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. No percentage for missing periods, unknown output counters or a zero baseline. |
+| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. `UsageInsightsSummary` owns the claim: no percentage for missing periods, unknown output counters or a zero baseline; the view only renders it. |
 | Insights active days and busiest day (`UsageInsightsView`) | REMOVE | Descriptive summaries of the same History series, without evidence of an unusual condition. |
 | Insights peak context in counting details (`UsageInsightsView`) | MOVE to main evidence section | Known request context and its measurable-record count help interpret coverage. A maximum does not establish anomaly or predict exhaustion. |
 | Insights cached-input share (`UsageInsightsView`) | MOVE to counting details | Mechanism/context, not a primary insight or a savings claim. |
@@ -634,7 +643,8 @@ quota-burn claim is inferred without an appropriate comparable local baseline.
 ### Now decision hierarchy
 
 Each live tool leads with activity and a numeric estimated output rate with its
-native s/m/h control, followed by reporting coverage and the report timestamp.
+native s/m/h control, followed by reporting coverage and relative report age.
+A missing rate report stays “No current rate report”, not an invented clock.
 Remaining lives in that tool's provider column with the rate and dial, not on a
 full-bleed row above the gauges. The rate stays the large figure. Projected zero,
 the quota reading timestamp, reset, projection limitations and account/estimate

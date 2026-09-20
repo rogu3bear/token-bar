@@ -36,11 +36,11 @@ struct QuotaGuardSummary: View {
     }
     private func summary(_ decision: QuotaGuardDecision) -> some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: PageStyle.related) {
                 summaryText(decision).frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
                 actions(decision).fixedSize()
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: PageStyle.labelGap) {
                 summaryText(decision)
                 actions(decision)
             }
@@ -97,7 +97,7 @@ struct QuotaGuardDetail: View {
             if let forecast = evidence.forecast { Text("Projected exhaustion " + Runway.clockLabel(forecast, now: evidence.evaluated)) }
             Text("This is one account allowance, not a whole-tool stop. Forecasts assume recent quota burn continues; they are not a guarantee or token-speed measurement.").font(.caption).foregroundStyle(.secondary)
             Button("Done") { coordinator.selected = nil }.keyboardShortcut(.defaultAction)
-        }.padding(24).frame(width: 460).onExitCommand { coordinator.selected = nil }
+        }.padding(PageStyle.section).frame(width: 460).onExitCommand { coordinator.selected = nil }
     }
 }
 struct QuotaGuardSettingsView: View {

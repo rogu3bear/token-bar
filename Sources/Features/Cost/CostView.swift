@@ -37,7 +37,7 @@ struct CostView: View {
                             ForEach(report.issues.keys.sorted(), id: \.self) { reason in
                                 HStack { Text(reason); Spacer(); Text(compact(report.issues[reason] ?? 0) + " tokens").monospacedDigit() }
                             }
-                        }.font(.callout).padding(16).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }.font(.callout).padding(PageStyle.related).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 DetailSheet("Report details and exports") {
@@ -55,7 +55,7 @@ struct CostView: View {
         .sheet(isPresented: $showMethod) { method }
     }
     private var header: some View {
-        PageHeader("Cost", subtitle: "What the selected usage is worth under these pricing assumptions.") {
+        PageHeader(.cost, subtitle: "What the selected usage is worth under these pricing assumptions.") {
             Button("Recover details") { model.refresh(history: true, recoverCosts: true) }.disabled(model.busy)
             Button("Export CSV") { model.exportCosts() }.disabled(model.filtering || model.busy || report.lines.isEmpty)
             MethodButton(title: "How cost is calculated") { showMethod = true }
@@ -98,14 +98,14 @@ struct CostView: View {
                 .overlay { if report.timeline.isEmpty { Text("No timestamped priceable usage in this period").foregroundStyle(.secondary) } }
             Text(report.minuteResolution ? "Cumulative API-equivalent estimate · minute resolution · local time. Unpriced usage is excluded." : "Daily totals. Unpriced usage is excluded from dollar bars and retained in the selected report and coverage.").font(.caption).foregroundStyle(.secondary)
             if report.dailyOnlyAmount.total > 0 {
-                Text(CostPricing.dollars(report.dailyOnlyAmount.total) + " has daily totals only; minute timing is unavailable.").font(.caption).foregroundStyle(.secondary)
+                Text(UsageTimeline.dailyOnlyCaption(CostPricing.dollars(report.dailyOnlyAmount.total), additionalTokens: false)).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
     private var contributions: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("What contributes to the estimate").font(PageStyle.sectionTitle)
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: PageStyle.related) {
                 component("Input", report.amounts.input)
                 component("Cache reads", report.amounts.cached)
                 component("Cache writes", report.amounts.cacheWrite)
@@ -122,7 +122,7 @@ struct CostView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private func costRow(_ row: CostRow) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
             HStack {
                 Text(row.title).font(.callout.weight(.medium)).textSelection(.enabled)
                 Spacer()
@@ -138,7 +138,7 @@ struct CostView: View {
         }
     }
     private var method: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
             Text("API-equivalent estimates and evidence").font(PageStyle.sectionTitle)
             Text("Historical rates use dated, sourced versions and leave unsupported intervals unpriced. Reference rates apply the \(CostRateCard.reference.observedOn) card to any period for comparison. Recorded tier uses only a tier present in usage metadata; Standard and Fast are explicit scenarios. Neither establishes a charge. Subscriptions, credits, taxes, regional uplifts, and tool fees are excluded.")
             Text("Effort is the setting recorded for a turn. It is not inferred from reasoning-token counts and does not multiply prices. Missing effort stays Unknown; models with no verified price stay unpriced.")

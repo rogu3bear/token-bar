@@ -38,6 +38,12 @@ struct UsageTimeline {
         }
         return result
     }
+    /// History token charts and Cost dollar charts share this unavailable-timing face.
+    static func dailyOnlyCaption(_ amount: String, additionalTokens: Bool) -> String {
+        additionalTokens
+            ? "\(amount) additional tokens have daily totals only; minute timing is unavailable."
+            : "\(amount) has daily totals only; minute timing is unavailable."
+    }
     /// Today’s recorded usage for the compact popover. Empty when nothing was admitted today.
     static func compact(entries: [Entry], now: Date, calendar: Calendar = .current) -> CompactUsage {
         let query = UsageQuery(period: 0)
@@ -142,7 +148,7 @@ enum HistoryTool: String, CaseIterable, Identifiable {
     case codex = "Codex", claude = "Claude Code", grok = "Grok", other = "Other tools", unknown = "Unknown tool"
     var id: String { rawValue }
     static func recorded(_ entry: Entry) -> Self {
-        guard let tool = entry.harness, !tool.isEmpty, tool != "Unattributed" else { return .unknown }
+        guard let tool = entry.harness, !tool.isEmpty, tool != DimensionReport.unattributed else { return .unknown }
         if tool.lowercased().hasPrefix("codex") { return .codex }
         if tool == "Claude Code" { return .claude }
         if tool == "Grok" { return .grok }

@@ -98,19 +98,19 @@ struct AccountAllowanceSection: View {
             if tools.isEmpty {
                 if !sourcesKnown {
                     Text("Account allowances").font(.headline)
-                    Text("No account sources detected yet. Open a supported tool to begin.")
+                    Text(NowOccupancyCopy.noSources)
                         .font(.callout).foregroundStyle(.secondary)
                 }
             } else {
                 Text("Account allowances").font(.headline)
-                HStack(alignment: .top, spacing: 24) {
+                HStack(alignment: .top, spacing: PageStyle.section) {
                     ForEach(tools) { tool in
                         AccountAllowanceDisclosure(tool: tool, quota: quota(tool), now: now,
                                                    connection: tool == .claude ? connection : nil)
                     }
                 }
             }
-        }.padding(.horizontal, 16)
+        }.padding(.horizontal, PageStyle.related)
     }
 }
 
@@ -128,7 +128,7 @@ struct AccountAllowanceDisclosure: View {
                 .padding(.top, 8)
         } label: {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: PageStyle.labelGap) {
                     if showsIdentity {
                         Text(tool.label).font(.subheadline.weight(.semibold))
                     }

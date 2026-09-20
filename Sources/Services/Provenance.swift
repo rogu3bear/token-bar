@@ -31,7 +31,9 @@ enum Provenance: String, CaseIterable, Identifiable {
         }
     }
 
-    var badge: String? { isApproximate ? "approx." : nil }
+    /// Visible abbreviation. VoiceOver says Approximate, not this spelling.
+    static let approximateBadge = "approx."
+    var badge: String? { isApproximate ? Self.approximateBadge : nil }
 
     var title: String {
         switch self {

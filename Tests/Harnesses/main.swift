@@ -964,3 +964,10 @@ do {
     check(watched.contains(transcript), "Rebound native watcher receives later transcript appends")
 }
 print("PASS: first-use rediscovery rebinds live readers and watchers, preserves history/cursors, and closes removed database readers")
+
+do {
+    let now = Date(timeIntervalSince1970: 1_000_000_000)
+    check(RelativeAgeText.label(from: now.addingTimeInterval(-600), to: now) == "10 minutes",
+          "A rate report names relative age, not only a clock")
+}
+print("PASS: Now rate-report age is relative; a missing report stays unavailable")

@@ -5,7 +5,8 @@ import Combine
 @Observable final class InsightsModel {
     private(set) var state = PromptReadState()
     var busy: Bool { state.loading }
-    private let queue = DispatchQueue(label: "local.codex-token-bar.insights", qos: .background, autoreleaseFrequency: .workItem)
+    /// Utility schedules user-visible Insights reads while keeping work off the main queue.
+    private let queue = DispatchQueue(label: "local.codex-token-bar.insights", qos: .utility, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var nextRead = Date.distantPast
     private let clock: () -> Date
     private let index: PromptIndex

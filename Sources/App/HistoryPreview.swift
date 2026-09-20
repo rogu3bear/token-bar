@@ -27,7 +27,7 @@ enum HistoryPreview {
                                         tokens: Tokens(["input_tokens": output * 2, "output_tokens": output])))
         }
         for index in ledger.entries.indices {
-            ledger.entries[index].harness = index < 2 ? "Claude Code" : "Codex Desktop"
+            ledger.entries[index].harness = index < 2 ? ClaudeCodeUsage.harness : "Codex Desktop"
             ledger.entries[index].provider = index < 2 ? "anthropic" : "openai"
         }
         try JSONEncoder().encode(ledger).write(to: support.appendingPathComponent("ledger.json"))
@@ -68,10 +68,7 @@ enum HistoryPreview {
         defer { PreviewModelScope.close(window) }
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-        AppearanceRendering.capture(host, to: bitmap)
-        guard let data = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-        try data.write(to: destination, options: .atomic)
+        try PreviewModelScope.png(host, to: destination)
         print("PASS: saved usage visible during import; native minute timeline rendered")
     }
 }

@@ -16,13 +16,13 @@ struct LiveToolPanels: View {
             }
             let tools = LiveTool.active(codex: codex, claude: claude, grok: model.grokMeter)
             let seats = LiveTool.nowOccupied(codex: codex, claude: claude, grok: model.grokMeter, remaining: remaining)
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: PageStyle.related) {
             if tools.isEmpty {
                 AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },
                                         now: now, connection: model.claudeConnection,
                                         sourcesKnown: !model.accountTools.isEmpty)
-                if seats.isEmpty {
-                    Text("No tools working right now").foregroundStyle(.secondary).padding(16)
+                if let empty = NowOccupancyCopy.noneWorkingLine(sourcesKnown: !model.accountTools.isEmpty, occupied: !seats.isEmpty) {
+                    Text(empty).foregroundStyle(.secondary).padding(16)
                 }
             } else {
                 NowOccupancyStack(working: tools, remaining: { tool in
@@ -54,7 +54,7 @@ struct LiveToolPanels: View {
                             }.stroke(Color.primary.opacity(0.1), lineWidth: 1)
                         }
                     }.allowsHitTesting(false)
-                }.padding(16)
+                }.padding(PageStyle.related)
             }
             ToolActivityErrors(model: model, excluding: tools)
             }

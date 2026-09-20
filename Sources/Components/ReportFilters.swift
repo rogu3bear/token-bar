@@ -10,7 +10,7 @@ struct ReportFilters: View {
         [all] + Set(values + (selected == all ? [] : [selected])).subtracting([all]).sorted()
     }
     private var accountChoices: [(String, String)] {
-        var result = [("All accounts", "All accounts"), ("Unattributed", "Unattributed")]
+        var result = [("All accounts", "All accounts"), (DimensionReport.unattributed, DimensionReport.unattributed)]
         result += model.availableAccounts.map { ($0.id, $0.label + " (inferred)") }
         if !result.contains(where: { $0.0 == model.accountFilter }) { result.append((model.accountFilter, "Selected account")) }
         return result
@@ -44,7 +44,7 @@ struct ReportFilters: View {
                 }.padding(.top, 8)
             }
             if model.filtering {
-                Text("Updating the report. Previous results remain visible until the selected report is ready. Export is unavailable while updating.")
+                Text(ReportUpdateCopy.filterCaption)
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

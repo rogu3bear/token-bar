@@ -33,7 +33,7 @@ struct PromptInsightsSection: View {
                             Text("Exact repeats after normalizing case and spacing; up to 300 characters. Repetition alone does not establish a recurring task.")
                                 .font(.caption).foregroundStyle(.secondary)
                             ForEach(Array(result.repeats.prefix(3))) { fact in
-                                HStack(alignment: .top, spacing: 16) {
+                                HStack(alignment: .top, spacing: PageStyle.related) {
                                     Text(fact.label).font(.callout).textSelection(.enabled)
                                     Spacer(minLength: 8)
                                     Text("\(fact.count) times").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
@@ -57,19 +57,14 @@ struct PromptInsightsSection: View {
     private var readStatus: some View {
         VStack(alignment: .leading, spacing: 6) {
             if state.loading {
-                Text(state.filesTotal.map { "Checking prompt history · \(state.filesChecked) of \($0) files · \(max(0, $0 - state.filesChecked)) remaining" }
-                     ?? "Finding recent chats in the background…")
+                Text(state.checkingCaption)
                 if let total = state.filesTotal, total > 0 {
                     ProgressView(value: Double(state.filesChecked), total: Double(total))
                         .progressViewStyle(.linear).accessibilityLabel("Reading prompt history")
                         .animation(reduceMotion ? nil : .linear(duration: 0.2), value: state.filesChecked)
                 }
             } else if let date = state.result?.readAt {
-                HStack(spacing: 4) {
-                    Text(state.isPartial ? "Partial sample read" : "Results read")
-                    RelativeAgeText(date: date)
-                    Text("ago · " + date.formatted(date: .abbreviated, time: .shortened))
-                }
+                ReadAgeCaption(date: date, prefix: state.isPartial ? "Partial sample read" : "Results read")
             } else if !state.failed {
                 Text(state.message)
             }

@@ -113,11 +113,7 @@ enum QuotaGuardPreview {
         defer { PreviewModelScope.close(window) }
         if let destination {
             host.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.4)); host.layoutSubtreeIfNeeded()
-            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-            AppearanceRendering.capture(host, to: bitmap)
-            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try png.write(to: destination)
+            try PreviewModelScope.png(host, to: destination)
             print("Rendered Quota Guard synthetic surface \(host.frame.size): " + destination.path)
         } else {
             NSApp.setActivationPolicy(.regular); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)

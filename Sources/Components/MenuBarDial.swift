@@ -15,6 +15,13 @@ struct MenuBarDial {
         result.addAttributes([Self.position: position, Self.available: available, Self.accent: accent, Self.identity: identity], range: NSRange(location: 0, length: result.length))
         return result
     }
+    /// AppKit degrees: the rail runs clockwise from 10 o'clock to 4 o'clock.
+    static let sweepDegrees = 240.0
+    static let startDegrees = 210.0
+    static var endDegrees: Double { startDegrees - sweepDegrees }
+    static func degrees(at fraction: Double) -> Double {
+        startDegrees - fraction * sweepDegrees
+    }
     static func fraction(value: Double, minimum: Double, maximum: Double) -> Double {
         guard value.isFinite, minimum.isFinite, maximum.isFinite, maximum > minimum else { return 0 }
         return min(1, max(0, (value - minimum) / (maximum - minimum)))
@@ -23,18 +30,18 @@ struct MenuBarDial {
         NSImage(size: NSSize(width: 26, height: 18), flipped: false) { _ in
             let center = NSPoint(x: 13, y: 6), radius = 10.0
             func point(_ fraction: Double, _ radius: Double) -> NSPoint {
-                let angle = (210 - fraction * 240) * Double.pi / 180
+                let angle = degrees(at: fraction) * Double.pi / 180
                 return NSPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
             }
             NSColor.labelColor.withAlphaComponent(0.25).setStroke()
             let arc = NSBezierPath()
-            arc.appendArc(withCenter: center, radius: radius, startAngle: 210, endAngle: -30, clockwise: true)
+            arc.appendArc(withCenter: center, radius: radius, startAngle: startDegrees, endAngle: endDegrees, clockwise: true)
             arc.lineWidth = 1.8; arc.lineCapStyle = .round; arc.stroke()
             if available {
                 accent.setStroke()
                 let active = NSBezierPath()
-                active.appendArc(withCenter: center, radius: radius, startAngle: 210,
-                    endAngle: 210 - fraction(value: value, minimum: minimum, maximum: maximum) * 240, clockwise: true)
+                active.appendArc(withCenter: center, radius: radius, startAngle: startDegrees,
+                    endAngle: degrees(at: fraction(value: value, minimum: minimum, maximum: maximum)), clockwise: true)
                 active.lineWidth = 1.8; active.lineCapStyle = .round; active.stroke()
             }
             NSColor.labelColor.setStroke()

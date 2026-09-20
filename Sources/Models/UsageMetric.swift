@@ -11,5 +11,10 @@ enum UsageMetric: String, CaseIterable, Identifiable {
         case .total: return tokens.total
         }
     }
+
+    /// Compact face for this measure. Charts and History cards share `compact(_:)`.
+    func formatted(_ tokens: Tokens) -> String {
+        compact(amount(tokens))
+    }
 }
 

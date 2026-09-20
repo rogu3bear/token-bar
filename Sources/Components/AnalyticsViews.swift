@@ -69,7 +69,7 @@ struct ContributionChart: View {
         let shown = Array(ranked.prefix(limit))
         let maximum = max(1, shown.first.map { metric.amount($0.tokens) } ?? 1)
         VStack(alignment: .leading, spacing: 14) {
-            if shown.isEmpty { Text("No recorded usage in this selection.").foregroundStyle(.secondary).padding(.vertical, 24) }
+            if shown.isEmpty { Text("No recorded usage in this selection.").foregroundStyle(.secondary).padding(.vertical, PageStyle.section) }
             ForEach(shown) { row in
                 rowButton(row, maximum: maximum)
             }
@@ -78,7 +78,7 @@ struct ContributionChart: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(row.title).font(.headline)
                     Text(row.subtitle.isEmpty ? row.id : row.subtitle).font(.caption).foregroundStyle(.secondary)
-                    Text("\(metric.amount(row.tokens).formatted()) \(metric.rawValue.lowercased()) tokens · Last activity \(row.last.formatted(date: .abbreviated, time: .shortened))").font(.callout)
+                    ReadAgeCaption(date: row.last, prefix: "\(metric.amount(row.tokens).formatted()) \(metric.rawValue.lowercased()) tokens · Last activity", includesClock: false).font(.callout)
                 }.textSelection(.enabled).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -112,7 +112,7 @@ private struct ContributionBar: View {
     var selected: Bool
     @Environment(\.appAccent) private var accent
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
             HStack {
                 Text(title).lineLimit(1)
                 Spacer(minLength: 16)

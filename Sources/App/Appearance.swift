@@ -6,12 +6,12 @@ struct ToolPalette {
     static func defaultColor(_ id: String) -> Color { .primary }
     var overrides: [String: Color] = [:]
     var followsAccent = true
-    var accent: Color = AccentContrast.foreground(AppearancePreferences.color(AppearancePreferences.marketingAccent))
+    var accent: Color = AccentContrast.foreground(Color(nsColor: .controlAccentColor))
     func color(_ id: String, fallback: Color) -> Color { accent }
 
 }
 struct ToolPaletteKey: EnvironmentKey { static let defaultValue = ToolPalette() }
-struct AppAccentKey: EnvironmentKey { static let defaultValue = AccentContrast.foreground(AppearancePreferences.color(AppearancePreferences.marketingAccent)) }
+struct AppAccentKey: EnvironmentKey { static let defaultValue = AccentContrast.foreground(Color(nsColor: .controlAccentColor)) }
 struct PresentationClockKey: EnvironmentKey { static let defaultValue = PresentationClock() }
 extension EnvironmentValues {
     var presentationClock: PresentationClock { get { self[PresentationClockKey.self] } set { self[PresentationClockKey.self] = newValue } }
@@ -20,7 +20,9 @@ extension EnvironmentValues {
 }
 @Observable final class AppearancePreferences {
     static let marketingAccent = "D5F566"
+    static let systemAccent = "SYSTEM"
     static let presets = [("Mint", "65E0BB"), ("Lime", "D5F566"), ("Blue", "67B9FF"), ("Coral", "FFAB91")]
+    static var accentChoices: [(String, String)] { [("macOS", systemAccent)] + presets }
     var mode: String { didSet { defaults.set(mode, forKey: "appearance.mode") } }
     var hex: String { didSet { defaults.set(hex, forKey: "appearance.accent") } }
     var toolColors: [String: String] { didSet { defaults.set(toolColors, forKey: "appearance.toolColors") } }
@@ -32,13 +34,18 @@ extension EnvironmentValues {
         toolsFollowAccent = defaults.bool(forKey: "appearance.toolsFollowAccent")
         let storedMode = defaults.string(forKey: "appearance.mode") ?? "System"
         mode = ["System", "Dark", "Light"].contains(storedMode) ? storedMode : "System"
-        let storedHex = defaults.string(forKey: "appearance.accent") ?? "65E0BB"
-        hex = Self.valid(storedHex) ? storedHex.uppercased() : "65E0BB"
+        hex = Self.resolvedAccent(defaults.string(forKey: "appearance.accent"))
     }
     static func valid(_ hex: String) -> Bool { hex.count == 6 && UInt32(hex, radix: 16) != nil }
-    var color: Color { Self.color(hex) }
+    static func resolvedAccent(_ stored: String?) -> String {
+        guard let stored, stored != systemAccent else { return systemAccent }
+        return valid(stored) ? stored.uppercased() : systemAccent
+    }
+    var followsSystemAccent: Bool { hex == Self.systemAccent }
+    var color: Color { followsSystemAccent ? Color(nsColor: .controlAccentColor) : Self.color(hex) }
     var foreground: Color { AccentContrast.foreground(color) }
     static func color(_ hex: String) -> Color {
+        if hex == systemAccent { return Color(nsColor: .controlAccentColor) }
         let rgb = UInt32(hex, radix: 16) ?? 0x65E0BB
         return Color(red: Double((rgb >> 16) & 255) / 255, green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255)
     }
@@ -79,10 +86,10 @@ struct AppearanceSettingsView: View {
                 }.pickerStyle(.segmented)
                 HStack(spacing: 12) {
                     Picker("Accent preset", selection: $preferences.hex) {
-                        ForEach(AppearancePreferences.presets, id: \.1) { name, hex in
+                        ForEach(AppearancePreferences.accentChoices, id: \.1) { name, hex in
                             Text(name).tag(hex)
                         }
-                        if !AppearancePreferences.presets.contains(where: { $0.1 == preferences.hex }) {
+                        if !AppearancePreferences.accentChoices.contains(where: { $0.1 == preferences.hex }) {
                             Text("Custom").tag(preferences.hex)
                         }
                     }.pickerStyle(.menu)
@@ -91,11 +98,15 @@ struct AppearanceSettingsView: View {
                 }
                 HStack {
                     Circle().fill(preferences.color).frame(width: 14, height: 14)
-                    Text("Accent #" + preferences.hex).monospaced()
+                    if preferences.followsSystemAccent {
+                        Text("macOS accent")
+                    } else {
+                        Text("Accent #" + preferences.hex).monospaced()
+                    }
                     Spacer()
                     Button("Match website preview") { preferences.websitePreset() }.buttonStyle(.borderedProminent)
                 }
-                Text("One accent is shared by all tools, charts, and controls. Tool names and chart symbols identify each tool.")
+                Text("macOS follows the accent in System Settings. One accent is shared by all tools, charts, and controls. Tool names and chart symbols identify each tool.")
                     .font(.callout).foregroundStyle(.secondary)
                 Text("Warnings keep their warning color.").font(.caption).foregroundStyle(.secondary)
             }
@@ -257,5 +268,22 @@ struct RelativeAgeText: View {
         formatter.unitsStyle = .full
         formatter.maximumUnitCount = 1
         return formatter.string(from: max(0, now.timeIntervalSince(date))) ?? "0 seconds"
+    }
+    /// Absolute clock after the relative age. Cost, Insights, and prompt results share this suffix.
+    static func captionSuffix(_ date: Date) -> String {
+        "ago · " + date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+/// Shared relative-age caption; successful local reads also show the absolute clock.
+struct ReadAgeCaption: View {
+    var date: Date
+    var prefix: String
+    var includesClock = true
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(prefix)
+            RelativeAgeText(date: date)
+            Text(includesClock ? RelativeAgeText.captionSuffix(date) : "ago")
+        }
     }
 }

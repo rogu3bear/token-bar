@@ -36,13 +36,17 @@ struct ActivityTriggerKey: PreferenceKey {
 struct ContainedPopupLayout {
     var frame: CGRect
     var above: Bool
+    static let inset: CGFloat = 12
+    static let gap: CGFloat = 4
+    static let maxWidth: CGFloat = 500
+    static let maxHeight: CGFloat = 380
+    static let preferAboveLimit: CGFloat = 240
     static func fit(trigger: CGRect, container: CGSize) -> ContainedPopupLayout {
-        let inset: CGFloat = 12, gap: CGFloat = 4
-        let width = max(0, min(500, container.width - 2 * inset))
+        let width = max(0, min(maxWidth, container.width - 2 * inset))
         let below = max(0, container.height - inset - trigger.maxY - gap)
         let above = max(0, trigger.minY - gap - inset)
-        let useAbove = below < min(240, above)
-        let height = min(380, useAbove ? above : below)
+        let useAbove = below < min(preferAboveLimit, above)
+        let height = min(maxHeight, useAbove ? above : below)
         let x = min(max(inset, trigger.midX - width / 2), max(inset, container.width - inset - width))
         let y = useAbove ? trigger.minY - gap - height : trigger.maxY + gap
         return ContainedPopupLayout(frame: CGRect(x: x, y: min(max(inset, y), max(inset, container.height - inset - height)), width: width, height: height), above: useAbove)
