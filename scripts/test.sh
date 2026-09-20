@@ -19,7 +19,7 @@ CORE="ProviderUsage.swift UsageComparison.swift CostRateHistory.swift CostCovera
       CostReport.swift CostRecovery.swift UsageInsights.swift Appearance.swift StatusNotice.swift PageStyle.swift
       Usage.swift UsageStore.swift ImportProgress.swift GrokUsage.swift Activity.swift LiveTool.swift ClaudeActivityReader.swift ActivityFeed.swift EventIndex.swift
       PlanHistory.swift TaskCatalog.swift Reports.swift ReportEngine.swift ReportIndexStorage.swift PrivateCache.swift UsageTimeline.swift LiveMonitor.swift ClaudeQuotaMonitor.swift FableQuota.swift ClaudeUsageRefresh.swift ClaudeStatuslineConnection.swift
-      Project.swift DimensionReport.swift TokenConvention.swift Integrity.swift EventTime.swift
+      Project.swift DimensionReport.swift TokenConvention.swift Integrity.swift EventIdentity.swift EventTime.swift
       ClaudeCodeUsage.swift OpenCodeUsage.swift ForeignHarnessScan.swift IncrementalScan.swift HarnessDiscovery.swift
       Tachometer.swift SignInTimeline.swift CodexInstallation.swift GrokInstallation.swift GrokQuotaMonitor.swift"
 
@@ -51,7 +51,7 @@ build_group usage      Tests/main.swift            "-swift-version 5 -lsqlite3" 
 build_group menu-bar   Tests/MenuBar/main.swift    "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD AccountQuotaPresentation.swift
 build_group quota-guard Tests/QuotaGuard/main.swift "-swift-version 5 -lsqlite3" $CORE $MENU $GUARD
 build_group hover      Tests/Hover/main.swift      ""                           ContainedHover.swift
-build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift
+build_group insights   Tests/Insights/main.swift   "-lsqlite3"                  Insights.swift PromptIndex.swift PrivateCache.swift PromptReadState.swift InsightsModel.swift TaskCatalog.swift EventIdentity.swift
 build_group feedback   Tests/Feedback/main.swift   ""                           Feedback.swift CodexInstallation.swift
 build_group update-check Tests/UpdateCheck/main.swift ""                        UpdateCheck.swift
 build_group appearance Tests/Appearance/main.swift "-swift-version 5 -lsqlite3" $CORE ProviderColumnsLayout.swift NowOccupancyStack.swift FirstRunWelcome.swift PreviewFixture.swift UsageMetric.swift UsageTimelineChart.swift TokenFormatting.swift CompactToolRate.swift ToolQuotaSummary.swift ClaudeConnectionControl.swift
