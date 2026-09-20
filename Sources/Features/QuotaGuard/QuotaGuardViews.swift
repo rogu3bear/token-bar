@@ -56,9 +56,9 @@ struct QuotaGuardSummary: View {
     }
     private func actions(_ decision: QuotaGuardDecision) -> some View {
         HStack {
-            Button("View quota") { coordinator.view(decision) }
-                .accessibilityLabel("View quota for " + decision.title)
-            Button(coordinator.isSnoozed(decision) ? "Snoozed 30 min" : "Snooze 30 min") { coordinator.snooze(decision) }
+            Button(QuotaGuardAction.viewTitle) { coordinator.view(decision) }
+                .accessibilityLabel(QuotaGuardAction.viewTitle + " for " + decision.title)
+            Button(coordinator.isSnoozed(decision) ? "Snoozed 30 min" : QuotaGuardAction.snoozeTitle) { coordinator.snooze(decision) }
                 .disabled(coordinator.isSnoozed(decision))
                 .accessibilityLabel("Snooze notifications for " + decision.title + " for 30 minutes")
         }.font(.caption)
@@ -71,7 +71,7 @@ struct QuotaGuardSummary: View {
             if let forecast = decision.forecast { Text("At recent burn: " + Runway.clockLabel(forecast, now: decision.evaluated)).font(.caption) }
             Text(decision.reason.label).font(.caption).foregroundStyle(.secondary)
             if let reading = decision.reading {
-                Text("Reset " + (reading.reset.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "unavailable") + " · read " + reading.date.formatted(date: .omitted, time: .standard))
+                Text("Reset " + (reading.resetWhen ?? "unavailable") + " · read " + reading.date.formatted(date: .omitted, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
                 actions(decision)
             }
@@ -91,7 +91,7 @@ struct QuotaGuardDetail: View {
             Text(evidence.reason.label)
             if let r = evidence.reading {
                 Text("Bucket: " + r.bucket + " · Window: " + r.window)
-                Text("Observed " + r.date.formatted() + " · Reset " + (r.reset.map { $0.formatted() } ?? "unavailable"))
+                Text("Observed " + r.date.formatted() + " · Reset " + (r.resetWhen ?? "unavailable"))
             }
             Text("Account reference: " + decision.id.prefix(10)).font(.caption).textSelection(.enabled)
             if let forecast = evidence.forecast { Text("Projected exhaustion " + Runway.clockLabel(forecast, now: evidence.evaluated)) }

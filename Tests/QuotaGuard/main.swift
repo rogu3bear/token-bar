@@ -35,10 +35,22 @@ var failed = input(reading()); failed.failed = true
 check(decision(failed).reason == .providerError, "failure cannot reuse fresh old reading")
 var relay = input(reading()); relay.relay = true
 check(decision(relay).reason == .unsupportedSource, "relay cannot authenticate")
-var claude = input(reading(-121), tool: .claude); claude.horizon = 1800
+var claude = input(reading(-121), tool: .claude); claude.horizon = ClaudeQuotaSource.horizon
 check(decision(claude).evidence == .stale, "guard tightens Claude without altering display")
 var strict = input(reading(-61)); strict.horizon = 60
 check(decision(strict).evidence == .stale, "shorter provider horizon preserved")
+do {
+    let fiveHour = reading()
+    let week = reading(window: "weekly")
+    var odd = fiveHour; odd.minutes = 2000
+    var leftover = fiveHour; leftover.minutes = 90
+    var missingReset = fiveHour; missingReset.reset = nil
+    check(fiveHour.windowLabel == "5-hour" && week.windowLabel == "7-day", "exact hour and day windows keep those units")
+    check(odd.windowLabel == "2000-minute" && leftover.windowLabel == "90-minute", "non-multiples stay in minutes instead of truncating to a day")
+    check(low.windowLabel == fiveHour.windowLabel, "Quota Guard names the reading's window")
+    check(fiveHour.resetWhen == fiveHour.reset?.formatted(date: .abbreviated, time: .shortened), "resetWhen is the abbreviated date-time face")
+    check(missingReset.resetWhen == nil && missingReset.windowLabel == "5-hour", "a missing reset is not a missing window")
+}
 let burn = [reading(-120, used: 70), reading(-60, used: 75), reading(used: 80)]
 let forecast = decision(input(burn[2], samples: burn))
 check(forecast.risk == .projectedExhaustion && forecast.forecast == base.addingTimeInterval(240), "canonical projection")

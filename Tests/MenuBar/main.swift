@@ -99,7 +99,7 @@ func cacheData(account: String = "a", signedIn: String = "a", used: Double = 58,
 }
 let freshClaude = try JSONDecoder().decode(ClaudeQuotaCache.self, from: cacheData()).readings(now: cacheNow)
 assert(freshClaude.count == 1 && freshClaude[0].used == 58 && freshClaude[0].accountID.hasPrefix("claude:"))
-for data in [try cacheData(account: "other"), try cacheData(age: 1800), try cacheData(age: -1), try cacheData(used: -1), try cacheData(used: 101)] {
+for data in [try cacheData(account: "other"), try cacheData(age: ClaudeQuotaSource.horizon), try cacheData(age: -1), try cacheData(used: -1), try cacheData(used: 101)] {
     let decoded = try JSONDecoder().decode(ClaudeQuotaCache.self, from: data)
     assert(decoded.readings(now: cacheNow).isEmpty)
 }
@@ -113,13 +113,14 @@ assert(claudeValues[.quota] == "Claude 42% remaining")
 assert(claudeValues[.zero] != "Zero —")
 let laterClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(120), tool: .claude, claudeQuota: ownQuota)
 assert(laterClaude[.quota] == "Claude 42% remaining", "Claude Code refreshes on demand; two minutes is Codex's horizon, not Claude's")
-let staleClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(1800), tool: .claude, claudeQuota: ownQuota)
+let staleClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(ClaudeQuotaSource.horizon), tool: .claude, claudeQuota: ownQuota)
 assert(staleClaude[.quota] == "Claude quota unavailable" && staleClaude[.zero] == "Zero —")
 let codexHorizon = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: Runway.defaultHorizon)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(120), tool: .claude, claudeQuota: codexHorizon)[.quota] == "Claude quota unavailable")
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(90)) == "")
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(660)) == " · 11 min ago")
 assert(ClaudeQuotaSource.relayHelp.contains("claude-statusline-relay.sh") && ClaudeQuotaSource.relayHelp.contains("statusLine"))
+assert(ClaudeQuotaSource.connectionCaption.contains("no account identity") && ClaudeQuotaSource.connectionCaption.contains("usage cache"), "Connect panel caption is the quota-source no-identity claim")
 let mixed = Runway.estimate(freshClaude[0], samples: monitor.state.samples + [freshClaude[0]], now: cacheNow)
 assert(mixed.exhaustion == nil, "Codex observations cannot supply Claude's burn slope")
 func cacheUtilization(fiveHour: [String: Any]?, sevenDay: [String: Any]?, account: String = "a", age: Double = 0) throws -> Data {
@@ -183,12 +184,12 @@ func relayData(used: Double = 41, week: Double? = 12, age: Double = 0, resetIn: 
 let relayRoot = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-relay-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: relayRoot, withIntermediateDirectories: true)
 let cacheFile = relayRoot.appendingPathComponent("claude.json"), relayFile = relayRoot.appendingPathComponent("claude-statusline.json")
-try cacheData(age: 3600).write(to: cacheFile)
+try cacheData(age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
 assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "stale cache and no relay file")
 try relayData().write(to: relayFile)
 let fromFiles = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow)
 assert(fromFiles.isEmpty, "an identity-free relay cannot replace a stale account-bound cache")
-try cacheData(account: "a", signedIn: "b", age: 3600).write(to: cacheFile)
+try cacheData(account: "a", signedIn: "b", age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
 assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "account A relay cannot become account B quota")
 // A new monitor/read after a restart has the same files and must also reject it.
 let restarted = ClaudeQuotaMonitor(cacheURL: cacheFile, relayURL: relayFile)
@@ -230,7 +231,7 @@ assert(chained["command"] as? String == ClaudeStatuslineConnection.command(relay
 assert(connectedExisting.previous.present && connectedExisting.previous.raw != nil)
 let restoredChain = ClaudeStatuslineConnection.disconnect(connectedExisting.settings, relay: relayPath, previous: connectedExisting.previous)!
 assert((restoredChain["statusLine"] as! [String: Any])["command"] as? String == "~/.claude/scripts/statusline.sh", "relay prefix stripped keeps the chained command")
-func statusOutput(_ command: String) throws -> String {
+func statusOutput(_ command: String, payload: String = "{\"sample\":\"value\"}\n") throws -> String {
     let process = Process(), input = Pipe(), output = Pipe()
     process.executableURL = URL(fileURLWithPath: "/bin/sh")
     process.arguments = ["-c", command]
@@ -239,7 +240,7 @@ func statusOutput(_ command: String) throws -> String {
     process.environment = environment
     process.standardInput = input; process.standardOutput = output
     try process.run()
-    input.fileHandleForWriting.write(Data("{\"sample\":\"value\"}\n".utf8))
+    input.fileHandleForWriting.write(Data(payload.utf8))
     try input.fileHandleForWriting.close()
     let result = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
@@ -247,6 +248,19 @@ func statusOutput(_ command: String) throws -> String {
 }
 let shippingRelay = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("Assets/claude-statusline-relay.sh").path
+// Compare each available relay runtime with the shipping whole-percent copy.
+// The target is the disposable connection fixture, never the operator's relay.
+for path in ["/opt/homebrew/bin:/usr/bin:/bin", "/usr/bin:/bin"] {
+    let command = "PATH=" + path + " /bin/sh " + ClaudeStatuslineConnection.quoted(shippingRelay)
+    for used in [0.0, 41.5, 42.5, 41.6, 100.0] {
+        let payload = "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":\(used)}}}"
+        let output = try statusOutput(command, payload: payload).trimmingCharacters(in: .whitespacesAndNewlines)
+        assert(output == "Claude 5h " + CompactLiveCopy.percent(max(0, 100 - used)) + " left",
+               "Relay and native whole-percent copy must agree, including half ties")
+    }
+    let missing = try statusOutput(command, payload: "{\"rate_limits\":{\"five_hour\":{}}}")
+    assert(missing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Missing used percentage must not invent remaining")
+}
 for original in [
     "FOO=bar /bin/sh -c 'printf %s \"$FOO\"'",
     "read line; printf '%s' \"$line\" | tr a-z A-Z; printf ':done'",
@@ -440,7 +454,7 @@ assert(grokMeasured.string.hasPrefix("Grok") && grokMeasured.string.contains("51
 assert(!grokMeasured.string.contains("Codex 40% remaining"))
 print("PASS: Auto menu bar follows Grok activity without a rate and without falling back to Codex")
 print("PASS: Auto does not borrow unused Codex remaining beside Grok speed; explicit Grok does not inherit Codex quota")
-let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude", window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
+let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
 let claudeSpentState = ToolQuotaState(readings: [claudeSpent], samples: [claudeSpent], horizon: ClaudeQuotaSource.horizon)
 var spentBar = MenuBarConfiguration(); spentBar.enabled = [.dial, .rate, .quota, .fable]
 let spent = MenuBarPresentation.combined(spentBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
@@ -823,7 +837,7 @@ do {
     var exhaustedQuota = current; exhaustedQuota.readings[0].used = 100
     let empty = AccountAllowancePresentation(quota: exhaustedQuota, now: now)
     assert(empty.remaining == "0%" && empty.qualifier == "Exhausted")
-    var stale = current; stale.readings[0].date = now.addingTimeInterval(-3600)
+    var stale = current; stale.readings[0].date = now.addingTimeInterval(-Runway.defaultHorizon)
     assert(AccountAllowancePresentation(quota: stale, now: now).remaining == "—")
     assert(AccountAllowancePresentation(quota: stale, now: now).detail.contains("Stale"))
     var expired = current; expired.readings[0].reset = now
@@ -897,7 +911,7 @@ do {
     typealias Budget = ClaudeQuotaSource.FableBudget
     let bound = try claudeState(try claudeLimitsCache())
     assert(bound.readings.map(\.window) == ["five_hour", "seven_day"], "Scoped windows never join the prioritized Claude allowance or Quota Guard")
-    assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == 10080)
+    assert(bound.scoped.count == 1 && bound.scoped[0].window == ClaudeQuotaSource.fableWindow && bound.scoped[0].used == 8 && bound.scoped[0].minutes == ClaudeQuotaSource.sevenDayMinutes)
     assert(abs(bound.scoped[0].reset!.timeIntervalSince(cacheNow.addingTimeInterval(6 * 86400))) < 0.01, "Microsecond reset stamps parse")
     // Assertions evaluate lazily and cannot throw, so fixtures are decoded first.
     let weekBinds = try claudeState(try claudeLimitsCache(session: 10, week: 40, fable: 20))
@@ -1058,7 +1072,7 @@ do {
                resetJitter: Double = 0) -> ToolQuotaState {
         func series(_ window: String, _ values: [Double], minutes: Int, reset: Double) -> [QuotaReading] {
             values.enumerated().map { index, used in
-                QuotaReading(accountID: account, bucket: "claude", name: "Claude", window: window, minutes: minutes, used: used,
+                QuotaReading(accountID: account, bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: window, minutes: minutes, used: used,
                              reset: cacheNow.addingTimeInterval(reset + (index % 2 == 0 ? 0 : resetJitter)),
                              date: cacheNow.addingTimeInterval(-Double(values.count - 1 - index) * step))
             }

@@ -86,11 +86,7 @@ struct AccountAllowancePresentation {
         var parts = [String]()
         if let reading, let estimate {
             parts.append(estimate.remaining == 0 ? "Exhausted" : remaining + " remaining")
-            if let reset = reading.reset {
-                parts.append("Resets " + reset.formatted(date: .abbreviated, time: .shortened))
-            } else {
-                parts.append("Reset unavailable")
-            }
+            parts.append(reading.resetWhen.map { "Resets " + $0 } ?? "Reset unavailable")
             parts.append("Quota read " + reading.date.formatted(date: .omitted, time: .standard) + Runway.ageLabel(reading, now: now))
             if let zero = estimate.exhaustion { parts.append("Projected zero " + Runway.clockLabel(zero, now: now)) }
             parts.append(estimate.message)
@@ -98,9 +94,7 @@ struct AccountAllowancePresentation {
             parts.append(qualifier + " · " + quota.unavailable)
             if let last = matching.max(by: { $0.date < $1.date }) {
                 parts.append("Last quota read " + last.date.formatted(date: .abbreviated, time: .shortened))
-                if let reset = last.reset {
-                    parts.append("Reported reset " + reset.formatted(date: .abbreviated, time: .shortened))
-                }
+                if let when = last.resetWhen { parts.append("Reported reset " + when) }
             }
         }
         if let label = quota.accountLabel { parts.append(label) }

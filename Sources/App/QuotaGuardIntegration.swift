@@ -7,6 +7,7 @@ extension UsageModel {
             let state = quota(for: tool)
             if tool == .codex {
                 return QuotaGuardInput(tool: tool, accountID: live.currentID, readings: state.readings, samples: state.samples,
+                    horizon: Runway.defaultHorizon,
                     authenticated: live.lastQuotaRefresh != nil && state.readings.allSatisfy { $0.date == live.lastQuotaRefresh }, failed: live.error != nil)
             }
             return QuotaGuardInput(tool: tool, accountID: state.guardAccountID, readings: state.readings, samples: state.samples,

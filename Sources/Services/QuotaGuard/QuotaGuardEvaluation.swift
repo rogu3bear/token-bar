@@ -1,4 +1,15 @@
 import Foundation
+
+/// Notification actions and the in-app Guard buttons share these titles and identifiers.
+enum QuotaGuardAction {
+    static let category = "quota-guard"
+    static let requestPrefix = "quota-"
+    static let view = "view-quota"
+    static let snooze = "snooze-quota"
+    static let viewTitle = "View quota"
+    static let snoozeTitle = "Snooze 30 min"
+}
+
 import CryptoKit
 
 struct QuotaGuardPolicy: Codable, Equatable {
@@ -72,8 +83,7 @@ struct QuotaGuardDecision: Identifiable, Equatable, Codable {
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
     var windowLabel: String {
-        guard let r = reading else { return "Account allowance" }
-        return r.minutes % 1440 == 0 ? "\(r.minutes / 1440)-day" : r.minutes % 60 == 0 ? "\(r.minutes / 60)-hour" : "\(r.minutes)-minute"
+        reading?.windowLabel ?? "Account allowance"
     }
     var title: String { tool.label + " · " + windowLabel + (reading.map { " · " + $0.name } ?? "") }
     var riskLabel: String {
@@ -117,7 +127,7 @@ enum QuotaGuardEvaluator {
             }
             guard input.horizon.isFinite, input.horizon > 0,
                   now.timeIntervalSince(reading.date) < min(input.horizon, QuotaGuardPolicy.freshness) else { return reject(.stale, .stale) }
-            d.remaining = 100 - reading.used
+            d.remaining = reading.remaining
             if reading.used == 100 { d.risk = .observedExhaustion; return d }
             if reading.reset == nil { return d }
             if d.remaining! <= policy.lowPercent { d.risk = .low }
@@ -127,7 +137,7 @@ enum QuotaGuardEvaluator {
             if input.samples.contains(where: { sameAllowance($0) && (!$0.date.timeIntervalSince1970.isFinite || !$0.used.isFinite || !(0...100).contains($0.used) || $0.date > reading.date) }) {
                 d.evidence = .insufficient; d.reason = .invalidValue; return d
             }
-            let history = input.samples.filter { sameAllowance($0) && $0.date >= reading.date.addingTimeInterval(-1800) }
+            let history = input.samples.filter { sameAllowance($0) && $0.date >= reading.date.addingTimeInterval(-Runway.lookback) }
             var segment: [QuotaReading] = []
             var reason: QuotaReason = .learning
             for sample in history + [reading] {

@@ -13,6 +13,17 @@ struct QuotaReading: Codable, Identifiable, Equatable {
     var reset: Date?
     var date: Date
     var id: String { accountID + "|" + bucket + "|" + window }
+    /// Arithmetic only; callers qualify identity, validity and freshness separately.
+    var remaining: Double { max(0, 100 - used) }
+    /// Guard, Now, and Accounts name the same window. Day and hour only when
+    /// the duration is an exact multiple; otherwise keep minutes.
+    var windowLabel: String {
+        minutes % 1440 == 0 ? "\(minutes / 1440)-day" : minutes % 60 == 0 ? "\(minutes / 60)-hour" : "\(minutes)-minute"
+    }
+    /// Clock text only. Callers add Reset/resets grammar.
+    var resetWhen: String? {
+        reset.map { $0.formatted(date: .abbreviated, time: .shortened) }
+    }
 }
 struct LiveAccount: Codable, Identifiable {
     var id: String
@@ -60,6 +71,8 @@ struct Runway {
     /// `horizon` is how old a reading may be and still count as current. Codex polls
     /// every 30 seconds; a tool that refreshes its own cache less often passes its cadence.
     static let defaultHorizon: TimeInterval = 120
+    /// Remaining-burn observations kept for forecasts. Not Claude remaining display, Guard snooze, or Fable pace span.
+    static let lookback: TimeInterval = 1800
     /// A reading older than the shared two-minute horizon says so beside its read time.
     static func ageLabel(_ reading: QuotaReading, now: Date) -> String {
         let seconds = now.timeIntervalSince(reading.date)
@@ -67,7 +80,7 @@ struct Runway {
         return " · \(Int(seconds / 60)) min ago"
     }
     static func estimate(_ latest: QuotaReading, samples: [QuotaReading], now: Date, horizon: TimeInterval = defaultHorizon) -> Runway {
-        let remaining = max(0, 100 - latest.used)
+        let remaining = latest.remaining
         guard now.timeIntervalSince(latest.date) < horizon else {
             return Runway(remaining: remaining, message: "Waiting for a fresh quota reading")
         }
@@ -80,7 +93,7 @@ struct Runway {
         guard let reset = latest.reset else {
             return Runway(remaining: remaining, message: "Reset unavailable")
         }
-        let relevant = samples.filter { $0.id == latest.id && $0.reset == latest.reset && $0.date >= now.addingTimeInterval(-1800) && $0.date <= latest.date }.sorted { $0.date < $1.date }
+        let relevant = samples.filter { $0.id == latest.id && $0.reset == latest.reset && $0.date >= now.addingTimeInterval(-lookback) && $0.date <= latest.date }.sorted { $0.date < $1.date }
         // A quota decrease can be a manual reset or adjustment. Discard the old slope.
         var boundary = 0
         for index in relevant.indices.dropFirst() where relevant[index].used < relevant[index - 1].used { boundary = index }

@@ -34,8 +34,9 @@ extension ClaudeQuotaSource {
             // Any missing, stale, reset or other-account input leaves the budget unknown.
             guard let reading = limit.reading, reading.accountID == account, reading.used.isFinite, (0...100).contains(reading.used),
                   let reset = reading.reset, reset > now, reading.date <= now, now.timeIntervalSince(reading.date) < quota.horizon else { return nil }
-            if 100 - reading.used < (budget?.remaining ?? .infinity) {
-                budget = FableBudget(remaining: 100 - reading.used, binding: limit.binding)
+            let leftover = reading.remaining
+            if leftover < (budget?.remaining ?? .infinity) {
+                budget = FableBudget(remaining: leftover, binding: limit.binding)
             }
         }
         return budget
@@ -51,7 +52,7 @@ extension ClaudeQuotaSource {
             guard let rate = averageBurn(latest, history: quota.paceHistory, now: now) else { return .learning }
             guard rate > 0 else { continue }
             burning = true
-            let exhaustion = latest.date.addingTimeInterval((100 - latest.used) / rate)
+            let exhaustion = latest.date.addingTimeInterval(latest.remaining / rate)
             if let reset = latest.reset, exhaustion < reset && exhaustion < (earliest?.date ?? .distantFuture) { earliest = (exhaustion, limit.binding) }
         }
         if let earliest { return .left(max(0, earliest.date.timeIntervalSince(now)), binding: earliest.binding) }

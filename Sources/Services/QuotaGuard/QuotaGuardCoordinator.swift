@@ -104,7 +104,7 @@ struct QuotaGuardDisk: Codable {
                 guard let self else { return }
                 self.prune(now: self.clock())
                 let known = self.persistenceError == nil && self.settings.notifications ? Set(self.disk.episodes.values.compactMap(\.requestID)) : []
-                let orphans = pending.union(ids).filter { $0.hasPrefix("quota-") && !known.contains($0) }
+                let orphans = pending.union(ids).filter { $0.hasPrefix(QuotaGuardAction.requestPrefix) && !known.contains($0) }
                 if !orphans.isEmpty { adapter.remove(Array(orphans)) }
                 var changed = false
                 for key in self.disk.episodes.keys {
@@ -182,7 +182,7 @@ struct QuotaGuardDisk: Codable {
                 if decision.level > next.level { next.attempts = 0 }
                 next.level = decision.level; next.attempts += 1; next.failed = false
                 next.submitted = now; next.delivered = nil; next.target = decision
-                next.requestID = "quota-" + decision.id.prefix(24) + "-" + next.period + "-" + String(next.level)
+                next.requestID = QuotaGuardAction.requestPrefix + decision.id.prefix(24) + "-" + next.period + "-" + String(next.level)
                 if let previousID, previousID != next.requestID { retired.append(previousID) }
             }
             disk.episodes[decision.id] = next

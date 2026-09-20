@@ -48,7 +48,7 @@ enum QuotaGuardPreview {
         model.live.lastQuotaRefresh = now
         var claude = latest; claude.accountID = "synthetic-claude"; claude.bucket = "claude"; claude.name = "Model allowance"
         claude.date = now.addingTimeInterval(-180); claude.used = 95
-        model.claudeQuota.quota = ToolQuotaState(readings: [claude], samples: [claude], horizon: 1800,
+        model.claudeQuota.quota = ToolQuotaState(readings: [claude], samples: [claude], horizon: ClaudeQuotaSource.horizon,
             guardAccountID: claude.accountID, guardAuthenticated: true)
         model.grokQuota.quota = ToolQuotaState(unavailable: "No supported account quota available")
         if arguments.contains("--sample-unavailable") {

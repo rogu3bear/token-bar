@@ -39,7 +39,7 @@ enum GrokBilling {
         guard minutes > 0 else { return nil }
         let window = windowName(period["type"] as? String)
         let plan = result["subscription_tier"] as? String
-        return QuotaReading(accountID: accountID, bucket: "grok", name: plan ?? "Grok", window: window, minutes: minutes, used: used, reset: reset, date: now)
+        return QuotaReading(accountID: accountID, bucket: "grok", name: plan ?? Harness.grok, window: window, minutes: minutes, used: used, reset: reset, date: now)
     }
     static func windowName(_ type: String?) -> String {
         let text = type?.uppercased() ?? ""
@@ -102,7 +102,7 @@ enum GrokBilling {
                         self.quota = ToolQuotaState(unavailable: "Grok account changed; awaiting a fresh quota")
                         self.busy = false; return
                     }
-                    var samples = self.quota.samples.filter { $0.accountID == id && $0.date >= now.addingTimeInterval(-1800) }
+                    var samples = self.quota.samples.filter { $0.accountID == id && $0.date >= now.addingTimeInterval(-Runway.lookback) }
                     if !samples.contains(where: { $0.id == reading.id && $0.date == reading.date }) { samples.append(reading) }
                     self.quota = ToolQuotaState(readings: [reading], samples: samples,
                         unavailable: "Grok quota unavailable · billing missing or stale",

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align allowance windows, reset clocks, forecast lookback, and notification actions across Now, Accounts, Guard and previews. Keep provider display horizons distinct from Guard freshness, snooze and Fable pacing; missing reset and remaining remain independent.
+
 - Reconcile provider discovery, event identity and timestamp parsing, account-attribution copy, and optional cache-write counters with their shared owners. Publish private ledgers, checkpoints and recovery files through the same protected replacement path.
 
 ## 0.1.12 — Unreleased
