@@ -1,4 +1,4 @@
-import { DRAFT_KEY, FIELDS, draftFields, issueURL, copyText } from './feedback-draft.js';
+import { DRAFT_KEY, FIELDS, VERSION_QUERY_MAX, draftFields, issueURL, copyText } from './feedback-draft.js';
 
 export function initFeedback({ document, location, history, storage, writeClipboard, openReview }) {
   const form = document.querySelector('#feedback-form');
@@ -32,7 +32,7 @@ export function initFeedback({ document, location, history, storage, writeClipbo
     saved.textContent = 'Saved draft could not be read. Keep this page open or copy your draft before leaving.';
   }
   const version = new URLSearchParams(location.search).get('version') || '';
-  if (!form.elements.version.value && /^[\w.\-]{1,40}$/.test(version)) form.elements.version.value = version;
+  if (!form.elements.version.value && new RegExp(`^[\\w.\\-]{1,${VERSION_QUERY_MAX}}$`).test(version)) form.elements.version.value = version;
   history.replaceState(null, '', location.pathname);
   text.value = copyText(fields());
   document.querySelector('#review').disabled = false;

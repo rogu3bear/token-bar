@@ -85,8 +85,10 @@ fi
 
 # 3. Expand the exact component payload; never choose an arbitrary executable.
 pkgutil --expand-full "$package" "$work/shipped" || fail "package could not be expanded"
-shipped="$work/shipped/Payload/Token Bar.app"
-[ -f "$shipped/Contents/MacOS/TokenBar" ] || fail "expected Token Bar executable is missing"
+bundle=$(python3 scripts/bundle_layout.py bundle-name)
+exe=$(python3 scripts/bundle_layout.py executable-name)
+shipped="$work/shipped/Payload/$bundle"
+[ -f "$shipped/Contents/MacOS/$exe" ] || fail "expected Token Bar executable is missing"
 codesign --verify --deep --strict "$shipped" || fail "shipped app signature is invalid"
 
 # 4. Rebuild the entire unsigned installer using the candidate's own scripts.
@@ -97,7 +99,7 @@ git archive "$resolved" | (mkdir -p "$work/src" && tar -x -C "$work/src") \
 version=$(tr -d '\n' < "$work/src/VERSION")
 rebuilt_package="$work/src/dist/TokenBar-$version-arm64.pkg"
 pkgutil --expand-full "$rebuilt_package" "$work/rebuilt" || fail "rebuilt installer could not be expanded"
-rebuilt="$work/rebuilt/Payload/Token Bar.app"
+rebuilt="$work/rebuilt/Payload/$bundle"
 
 # 5. Remove signatures only from these disposable copies, then compare complete
 # payload files and installer semantics. A toolchain difference fails closed.

@@ -16,7 +16,7 @@ See your AI usage from the macOS menu bar.
 
 **Idle popover**
 
-![Token Bar popover while idle: named remaining, Quota Guard, and saved Today history](site/public/popover-idle.png)
+![Token Bar popover while idle: named remaining, Quota Guard, and recorded Today output](site/public/popover-idle.png)
 
 *Native previews of the current source candidate with synthetic sample data. The public installer below remains v0.1.9.*
 

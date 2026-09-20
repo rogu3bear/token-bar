@@ -86,3 +86,24 @@ check(!unknown.isEmpty && unknown.lowercased().contains("history"), "an unknown 
 print("PASS: an unreadable lock still produces an explanation rather than a bare failure")
 
 print("PASS: single-instance suite complete")
+
+func shippingBundleIdentifier() -> String? {
+    guard let text = try? String(contentsOfFile: "scripts/sources.sh", encoding: .utf8) else { return nil }
+    for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("BUNDLE_IDENTIFIER=") else { continue }
+        var value = trimmed.dropFirst("BUNDLE_IDENTIFIER=".count)
+        if value.count >= 2, value.first == "\"", value.last == "\"" {
+            value = value.dropFirst().dropLast()
+        }
+        return String(value)
+    }
+    return nil
+}
+
+let shellIdentity = shippingBundleIdentifier()
+check(shellIdentity == DuplicateScan.identifier, "Spotlight identity must match the Info.plist identity, got \(shellIdentity ?? "missing") vs \(DuplicateScan.identifier)")
+let buildScript = (try? String(contentsOfFile: "scripts/build.sh", encoding: .utf8)) ?? ""
+check(buildScript.contains("$BUNDLE_IDENTIFIER"), "Info.plist must take identity from sources.sh")
+check(!buildScript.contains(DuplicateScan.identifier), "build.sh must not spell the identifier a second time")
+print("PASS: installer identity and Spotlight identity are the same shipping identifier")

@@ -320,3 +320,31 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-appl-test-') as temporary:
     assert plist_value('CFBundleShortVersionString') == '9.8.7'
     assert plist_value('CFBundleVersion') == '120807'
 print('PASS: shipping Info.plist is APPL and a missing package type fails closed before signing')
+
+with tempfile.TemporaryDirectory(prefix='tokenbar-package-identifier-test-') as temporary:
+    root = Path(temporary)
+    env = prepare_bundle_tree(root)
+    result = run_build(root, env)
+    assert result.returncode == 0, result.stderr
+    shutil.copy2(owner.parent / 'package.sh', root / 'scripts/package.sh')
+    shutil.copy2(owner.parent / 'checksum.sh', root / 'scripts/checksum.sh')
+    shutil.copytree(owner.parent / 'pkg', root / 'scripts/pkg')
+    pkgbuild = root / 'bin/pkgbuild'
+    pkgbuild.write_text('#!/bin/bash\nprintf \'%s\\n\' "$@" > "$TMPDIR/pkgbuild-args"\ntouch "${!#}"\n')
+    pkgbuild.chmod(0o700)
+    result = subprocess.run(['bash', str(root / 'scripts/package.sh')], cwd=root, env=env, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    args = (root / 'pkgbuild-args').read_text().splitlines()
+    identifier = subprocess.check_output(
+        ['/usr/libexec/PlistBuddy', '-c', 'Print :CFBundleIdentifier',
+         str(root / 'build/Token Bar.app/Contents/Info.plist')], text=True).strip()
+    assert identifier and args[args.index('--identifier') + 1] == identifier, args
+    assert Path(args[-1]).name == 'TokenBar-9.8.7-arm64.pkg', args
+    from bundle_layout import built_app, built_executable
+    assert built_app(root).name == 'Token Bar.app'
+    assert built_executable(root).is_file()
+    executable = subprocess.check_output(
+        ['/usr/libexec/PlistBuddy', '-c', 'Print :CFBundleExecutable',
+         str(built_app(root) / 'Contents/Info.plist')], text=True).strip()
+    assert executable == built_executable(root).name
+print('PASS: installer identity is the built Info.plist identifier, not a second spelling')

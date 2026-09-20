@@ -1,10 +1,20 @@
 """Exercise the real preinstall flow with isolated process-command fixtures."""
 from pathlib import Path
 import os
+import re
 import subprocess
 import tempfile
 
-source = Path("scripts/pkg/preinstall").read_text()
+swift = Path("Sources/Stores/SingleInstance.swift").read_text()
+match = re.search(r'static let installedPath = "([^"]+)"', swift)
+assert match, "DuplicateScan.installedPath must name the Applications bundle"
+installed_app = match.group(1)
+preinstall = Path("scripts/pkg/preinstall").read_text()
+assert f'installed_app="{installed_app}"' in preinstall, "preinstall must stop the copy DuplicateScan calls installed"
+assert 'installed_info="$installed_app/Contents/Info.plist"' in preinstall
+assert 'target="$installed_app/Contents/MacOS/$executable"' in preinstall
+assert installed_app in Path("scripts/pkg/postinstall").read_text(), "postinstall must register the same Applications bundle"
+source = preinstall
 with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
     root = Path(scratch)
     commands = {
@@ -20,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
         fixture.chmod(0o700)
         source = source.replace(path, str(fixture))
     installed_plist = root / "Installed Info.plist"
-    source = source.replace("/Applications/Token Bar.app/Contents/Info.plist", str(installed_plist))
+    source = source.replace('installed_info="$installed_app/Contents/Info.plist"', f'installed_info="{installed_plist}"')
     script = root / "preinstall"
     script.write_text(source)
     calls = root / "calls"
@@ -39,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-installer-test-") as scratch:
                    TEST_INSTALLED_BUILD_FILE=str(installed_build))
         result = subprocess.run(["/bin/bash", str(script), "package", "/Applications", volume], env=env, capture_output=True, text=True)
         return result.returncode, calls.read_text(), result.stderr
-    installed = "/Applications/Token Bar.app/Contents/MacOS/TokenBar"
+    installed = installed_app + "/Contents/MacOS/TokenBar"
     code, log, _ = run("/tmp/Token Bar.app/Contents/MacOS/TokenBar")
     assert code == 0 and not log, "Development copies must not be signalled"
     code, log, _ = run(installed)

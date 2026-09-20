@@ -55,3 +55,8 @@ with tempfile.TemporaryDirectory(prefix="tokenbar-public-tree-") as scratch:
     (root / "config.txt").write_text("clean working copy")
     assert b"provider API key" in check(1).stderr
 print("PASS: public-tree guard checks the index, ignored tracked files, examples and redacted secrets")
+
+# Preserve the published basename contract without a single-use wrapper in release.sh.
+for script in ('release.sh', 'package.sh', 'verify-release.sh'):
+    assert 'TokenBar-$version-arm64.pkg' in (owner / 'scripts' / script).read_text(), script
+print('PASS: release, assembly and reproduction retain the published installer basename')

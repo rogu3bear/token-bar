@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+
+const motion = JSON.parse(readFileSync(new URL('../motion-preview.json', import.meta.url), 'utf8'));
+const posterStart = motion.posterFrame / motion.fps;
+const loopStart = motion.loopFrame / motion.fps;
 
 function listen(events, key, fn) {
   const list = events.get(key) || [];
@@ -20,7 +25,7 @@ async function setup(reduced = false) {
   const elements = new Map(), events = new Map();
   const get = id => {
     if (!elements.has(id)) elements.set(id, {
-      textContent: '', paused: true, currentTime: 0, readyState: 1, dataset: { loopStart: '45.3', start: '3.5' },
+      textContent: '', paused: true, currentTime: 0, readyState: 1, dataset: { loopStart: String(loopStart), start: String(posterStart) },
       classList: { values: new Set(['visually-hidden']),
         add(value) { this.values.add(value); }, remove(value) { this.values.delete(value); },
         contains(value) { return this.values.has(value); } },
@@ -54,14 +59,14 @@ test('visible recordings start without a click and loop only their settled secti
   assert.ok(dashboard.paused && menu.paused);
   await d.visible(true);
   assert.ok(!dashboard.paused && !menu.paused);
-  assert.equal(dashboard.currentTime, 3.5);
-  assert.equal(menu.currentTime, 3.5);
+  assert.equal(dashboard.currentTime, posterStart);
+  assert.equal(menu.currentTime, posterStart);
   dashboard.currentTime = 4; menu.currentTime = 3;
   await d.fire('#dashboard-recording:timeupdate');
   assert.equal(menu.currentTime, 4);
   await d.fire('#dashboard-recording:ended');
-  assert.equal(dashboard.currentTime, 45.3);
-  assert.equal(menu.currentTime, 45.3);
+  assert.equal(dashboard.currentTime, loopStart);
+  assert.equal(menu.currentTime, loopStart);
   assert.ok(!dashboard.paused && !menu.paused);
 });
 
@@ -111,7 +116,7 @@ test('a loop waits for both media seeks before restarting either recording', asy
   dashboard.seeking = false; await d.fire('#dashboard-recording:seeked');
   assert.ok(dashboard.paused && menu.paused);
   menu.seeking = false; await d.fire('#menu-recording:seeked');
-  assert.equal(dashboard.currentTime, 45.3); assert.equal(menu.currentTime, 45.3);
+  assert.equal(dashboard.currentTime, loopStart); assert.equal(menu.currentTime, loopStart);
   assert.ok(!dashboard.paused && !menu.paused);
 });
 
@@ -185,4 +190,12 @@ test('recording failures keep a visible warning through visibility and reduced-m
   d.media.matches = true; await d.fire('motion');
   assert.match(status.textContent, /^Warning: Recording unavailable/);
   assert.equal(d.get('#demo-play').disabled, true);
+});
+
+test('published recordings use the motion-preview clock', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, new RegExp(`data-start="${posterStart}"`));
+  assert.match(html, new RegExp(`data-loop-start="${loopStart}"`));
+  const encode = await readFile(new URL('../../scripts/encode-motion-preview.sh', import.meta.url), 'utf8');
+  assert.match(encode, /site\/motion-preview\.json/);
 });

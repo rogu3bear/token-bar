@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align package identity with the built bundle, share preview/release and static-site paths, and keep website recordings synchronized with the native product.
+
 - Converge report evidence and native presentation: shared read age, scoped calculations, output-based Today totals, provider-column layout, and macOS accent defaults.
 
 - Align allowance windows, reset clocks, forecast lookback, and notification actions across Now, Accounts, Guard and previews. Keep provider display horizons distinct from Guard freshness, snooze and Fable pacing; missing reset and remaining remain independent.
