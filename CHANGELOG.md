@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.12 — Released 2026-09-19
 
 - Align package identity with the built bundle, share preview/release and static-site paths, and keep website recordings synchronized with the native product.
 
@@ -10,16 +10,16 @@
 
 - Reconcile provider discovery, event identity and timestamp parsing, account-attribution copy, and optional cache-write counters with their shared owners. Publish private ledgers, checkpoints and recovery files through the same protected replacement path.
 
-## 0.1.12 — Unreleased
-
 - Keep History, Cost and Insights usable with thousands of retained source warnings: show a compact incomplete-coverage summary and selectable details on demand, without deleting diagnostics.
 - Keep diagnostic ordering stable across refreshes and let native selectable text expose its own accessibility label, avoiding recursive accessibility reads when navigating to Cost.
 - Avoid a false replacement warning when replaying a fork log containing copied parent metadata before the original child. Recovery still requires the child’s exact counter boundary; genuine and previously retained gaps stay explicit.
 
-## 0.1.11 — Unreleased
+### 0.1.11 development work included in 0.1.12
+
+These changes shipped in 0.1.12; there was no separate public 0.1.11 release.
 
 - Retain the installed optional launch-time update check, its saved opt-out and privacy disclosures; downloads remain a manual browser action.
-- Prepare development build 30111 above the locally installed 30110, retaining console-user reopen after installation. Public downloads remain on notarized 0.1.9.
+- Preserve console-user reopen after installation.
 - Verify development package contents against an exact commit with explicit `--development`; the default release verifier still requires Developer ID signing and notarization.
 - Keep idle Auto and the popover focused on measured Codex/Claude remaining, with no invented speed field; preserve working-only Now columns and each tool’s gauge alignment.
 - Share remaining and speed copy across Now, Accounts, the status item and VoiceOver. Apply the same account, source-failure and freshness checks before displaying allowance, while qualifying speed and reset time independently.
@@ -90,7 +90,7 @@ These changes shipped in 0.1.2; there was no separate public 0.1.1 release.
 The public version sequence starts at 0.1.0. A Developer ID signed and
 Apple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).
 An OCI archive with the identical installer was uploaded to GitHub Packages at
-launch; that listing is private and is not the current 0.1.9 installer. The
+launch; that listing is private and is not the current installer. The
 public website and README used the direct v0.1 Release asset at launch.
 Installation needs no build tools or reboot.
 Claude after-turn account allowance refresh remains unavailable; the

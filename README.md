@@ -18,13 +18,13 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar popover while idle: named remaining, Quota Guard, and recorded Today output](site/public/popover-idle.png)
 
-*Native previews of the current source candidate with synthetic sample data. The public installer below remains v0.1.9.*
+*Native previews of Token Bar 0.1.12 with synthetic sample data.*
 
 Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
 saved measurements on your Mac and updates them as new records arrive.
 
-**v0.1.9 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
+**v0.1.12 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
 
 [Website](https://token-bar-9v8.pages.dev) · [Releases](https://github.com/rogu3bear/token-bar/releases) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
@@ -54,17 +54,17 @@ mean an entire tool has stopped.
 
 ## Get started
 
-[Download Token Bar 0.1.9 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.9/TokenBar-0.1.9-arm64.pkg)
+[Download Token Bar 0.1.12 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.12/TokenBar-0.1.12-arm64.pkg)
 
 The installer is signed with Developer ID and notarized by Apple. Open the
 `.pkg` and follow the macOS installer; it installs **Token Bar.app** in
 `/Applications`. Then open Token Bar from Applications. No build tools or reboot
 are required. Requires Apple silicon and macOS 14 or later.
 
-[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.9)
+[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.12)
 
 GitHub Releases hosts the macOS installer. The current download is the
-notarized v0.1.9 package above. [Distribution and verification details](docs/RELEASING.md).
+notarized v0.1.12 package above. [Distribution and verification details](docs/RELEASING.md).
 
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.

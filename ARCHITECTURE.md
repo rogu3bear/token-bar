@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the unreleased v0.1.12 source. Known limitations are listed separately;
+> Describes the released v0.1.12 source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
