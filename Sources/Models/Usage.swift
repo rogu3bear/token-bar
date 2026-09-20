@@ -1,6 +1,5 @@
 import Foundation
 import Darwin
-import CryptoKit
 
 struct Tokens: Codable, Equatable {
     var input: Int = 0
@@ -282,7 +281,7 @@ final class UsageScanner {
         "\(Int64((entry.date.timeIntervalSince1970 * 1000).rounded()))|\(entry.session)|\(entry.model)|\(entry.tokens.input)|\(entry.tokens.cached)|\(entry.tokens.output)|\(entry.tokens.reasoning)"
     }
     private func historyKey(_ entry: Entry) -> String {
-        let day = Calendar.current.startOfDay(for: entry.date).timeIntervalSince1970
+        let day = LedgerDay.key(entry.date)
         // Harness and project are part of the key. Without them a day bucket
         // would merge turns from different tools or different projects and keep
         // only the first one's attribution, which is exactly the blurring this
@@ -376,7 +375,7 @@ final class UsageScanner {
         let canonical = (try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])) ?? Data()
         // Preserve the established fingerprint contract, including fork deduplication.
         let identity = (cursor.turnID ?? "fallback|\(session)|\(stamp)") + "|" + String(decoding: canonical, as: UTF8.self)
-        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+        let fingerprint = EventIdentity.hash(identity)
         let previousFields = cursor.previousFields
         let reconciling = cursor.reconciliation != nil
         let recoveredBoundary = cursor.reconciliation.map { recovery in
@@ -462,7 +461,7 @@ final class UsageScanner {
         entry.harness = cursor.harness; entry.projectPath = cursor.projectPath
         entry.contextWindow = (info["model_context_window"] as? Int).flatMap { $0 > 0 ? $0 : nil }
         // Only price a known single request; cumulative deltas can span multiple calls.
-        if let last, delta == last, last.input >= 0 { entry.contextBand = last.input > 272_000 ? "long" : "short" }
+        if let last, delta == last, last.input >= 0 { entry.contextBand = last.input > CostPricing.threshold ? "long" : "short" }
         let fields: [String]
         if let last, delta == last, let lastRaw = info["last_token_usage"] as? [String: Any] {
             fields = UsageMetadata.recordedFields(lastRaw)
@@ -600,9 +599,9 @@ final class UsageScanner {
         errors = []
         otherTools?()
         if Self.contains(changedPaths, root: grokHome) {
-            toolProgress?("Grok", 0, 0)
-            count += scanGrok(historical: historical, poll: now, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths, errors: &errors, progress: { toolProgress?("Grok", $0, $1) })
-            retainErrors(errors, for: "Grok", paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths?.filter { Self.contains([$0], root: grokHome) })
+            toolProgress?(Harness.grok, 0, 0)
+            count += scanGrok(historical: historical, poll: now, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths, errors: &errors, progress: { toolProgress?(Harness.grok, $0, $1) })
+            retainErrors(errors, for: Harness.grok, paths: changedPaths?.contains(grokHome!) == true ? nil : changedPaths?.filter { Self.contains([$0], root: grokHome) })
             errors = []
         }
         if Self.contains(changedPaths, root: claudeHome) {
@@ -612,9 +611,9 @@ final class UsageScanner {
             errors = []
         }
         if Self.contains(changedPaths, root: openCodeHome) {
-            toolProgress?("OpenCode", 0, 0)
-            count += scanOpenCode(historical: historical, errors: &errors, progress: { toolProgress?("OpenCode", $0, $1) })
-            retainErrors(errors, for: "OpenCode")
+            toolProgress?(OpenCodeUsage.harness, 0, 0)
+            count += scanOpenCode(historical: historical, errors: &errors, progress: { toolProgress?(OpenCodeUsage.harness, $0, $1) })
+            retainErrors(errors, for: OpenCodeUsage.harness)
             errors = []
         }
         errors = Array((ledger.sourceErrors ?? [:]).values)

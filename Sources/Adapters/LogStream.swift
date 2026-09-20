@@ -35,9 +35,9 @@ final class LogStream {
             if dropped {
                 for root in roots where path == root.path || path.hasPrefix(root.path + "/") { files.insert(root) }
             }
-            if path.hasPrefix(self.home.appendingPathComponent("state_5.sqlite").path) { files.insert(URL(fileURLWithPath: path)) }
+            if path.hasPrefix(CodexCatalog.database(in: self.home).path) { files.insert(URL(fileURLWithPath: path)) }
             if let openCode = self.openCodeHome,
-               ["opencode.db", "opencode.db-wal", "opencode.db-shm"].contains(URL(fileURLWithPath: path).lastPathComponent),
+               OpenCodeCatalog.sidecarNames.contains(URL(fileURLWithPath: path).lastPathComponent),
                path.hasPrefix(openCode.path + "/") { files.insert(URL(fileURLWithPath: path)) }
             if path == self.home.appendingPathComponent("auth.json").path { account = true }
             if path.hasSuffix(".jsonl") && (path.hasPrefix(self.home.appendingPathComponent("sessions").path + "/") || path.hasPrefix(self.home.appendingPathComponent("archived_sessions").path + "/")) {

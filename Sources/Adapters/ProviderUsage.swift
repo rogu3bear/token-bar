@@ -7,8 +7,7 @@ struct ProviderUsage: Codable {
     var days: [String: Int]
     var source = "Installed app-server · account/usage/read"
     static func dayDate(_ day: String) -> Date? {
-        let parser = ISO8601DateFormatter()
-        guard day.count == 10, let date = parser.date(from: day + "T00:00:00Z"), UsageMetadata.day(date) == day else { return nil }
+        guard day.count == 10, let date = EventTime.parse(day + "T00:00:00Z"), UsageMetadata.day(date) == day else { return nil }
         return date
     }
     static func decode(_ data: [String: Any], accountID: String, afterID: String, now: Date = Date()) throws -> Self {

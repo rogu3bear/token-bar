@@ -21,7 +21,7 @@ enum RequestExport {
             var values = [iso.string(from: entry.date), entry.recordID ?? "", entry.session, entry.turnID ?? "", entry.provider ?? "", entry.model, entry.effort ?? ""]
             let tokens = entry.tokens
             values += [entry.hasField("input_tokens") ? String(tokens.input) : "", entry.hasField("cached_input_tokens") ? String(tokens.cached) : "", tokens.cacheWrite.map(String.init) ?? "", entry.hasField("output_tokens") ? String(tokens.output) : "", entry.hasField("reasoning_output_tokens") ? String(tokens.reasoning) : ""]
-            values += [entry.tokenFields?.joined(separator: ";") ?? "", entry.requestInputTokens.map(String.init) ?? "", entry.bucket == "revision" ? "message_increment" : entry.requestInputTokens == nil ? "aggregate_delta" : "single_request", entry.requestedService ?? "", entry.observedService ?? "", entry.serviceEvidence ?? "", entry.account == nil ? "unknown" : "inferred from sign-in observation"]
+            values += [entry.tokenFields?.joined(separator: ";") ?? "", entry.requestInputTokens.map(String.init) ?? "", entry.bucket == "revision" ? "message_increment" : entry.requestInputTokens == nil ? "aggregate_delta" : "single_request", entry.requestedService ?? "", entry.observedService ?? "", entry.serviceEvidence ?? "", UsageMetadata.accountAttribution(entry.account)]
             try file.write(contentsOf: Data((values.map(quote).joined(separator: ",") + "\n").utf8)); count += 1
         }
         try file.synchronize(); try file.close()

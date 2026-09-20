@@ -201,6 +201,35 @@ check(disjoint.0.total == 180, "Processed total stays input+output after fold")
 check(disjoint.1.contains("cache_write_input_tokens") && disjoint.1.contains("cached_input_tokens"), "Presence tracks Grok cache fields")
 let sessionShape = GrokUsage.tokens(["inputTokens": 150, "cachedReadTokens": 50, "outputTokens": 20, "totalTokens": 170, "cacheCreationTokens": 10, "reasoningTokens": 4])
 check(sessionShape.0.input == 150 && sessionShape.0.total == 170, "Session-shaped Grok totals already include cache-read")
+let absentWrite = GrokUsage.tokens(["inputTokens": 100, "cachedReadTokens": 50, "outputTokens": 20, "totalTokens": 170])
+let zeroWrite = GrokUsage.tokens(["inputTokens": 100, "cachedReadTokens": 50, "cacheCreationTokens": 0, "outputTokens": 20, "totalTokens": 170])
+check(absentWrite.0.input == 150 && absentWrite.0.cacheWrite == nil && !absentWrite.1.contains("cache_write_input_tokens"),
+      "Disjoint Grok counters retain missing cache-write evidence")
+check(zeroWrite.0.input == 150 && zeroWrite.0.cacheWrite == 0 && zeroWrite.1.contains("cache_write_input_tokens"),
+      "Disjoint Grok counters retain an explicitly recorded cache-write zero")
+do {
+    let overReasoning = GrokUsage.tokens(["inputTokens": 10, "cachedReadTokens": 5, "outputTokens": 2, "reasoningTokens": 9, "totalTokens": 17]).0
+    let negativeCache = GrokUsage.tokens(["inputTokens": 10, "cachedReadTokens": -1, "outputTokens": 2, "totalTokens": 11]).0
+    check(overReasoning.input == 15 && overReasoning.reasoning == 9 && overReasoning.cacheWrite == nil,
+          "Cache folding must preserve invalid reasoning for observable integrity repair")
+    check(negativeCache.input == 9 && negativeCache.cached == -1,
+          "Cache folding must preserve a negative component for quarantine")
+    let home = root.appendingPathComponent("invalid-fold")
+    let scanner = UsageScanner(home: home, stateURL: home.appendingPathComponent("ledger.json"))
+    scanner.readAccount = false
+    let date = Date()
+    for (name, tokens) in [("reasoning", overReasoning), ("negative", negativeCache)] {
+        let id = EventIdentity.hash(name)
+        var entry = Entry(date: date, session: name, model: "grok", tokens: tokens, account: nil)
+        entry.recordID = id; entry.harness = Harness.grok; entry.provider = GrokUsage.provider
+        scanner.persistAdmitted(entry, fingerprint: id, date: date)
+    }
+    check(scanner.ledger.entries.count == 1 && scanner.ledger.entries[0].tokens.reasoning == 2,
+          "Only repairable reasoning enters usage; negative counters remain excluded")
+    check(scanner.ledger.integrity?.repaired[IntegrityViolation.reasoningExceedsOutput.rawValue] == 1 &&
+          scanner.ledger.integrity?.quarantined[IntegrityViolation.negativeCounter.rawValue] == 1,
+          "Shared normalization must not erase the integrity evidence")
+}
 print("PASS: Grok token field mapping without inventing missing counters")
 
 var grokCost = Entry(date: ProviderUsage.dayDate("2026-09-07")!, session: validID, model: "grok-4.6-build",

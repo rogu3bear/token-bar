@@ -32,9 +32,7 @@ struct SignInObservation: Codable, Identifiable {
         var next = observations
         next.append(SignInObservation(date: Date(), account: account, reason: start ? "Monitor started · observation gap before this point" : "Credential-file change observed"))
         do {
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(next).write(to: file, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            try PrivateCache.write(next, to: file)
             observations = next; error = nil
         } catch { self.error = "Sign-in timeline could not be saved: " + error.localizedDescription }
     }

@@ -49,6 +49,7 @@ not application state or UI code.
 | Claude Code usage | `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`, with `projects/**/*.jsonl` message snapshots plus verified increments; a missing explicit root stays unavailable | tool and project reports | `Tests/Harnesses` |
 | OpenCode usage | `opencode.db` `message` table, read-only | tool, provider and project reports | `Tests/Harnesses` |
 | Counter convention | `Tokens.canonical` | every total and cache share | `Tests/Harnesses` |
+| Event timestamp | `EventTime.parse` | Codex/Claude activity, Claude turns, provider day bounds | `Tests/main.swift` |
 
 ## Critical flows
 
@@ -184,8 +185,9 @@ fake adapter for permission, submission, delivery and action routing.
    when its bytes differ, to a stable path in the support directory so the
    settings entry survives moving the app. **Connect Claude Code** (Claude
    panel, Menu bar settings, or `--claude-code connect`) edits only the
-   `statusLine` key of the user-level Claude Code `settings.json` (respecting
-   `CLAUDE_CONFIG_DIR`): relay alone when absent, relay prefixed to an existing
+   `statusLine` key of the user-level Claude Code `settings.json` (same root as
+   usage: `CLAUDE_HOME`, then `CLAUDE_CONFIG_DIR`, then `~/.claude`): relay
+   alone when absent, relay prefixed to an existing
    command through `/bin/sh -c` otherwise, with a timestamped backup (three
    kept) and an atomic
    replace. The previous value is remembered in preferences so Disconnect

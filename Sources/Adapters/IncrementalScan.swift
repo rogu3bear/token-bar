@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 import Darwin
 
 /// Durable byte position; the boundary digest detects replacement/truncation
@@ -107,16 +106,14 @@ extension UsageScanner {
         let checkpoint = UsageCheckpoint(generation: dirtyGeneration, contentGeneration: contentGeneration,
                                          ids: ledger.eventIDs ?? [], url: url)
         try checkpointWillRun?(.ledger)
-        try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if metadataOnly {
             var metadata = ledger
             metadata.entries = []
-            try JSONEncoder().encode(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata))
-                .write(to: url, options: .atomic)
+            try PrivateCache.write(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata), to: url)
         } else {
             var durable = ledger
             durable.checkpointID = UUID()
-            try JSONEncoder().encode(durable).write(to: url, options: .atomic)
+            try PrivateCache.write(durable, to: url)
             ledger.checkpointID = durable.checkpointID
         }
         pendingCheckpoint = checkpoint
@@ -127,7 +124,6 @@ extension UsageScanner {
 
     private func finishCheckpoint() throws {
         guard let checkpoint = pendingCheckpoint else { return }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: checkpoint.url.path)
         guard let eventIndex else { throw RequestArchive.failure("Event identity index is unavailable") }
         if !checkpoint.indexed {
             try checkpointWillRun?(.index)
@@ -153,7 +149,7 @@ extension UsageScanner {
         let length = min(offset, 128)
         try handle.seek(toOffset: offset - length)
         let bytes = try handle.read(upToCount: Int(length)) ?? Data()
-        return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        return EventIdentity.hash(bytes)
     }
 
     func claudeTail(_ url: URL, key: String, stamp: ClaudeFileCheck,
@@ -251,7 +247,7 @@ extension UsageScanner {
         guard !others.isEmpty else { return }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let evidence = try encoder.encode(Dictionary(uniqueKeysWithValues: others))
-        let witness = SHA256.hash(data: evidence).map { String(format: "%02x", $0) }.joined()
+        let witness = EventIdentity.hash(evidence)
         guard witness != cursor.aliasWitness else { return }
         let candidates = [cursor] + others.map { $0.1 }
         // This upper bound constrains reconciliation; it is never admitted as
@@ -276,7 +272,7 @@ extension UsageScanner {
         let count = bytes.withUnsafeMutableBytes { pread(descriptor, $0.baseAddress, length, off_t(start)) }
         guard count == length else { throw POSIXError(.EIO) }
         lastWork.codexValidationBytes += length
-        return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        return EventIdentity.hash(bytes)
     }
     func readLog(_ url: URL, session: String, cursor: inout Cursor,
                  account: Account?, poll: Date, historical: Bool, startDay: Date) throws {

@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 /// Ledger admission for the two harnesses that keep their own stores.
 ///
@@ -10,8 +9,7 @@ import CryptoKit
 extension UsageScanner {
     /// `<harness>|<message id>` is stable across rescans and unique across tools.
     static func foreignIdentity(harness: String, messageID: String) -> String {
-        SHA256.hash(data: Data("\(harness)|\(messageID)".utf8))
-            .map { String(format: "%02x", $0) }.joined()
+        EventIdentity.hash("\(harness)|\(messageID)")
     }
 
     func scanClaudeCode(historical: Bool, paths: Set<URL>? = nil, errors: inout [String], progress: ((Int, Int) -> Void)? = nil) -> Int {
@@ -118,7 +116,7 @@ extension UsageScanner {
 
     func scanOpenCode(historical: Bool, errors: inout [String], progress: ((Int, Int) -> Void)? = nil) -> Int {
         guard let home = openCodeHome else { openCodeReader = nil; return 0 }
-        let database = home.appendingPathComponent("opencode.db")
+        let database = OpenCodeCatalog.database(in: home)
         var admitted = 0
         do {
             let key = (historical ? "history:" : "current:") + String(ledger.started.timeIntervalSince1970) + ":" + database.path

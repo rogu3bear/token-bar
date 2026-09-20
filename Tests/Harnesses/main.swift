@@ -44,6 +44,9 @@ let hostile = Tokens.canonical(input: -5, cacheRead: -9, cacheWrite: -1,
 check(hostile.input == 0 && hostile.output == 0, "negative counters must clamp to zero")
 check(hostile.reasoning == 0, "reasoning cannot exceed output")
 check(hostile.cacheWrite == nil, "a negative cache write is absent, not zero")
+let missingWrite = Tokens.canonical(input: 10, cacheRead: 0, cacheWrite: nil,
+                                    output: 2, reasoning: 0, convention: .cacheBesideInput)
+check(missingWrite.cacheWrite == nil && missingWrite.input == 10, "a missing cache write stays unavailable, not a measured zero")
 print("PASS: malformed counters cannot enter the ledger as negative or impossible values")
 
 // Claude Code deduplication -------------------------------------------------
@@ -205,7 +208,7 @@ _ = migrating!.scan(historical: true)
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.output } == 100, "Legacy first-wins history gains exactly missing output")
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 1502, "Repeated input is not charged again")
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.eventCount } == 1, "An increase is not another message")
-let originalID = UsageScanner.foreignIdentity(harness: "Claude Code", messageID: "growth")
+let originalID = UsageScanner.foreignIdentity(harness: ClaudeCodeUsage.harness, messageID: "growth")
 let retainedOriginal = try migrating!.requestArchive!.entry(id: originalID)
 check(retainedOriginal?.tokens.output == 10, "Original admitted detail remains immutable")
 migrating = nil
@@ -842,6 +845,10 @@ do {
     check(HarnessDiscovery.claudeCode(environment: environment, userHome: userHome)?.path == configured.path, "Official custom root reaches discovery")
     check(ClaudeCodeUsage.home(environment: environment, userHome: userHome).path == configured.path, "Official custom root reaches reader")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_HOME": legacy.path, "CLAUDE_CONFIG_DIR": configured.path], userHome: userHome)?.path == legacy.path, "Explicit legacy transcript override retains precedence")
+    check(ClaudeStatuslineConnection.settingsURL(environment: ["CLAUDE_HOME": legacy.path, "CLAUDE_CONFIG_DIR": configured.path], home: userHome).path == legacy.appendingPathComponent("settings.json").path,
+          "Connect edits settings.json in the same home the reader uses")
+    check(ClaudeStatuslineConnection.settingsURL(environment: environment, home: userHome).path == configured.appendingPathComponent("settings.json").path,
+          "Official custom root reaches Connect")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_HOME": "", "CLAUDE_CONFIG_DIR": configured.path], userHome: userHome)?.path == configured.path, "Empty override is ignored")
     check(HarnessDiscovery.claudeCode(environment: ["CLAUDE_CONFIG_DIR": userHome.appendingPathComponent("missing").path], userHome: userHome) == nil, "Missing explicit root cannot silently select another installation")
     let transcript = configured.appendingPathComponent("projects/configured.jsonl")

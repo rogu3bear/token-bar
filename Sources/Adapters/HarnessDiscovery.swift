@@ -38,9 +38,16 @@ enum HarnessDiscovery {
                           directory(userHome.appendingPathComponent(".local/share/opencode").path),
                           directory(userHome.appendingPathComponent(".opencode").path)]
         for case let root? in candidates
-        where FileManager.default.fileExists(atPath: root.appendingPathComponent("opencode.db").path) {
+        where FileManager.default.fileExists(atPath: OpenCodeCatalog.database(in: root).path) {
             return root
         }
         return nil
     }
+}
+
+/// OpenCode's local usage catalog. Discovery, the file watcher, and the reader all use this file.
+enum OpenCodeCatalog {
+    static let fileName = "opencode.db"
+    static var sidecarNames: [String] { [fileName, fileName + "-wal", fileName + "-shm"] }
+    static func database(in home: URL) -> URL { home.appendingPathComponent(fileName) }
 }

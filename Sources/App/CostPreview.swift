@@ -316,7 +316,7 @@ enum CostPreview {
         try require(count == selected.count, "Request export must share Tool selection")
         model.costEffort = "high"
         model.modelFilter = "gpt-6-astra"
-        model.accountFilter = "Unattributed"
+        model.accountFilter = DimensionReport.unattributed
         model.search = "sample-task-0"
         model.costService = .fast
         try settle()

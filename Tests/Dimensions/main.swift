@@ -14,6 +14,30 @@ func entry(harness: String?, provider: String?, project: String?, model: String 
     return row
 }
 
+check(ModelIdentity.unknown == "Unknown model", "missing model names share one explicit label")
+let unnamedModel = entry(harness: "OpenCode", provider: "lmstudio", project: "/Users/x/dev/alpha", model: ModelIdentity.unknown)
+let namedModel = entry(harness: "OpenCode", provider: "lmstudio", project: "/Users/x/dev/alpha")
+check(CostCoverage.build([unnamedModel]).dimensions.first { $0.id == "model" }?.knownRecords == 0,
+      "an omitted model is not counted as a known model")
+check(CostCoverage.build([namedModel]).dimensions.first { $0.id == "model" }?.knownRecords == 1,
+      "a named model is counted as known")
+check(CostCoverage.build([entry(harness: nil, provider: nil, project: nil)]).byHarness[DimensionReport.unattributed] != nil,
+      "coverage groups a missing tool under the same unattributed label as dimension reports")
+do {
+    var data: [String: Any] = [
+        "role": "assistant", "providerID": "lmstudio",
+        "tokens": ["input": 10, "output": 2, "reasoning": 0, "cache": ["read": 0, "write": 0]],
+        "path": ["cwd": "/Users/x/dev/alpha"], "cost": 0,
+        "time": ["created": 1_769_555_059_217]
+    ]
+    check(OpenCodeUsage.turn(id: "m", session: "s", data: data)?.model == ModelIdentity.unknown,
+          "OpenCode without a model id uses the shared unknown-model label")
+    data["modelID"] = ""
+    check(OpenCodeUsage.turn(id: "m", session: "s", data: data)?.model == ModelIdentity.unknown,
+          "an empty OpenCode model id is unknown, not a blank model")
+}
+print("PASS: omitted models and tools use the shared unknown and unattributed labels")
+
 // A harness that is not a provider ------------------------------------------
 // One harness reaching several providers is the fact the single `provider`
 // field could not express. This is the reason the dimension exists.
@@ -67,7 +91,7 @@ let partial = [
 let partialProjects = DimensionReport.byProject(partial)
 check(partialProjects.count == 2, "a missing project must produce its own row")
 let unattributed = partialProjects.first { !$0.attributed }
-check(unattributed?.name == "Unattributed", "a missing project must be labelled, not blank")
+check(unattributed?.name == DimensionReport.unattributed, "a missing project must be labelled, not blank")
 check(unattributed?.tokens.input == 7, "unattributed usage must be counted, not discarded")
 check(unattributed?.paths.isEmpty == true, "an unattributed row must not invent a path")
 print("PASS: missing project attribution is reported as unattributed, not zero")
@@ -165,7 +189,7 @@ check(report.projects.count == 2, "expected one project row plus unattributed, g
 let alpha = report.projects.first { $0.title == "alpha" }
 check(alpha != nil, "the project row must be named for its directory")
 check(alpha?.tokens.output == 85, "case-variant spellings must total into one project row, got \(alpha?.tokens.output ?? -1)")
-check(report.projects.contains { $0.title == "Unattributed" }, "usage without a project must still appear")
+check(report.projects.contains { $0.title == DimensionReport.unattributed }, "usage without a project must still appear")
 print("PASS: the usage report groups output by project")
 
 check(report.harnesses.count == 2, "expected two tool rows, got \(report.harnesses.count)")
@@ -270,9 +294,9 @@ check(bucketProjects == ["alpha", "beta"],
       "day buckets must keep projects apart, got \(bucketProjects.sorted())")
 print("PASS: historical day buckets do not merge separate projects")
 
-let toolQuery = UsageQuery(period: 1, harness: "Claude Code")
+let toolQuery = UsageQuery(period: 1, harness: ClaudeCodeUsage.harness)
 let claudeReport = UsageReport.build(entries: four, query: toolQuery, catalog: [:], now: Date().addingTimeInterval(1))
-check(claudeReport.entries.count == 1 && claudeReport.entries[0].harness == "Claude Code", "Tool filter must scope the actual report entries")
+check(claudeReport.entries.count == 1 && claudeReport.entries[0].harness == ClaudeCodeUsage.harness, "Tool filter must scope the actual report entries")
 check(claudeReport.totals == four[2].tokens && claudeReport.harnesses.count == 1, "Tool-scoped totals and breakdown must agree")
 check(claudeReport.timeline.points.last?.tokens == four[2].tokens, "Timeline must use the same tool scope as totals")
 print("PASS: tool filter scopes history totals, breakdowns and timeline together")

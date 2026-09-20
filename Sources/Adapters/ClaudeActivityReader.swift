@@ -12,7 +12,7 @@ final class ClaudeActivityReader {
     private var lastReport: [String: Date] = [:]
     private var failures = Set<URL>()
     func consume(_ root: [String: Any], source: String) {
-        guard let date = ClaudeCodeUsage.date(root["timestamp"]) else { return }
+        guard let date = EventTime.parse(root["timestamp"]) else { return }
         let key = "claude:" + source
         let type = root["type"] as? String
         if let task = tasks[key], date < task.eventDate { return }

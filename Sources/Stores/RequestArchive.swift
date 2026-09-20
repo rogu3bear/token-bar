@@ -24,7 +24,7 @@ final class RequestArchive {
                 try execute("CREATE INDEX IF NOT EXISTS request_dates ON requests(admitted, date)")
                 try execute("CREATE INDEX IF NOT EXISTS request_pending ON requests(admitted,id)")
                 try execute("CREATE INDEX IF NOT EXISTS request_groups ON requests(group_key)")
-                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+                try PrivateFile.protect(url)
             }
         } catch { sqlite3_close(db); db = nil; throw error }
     }

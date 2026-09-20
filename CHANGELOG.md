@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reconcile provider discovery, event identity and timestamp parsing, account-attribution copy, and optional cache-write counters with their shared owners. Publish private ledgers, checkpoints and recovery files through the same protected replacement path.
+
 ## 0.1.12 — Unreleased
 
 - Keep History, Cost and Insights usable with thousands of retained source warnings: show a compact incomplete-coverage summary and selectable details on demand, without deleting diagnostics.

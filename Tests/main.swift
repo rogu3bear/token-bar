@@ -78,7 +78,7 @@ assert(all.totals.total == 330 && all.totals.cached == 80 && all.days.count == 2
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 0), catalog: catalog, now: now).totals.total == 220)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 2), catalog: catalog, now: now).totals.total == 330)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 4, start: oldDate, end: oldDate), catalog: catalog, now: now).totals.total == 110)
-assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, model: "A", account: "Unattributed", search: "Historical"), catalog: catalog, now: now).totals.total == 110)
+assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, model: "A", account: DimensionReport.unattributed, search: "Historical"), catalog: catalog, now: now).totals.total == 110)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 1, account: account.id), catalog: catalog, now: now).totals.total == 220)
 assert(UsageReport.build(entries: sample, query: UsageQuery(period: 4, start: now, end: oldDate), catalog: catalog, now: now).entries.isEmpty)
 print("PASS: aggregation, cache subset, today/week/custom dates, combined model/account/task filter, reversed dates")
@@ -442,14 +442,14 @@ print("PASS: usage trends distinguish unavailable input from completed zero and 
 var historicalCodex = Entry(date: now.addingTimeInterval(-86400), session: "codex-history", model: "sample", tokens: Tokens(["input_tokens": 200, "output_tokens": 100]))
 historicalCodex.harness = "Codex Desktop"
 var historicalClaude = Entry(date: now.addingTimeInterval(-172800), session: "claude-history", model: "sample", tokens: Tokens(["input_tokens": 400, "output_tokens": 300]))
-historicalClaude.harness = "Claude Code"
+historicalClaude.harness = ClaudeCodeUsage.harness
 var unknownTool = historicalClaude; unknownTool.harness = nil
 let historicalTools = UsageReport.build(entries: [historicalCodex, historicalClaude, unknownTool], query: UsageQuery(period: 1), catalog: [:], now: now)
 assert(historicalTools.toolTimelines.count == 3)
 assert(historicalTools.toolTimelines.reduce(Tokens()) { $0 + $1.totals } == historicalTools.totals)
 assert(historicalTools.toolTimelines.allSatisfy { !$0.timeline.minuteResolution }, "Tool subsets must share the whole report's daily resolution")
 assert(historicalTools.toolTimelines.first { $0.tool == .claude }?.totals.output == 300)
-var claudeOnly = UsageQuery(period: 1); claudeOnly.harness = "Claude Code"
+var claudeOnly = UsageQuery(period: 1); claudeOnly.harness = ClaudeCodeUsage.harness
 let filteredTools = UsageReport.build(entries: [historicalCodex, historicalClaude, unknownTool], query: claudeOnly, catalog: [:], now: now)
 assert(filteredTools.toolTimelines.count == 1 && filteredTools.toolTimelines[0].tool == .claude)
 assert(filteredTools.totals == historicalClaude.tokens && filteredTools.entries.count == 1)
@@ -1190,3 +1190,16 @@ do {
 }
 if !continuityFailures.isEmpty { fflush(stdout); exit(1) }
 print("PASS: Codex scan continuity live/history matrix, disjoint interval recovery, legacy no-anchor resumption, aliases, races, account boundaries and checkpoint restarts")
+
+do {
+    let zulu = EventTime.parse("2026-09-12T12:00:00Z")
+    assert(zulu != nil && zulu?.ISO8601Format() == "2026-09-12T12:00:00Z", "Plain Z timestamps must parse")
+    let fractional = EventTime.parse("2026-09-07T12:00:00.123Z")
+    assert(fractional != nil && EventTime.parse("2026-09-07T12:00:00.123Z" as Any?) == fractional, "Fractional stamps parse from strings and JSON values")
+    assert(EventTime.parse("2026-09-12T02:00:40+00:00") != nil, "Offset timestamps must parse")
+    assert(ProviderUsage.dayDate("2026-09-09")?.ISO8601Format() == "2026-09-09T00:00:00Z", "Provider day bounds use the same parser")
+    assert(EventTime.parse("not a date") == nil)
+    assert(EventTime.parse(nil as Any?) == nil)
+    assert(EventTime.parse(1 as Any?) == nil)
+}
+print("PASS: event timestamps share one ISO-8601 parse; missing stamps stay unavailable")

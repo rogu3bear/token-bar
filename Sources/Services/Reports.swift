@@ -75,7 +75,7 @@ struct UsageReport {
         func quote(_ s: String) -> String { RequestExport.quote(s) }
         let iso = ISO8601DateFormatter()
         let rows = entries.map { e in
-            [iso.string(from: e.date), e.session, e.model, String(e.tokens.input), String(e.tokens.cached), String(e.tokens.output), String(e.tokens.reasoning), String(e.tokens.total), e.account?.label ?? "Unattributed", e.account == nil ? "unknown" : "inferred from local sign-in observation", e.bucket ?? "event", String(e.eventCount)].map(quote).joined(separator: ",")
+            [iso.string(from: e.date), e.session, e.model, String(e.tokens.input), String(e.tokens.cached), String(e.tokens.output), String(e.tokens.reasoning), String(e.tokens.total), e.account?.label ?? "Unattributed", UsageMetadata.accountAttribution(e.account), e.bucket ?? "event", String(e.eventCount)].map(quote).joined(separator: ",")
         }
         return (["timestamp,session,model,input,cached_input,output,reasoning_subset,total,account,attribution,granularity,event_count"] + rows).joined(separator: "\n")
     }

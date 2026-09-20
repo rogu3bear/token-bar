@@ -59,14 +59,13 @@ enum ClaudeCodeUsage {
         let context = input.addingReportingOverflow(cached)
         let fullContext = context.partialValue.addingReportingOverflow(written)
         guard !context.overflow, !fullContext.overflow, !fullContext.partialValue.addingReportingOverflow(output).overflow else { return nil }
-        var tokens = Tokens.canonical(
+        let tokens = Tokens.canonical(
             input: input,
             cacheRead: cached,
             cacheWrite: written,
             output: output,
             reasoning: 0,
             convention: .cacheBesideInput)
-        tokens.cacheWrite = written // A recorded zero is available, not missing.
         guard includingZeroUsage || tokens.total > 0 else { return nil }
         let session = (root["sessionId"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? id
         return Turn(messageID: id,
@@ -99,22 +98,12 @@ enum ClaudeCodeUsage {
     }
     static func increment(_ new: Tokens, over old: Tokens) -> Tokens {
         let delta = zip(components(new), components(old)).map { $0 - $1 }
-        var result = Tokens.canonical(input: delta[0], cacheRead: delta[1], cacheWrite: delta[2], output: delta[3], reasoning: 0, convention: .cacheBesideInput)
-        if new.cacheWrite != nil { result.cacheWrite = delta[2] }
-        return result
+        return Tokens.canonical(input: delta[0], cacheRead: delta[1],
+                                cacheWrite: new.cacheWrite == nil ? nil : delta[2],
+                                output: delta[3], reasoning: 0, convention: .cacheBesideInput)
     }
 
-    private static let iso: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    private static let plainISO = ISO8601DateFormatter()
-
-    static func date(_ raw: Any?) -> Date? {
-        guard let value = raw as? String else { return nil }
-        return iso.date(from: value) ?? plainISO.date(from: value)
-    }
+    static func date(_ raw: Any?) -> Date? { EventTime.parse(raw) }
 
     private static func branch(_ raw: Any?) -> String? {
         guard let value = raw as? String else { return nil }

@@ -1,5 +1,13 @@
 import Foundation
 
+/// Local calendar day used as a durable aggregation key. Plan observations,
+/// historical usage buckets, and cost-recovery groups share this boundary.
+enum LedgerDay {
+    static func key(_ date: Date, calendar: Calendar = .current) -> TimeInterval {
+        calendar.startOfDay(for: date).timeIntervalSince1970
+    }
+}
+
 struct PlanObservation: Codable, Identifiable, Equatable {
     var id: String
     var plan: String
@@ -12,7 +20,7 @@ struct PlanObservation: Codable, Identifiable, Equatable {
 extension UsageScanner {
     func recordPlan(_ plan: String, date: Date, account: Account?, evidence: String, model: String?) {
         guard !plan.isEmpty else { return }
-        let day = Calendar.current.startOfDay(for: date).timeIntervalSince1970
+        let day = LedgerDay.key(date)
         let key = "\(day)|\(account?.id ?? "unknown")|\(plan)|\(evidence)"
         if ledger.plans == nil { ledger.plans = [:] }
         if var existing = ledger.plans?[key] {

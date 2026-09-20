@@ -11,7 +11,7 @@ enum PreviewFixture {
         return "Codex · \(scope) · /synthetic/sessions/sample-\(index).jsonl: " + reason
     }.joined(separator: " ")
 
-    static let date = ISO8601DateFormatter().date(from: "2026-09-12T12:00:00Z")!
+    static let date = EventTime.parse("2026-09-12T12:00:00Z")!
     static func prepare() {
         setenv("TZ", "UTC", 1)
         tzset()

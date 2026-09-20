@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 /// Local Grok/xAI session usage. Reads persisted usage.json, summary.json, and the grok usage envelope.
 /// Never copies prompt, chat, title, or summary text into the ledger.
@@ -49,7 +48,9 @@ enum GrokUsage {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: trimmed)
     }
-    /// Map Grok counters onto Codex's split. Missing keys stay absent rather than invented zeros.
+    /// Map Grok counters onto Codex's split. A reported total that equals
+    /// input+cache+output uses TokenConvention.cacheBesideInput; missing keys
+    /// stay absent rather than invented zeros.
     static func tokens(_ json: [String: Any]) -> (Tokens, [String]) {
         var raw: [String: Any] = [:]
         if let value = int(json, "inputTokens", "input_tokens") { raw["input_tokens"] = value }
@@ -67,7 +68,17 @@ enum GrokUsage {
         if let total = int(json, "totalTokens", "total_tokens") {
             let cached = tokens.cached, writes = tokens.cacheWrite ?? 0
             if total == tokens.input + cached + writes + tokens.output, total != tokens.input + tokens.output {
-                tokens.input += cached + writes
+                // Canonical normalization is not validation. Invalid source
+                // counters must still reach Integrity for quarantine or an
+                // explicitly reported repair, retaining the prior fold.
+                if tokens.input >= 0 && cached >= 0 && writes >= 0 && tokens.output >= 0 &&
+                    tokens.reasoning >= 0 && tokens.reasoning <= tokens.output {
+                    tokens = Tokens.canonical(input: tokens.input, cacheRead: cached,
+                        cacheWrite: tokens.cacheWrite, output: tokens.output,
+                        reasoning: tokens.reasoning, convention: .cacheBesideInput)
+                } else {
+                    tokens.input += cached + writes
+                }
             }
         }
         return (tokens, UsageMetadata.fields.filter { raw[$0] as? Int != nil })
@@ -350,7 +361,7 @@ extension UsageScanner {
              "turnNumber", "endedAt"].contains(key)
         }, options: [.sortedKeys])) ?? Data()
         let identity = "grok|\(session)|\(turn)|\(String(decoding: canonical, as: UTF8.self))"
-        let fingerprint = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+        let fingerprint = EventIdentity.hash(identity)
         if let duplicate = identityKnown(fingerprint) { if duplicate { return } } else { return }
         var cursor = Cursor(); cursor.turnID = turn; cursor.provider = GrokUsage.provider; cursor.model = model
         cursor.effort = effort

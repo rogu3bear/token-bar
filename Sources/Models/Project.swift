@@ -2,7 +2,8 @@ import Foundation
 
 /// Harness, provider, model and reasoning setting are four separate dimensions.
 /// This file owns the two that were previously unmodeled: the harness that ran a
-/// turn, and the project the turn was working in.
+/// turn, and the project the turn was working in. Missing model names share one
+/// explicit label so coverage does not treat a spelling variant as a real model.
 ///
 /// A harness is the client program (Codex Desktop, the Codex CLI, a Grok client).
 /// A provider is the account and API behind the model. They are not the same
@@ -24,6 +25,12 @@ enum Harness {
         guard !trimmed.isEmpty, trimmed.count <= 80 else { return nil }
         return trimmed
     }
+}
+
+/// Displayed when a harness omitted the model. Coverage treats this as unknown,
+/// not as a model named "Unknown model" that someone actually ran.
+enum ModelIdentity {
+    static let unknown = "Unknown model"
 }
 
 /// A project is the working directory a turn ran in. The path is evidence; the

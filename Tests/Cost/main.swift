@@ -94,10 +94,10 @@ func event(_ total: [String: Any], _ last: [String: Any], date: Date = now) -> D
 }
 scanner.consume(data("session_meta", ["model_provider": "openai"]), session: "s", cursor: &cursor, account: nil, poll: now)
 scanner.consume(data("turn_context", ["model": "gpt-6-astra", "effort": "high", "turn_id": "one"]), session: "s", cursor: &cursor, account: nil, poll: now)
-scanner.consume(event(counts(272_000, output: 10), counts(272_000, output: 10)), session: "s", cursor: &cursor, account: nil, poll: now)
-check(scanner.ledger.entries[0].contextBand == "short" && scanner.ledger.entries[0].effort == "high", "Threshold is strictly greater than 272K; capture effort")
+scanner.consume(event(counts(CostPricing.threshold, output: 10), counts(CostPricing.threshold, output: 10)), session: "s", cursor: &cursor, account: nil, poll: now)
+check(scanner.ledger.entries[0].contextBand == "short" && scanner.ledger.entries[0].effort == "high", "Threshold is strictly greater than CostPricing.threshold; capture effort")
 scanner.consume(data("turn_context", ["model": "gpt-6-astra", "turn_id": "two"]), session: "s", cursor: &cursor, account: nil, poll: now)
-scanner.consume(event(counts(544_001, output: 20), counts(272_001, output: 10)), session: "s", cursor: &cursor, account: nil, poll: now)
+scanner.consume(event(counts(CostPricing.threshold * 2 + 1, output: 20), counts(CostPricing.threshold + 1, output: 10)), session: "s", cursor: &cursor, account: nil, poll: now)
 check(scanner.ledger.entries[1].contextBand == "long" && scanner.ledger.entries[1].effort == nil, "Missing new-turn effort must not inherit high")
 scanner.consume(event(counts(600_000, output: 30), counts(100, output: 2)), session: "s", cursor: &cursor, account: nil, poll: now)
 check(scanner.ledger.entries.last!.contextBand == nil, "Multiple-request deltas do not have an established request band")
@@ -384,7 +384,7 @@ let preciseDay = MeteringComparison.build(history: meterHistory, windowID: windo
     source: meterSource + [previousDayBucket], query: UsageQuery(period: 1), effort: "All levels", now: meterNow)
 check(preciseDay.coarseRecords == 1 && preciseDay.intervals.allSatisfy { $0.tokensPerPoint != nil },
       "A coarse bucket on another day cannot invalidate precise intervals")
-var foreign = unbound; foreign.provider = "anthropic"; foreign.harness = "Claude Code"
+var foreign = unbound; foreign.provider = "anthropic"; foreign.harness = ClaudeCodeUsage.harness
 check(MeteringComparison.build(history: meterHistory, windowID: windowID, accountID: meterAccount.id,
     source: meterSource + [foreign], query: UsageQuery(period: 1), effort: "All levels", now: meterNow).intervals[0].tokensPerPoint == 1100,
     "Known foreign usage is outside the unknown Codex attribution denominator")

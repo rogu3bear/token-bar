@@ -98,12 +98,10 @@ enum InsightAnalysis {
 enum InsightReader {
     // Read only catalogued human chats. Cap the sample explicitly; stream logs without loading tool output into memory.
     static func read(home: URL, now: Date = Date(), clock: () -> Date = Date.init, index: PromptIndex? = nil, progress: ((PromptInsights) -> Void)? = nil) throws -> PromptInsights {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(home.appendingPathComponent("state_5.sqlite").path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            if let db { sqlite3_close(db) }; throw CocoaError(.fileReadUnknown)
+        guard let db = CodexCatalog.openReadOnly(CodexCatalog.database(in: home), busyTimeout: 300) else {
+            throw CocoaError(.fileReadUnknown)
         }
         defer { sqlite3_close(db) }
-        sqlite3_busy_timeout(db, 300)
         var statement: OpaquePointer?
         let query = "SELECT id, rollout_path FROM threads WHERE thread_source='user' AND updated_at >= ? ORDER BY updated_at DESC LIMIT 120"
         guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK else { throw CocoaError(.fileReadCorruptFile) }

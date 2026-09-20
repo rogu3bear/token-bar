@@ -30,7 +30,7 @@ struct CostCoverage: Codable {
     /// which is the question that matters when four tools are supported.
     var byHarness: [String: CoverageDimension] = [:]
     mutating func add(_ entry: Entry) {
-        let tool = entry.harness ?? "Unattributed"
+        let tool = entry.harness ?? DimensionReport.unattributed
         var row = byHarness[tool] ?? CoverageDimension(id: tool, title: tool)
         row.knownTokens += entry.tokens.total
         row.knownRecords += entry.eventCount
@@ -41,7 +41,7 @@ struct CostCoverage: Codable {
         let observed = entry.firstObserved ?? entry.date, latest = entry.lastObserved ?? entry.date
         first = min(first ?? observed, observed); last = max(last ?? latest, latest)
         if entry.firstObserved != nil || entry.bucket != "day" { preciseTimestampRecords += count }
-        let known = [entry.model != "Unknown model", entry.effort != nil, entry.hasField("cached_input_tokens"),
+        let known = [entry.model != ModelIdentity.unknown, entry.effort != nil, entry.hasField("cached_input_tokens"),
                      entry.hasField("cache_write_input_tokens"), entry.isSingleRequest, entry.observedService != nil, entry.requestedService != nil,
                      entry.provider != nil, entry.harness != nil, entry.projectPath != nil, entry.contextWindow != nil]
         for index in dimensions.indices where known[index] { dimensions[index].knownTokens += tokens; dimensions[index].knownRecords += count }

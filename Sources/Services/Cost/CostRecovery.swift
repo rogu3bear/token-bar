@@ -3,7 +3,7 @@ import Foundation
 /// Metadata enrichment only: never replaces an unmatched usage total or its account observation.
 enum CostRecovery {
     static func groupKey(_ e: Entry) -> String {
-        "\(Calendar.current.startOfDay(for: e.date).timeIntervalSince1970)|\(e.session)|\(e.model)"
+        "\(LedgerDay.key(e.date))|\(e.session)|\(e.model)"
     }
     static func sameUsage(_ a: Tokens, _ b: Tokens) -> Bool {
         a.input == b.input && a.cached == b.cached && a.output == b.output && a.reasoning == b.reasoning
@@ -110,8 +110,7 @@ extension UsageScanner {
         // self-contained rollback ledger; copying only the base loses cursors.
         if FileManager.default.fileExists(atPath: stateURL.path) {
             let backup = stateURL.deletingLastPathComponent().appendingPathComponent("ledger-before-cost-" + UUID().uuidString + ".json")
-            try JSONEncoder().encode(Self.loadLedger(from: stateURL)).write(to: backup, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backup.path)
+            try PrivateCache.write(Self.loadLedger(from: stateURL), to: backup)
         }
         if let rebuiltArchive, let requestArchive {
             let accounts = Dictionary(next.entries.compactMap { e in e.account.map { (CostRecovery.groupKey(e), $0) } }, uniquingKeysWith: { a, _ in a })

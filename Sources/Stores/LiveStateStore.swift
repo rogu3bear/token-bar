@@ -50,7 +50,7 @@ final class LiveStateStore {
         let files = FileManager.default
         try files.createDirectory(at: databaseURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let temporary = databaseURL.deletingLastPathComponent().appendingPathComponent(".live-observations-" + UUID().uuidString + ".sqlite")
-        guard files.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+        guard files.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: PrivateFile.mode]) else {
             throw failure("The account observation store could not be created.")
         }
         defer {
@@ -84,7 +84,7 @@ final class LiveStateStore {
         }
         do {
             sqlite3_busy_timeout(database, 3000)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            try PrivateFile.protect(url)
             try execute("PRAGMA synchronous=FULL")
         } catch { sqlite3_close(database); database = nil; throw error }
     }
