@@ -48,7 +48,7 @@ enum DataStatePreview {
                 VStack(alignment: .leading, spacing: PageStyle.section) {
                     Text("Sample state: " + name).font(.title.bold())
                     if surface == "cost" {
-                    CostSummary(report: cost, basis: .reference, refreshing: refreshing,
+                    CostSummary(report: cost, refreshing: refreshing,
                                 sourceDate: cost.calculatedAt == nil ? nil : earlier, sourceError: error,
                                 sourceAvailable: name != "first-failure")
                     } else {

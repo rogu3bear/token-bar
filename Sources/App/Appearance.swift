@@ -104,9 +104,8 @@ struct AppearanceControls: View {
                 Spacer()
                 Button("Match website preview") { preferences.websitePreset() }.buttonStyle(.borderedProminent)
             }
-            Text("macOS follows the accent in System Settings. One accent is shared by all tools, charts, and controls. Tool names and chart symbols identify each tool.")
+            Text("One accent is shared by tools, charts, and controls. Names and symbols identify each tool.")
                 .font(.callout).foregroundStyle(.secondary)
-            Text("Warnings keep their warning color.").font(.caption).foregroundStyle(.secondary)
         }
     }
 }

@@ -32,7 +32,7 @@ struct FirstRunWelcome: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PageStyle.section) {
             Text("Welcome to Token Bar").font(.system(size: 26, weight: .semibold, design: .rounded))
-            Text("Token Bar reads local tool history and saves usage counts on this Mac. Account allowance uses existing Codex and Grok sign-ins; those tools may contact their services. No passwords or API keys are needed here.")
+            Text("Token Bar reads local tool history and saves usage counts on this Mac. Remaining uses existing Codex, Claude Code, and Grok sign-ins; those tools may contact their services. No passwords or API keys are needed here.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button { showPrivacy = true } label: { Text("Data & privacy").foregroundStyle(accent) }.buttonStyle(.link)
                 .popover(isPresented: $showPrivacy) {

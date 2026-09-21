@@ -28,7 +28,7 @@ struct AccountsView: View {
                     }
                 }
                 if accounts.isEmpty {
-                    Text("No saved Codex account observations. Sign in through Codex; the account and plan appear after a successful reading.")
+                    Text("No saved account observations yet. Sign in through a supported tool; the account and plan appear after a successful reading.")
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(accounts) { account in
@@ -51,7 +51,8 @@ struct AccountsView: View {
                         LazyVGrid(columns: quotas.count == 1 ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 320), spacing: 20)], alignment: .leading, spacing: 20) {
                             ForEach(quotas) { quota in
                                 QuotaTrendCard(quota: quota, history: monitor.state.quotaHistory ?? monitor.state.samples, samples: monitor.state.samples,
-                                    current: account.id == monitor.currentID)
+                                    current: account.id == monitor.currentID,
+                                    confirmed: account.id == monitor.currentID && !model.quota(for: .codex).guardFailed)
                             }
                         }
                         let plans = monitor.state.plans.filter { $0.accountID == account.id }.sorted { $0.firstSeen < $1.firstSeen }
@@ -70,7 +71,7 @@ struct AccountsView: View {
                     }
                 }
                 DetailSheet("About account readings") {
-                Text("Quotas refresh every 30 seconds while the app runs. History is collected locally while this app runs. Quota samples are retained for 90 days, generally five minutes apart, with resets preserved. Gaps mean no readings; the app does not switch accounts or reconstruct missing quota history.")
+                Text("Quotas refresh every 30 seconds while the app runs. History is collected locally while this app runs. Quota samples are retained for 90 days, generally five minutes apart, with resets preserved. Gaps mean no readings; the app does not switch accounts or reconstruct missing quota history. A first sample has no trend line until a later reading arrives.")
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 if !model.snapshot.plans.isEmpty {
@@ -87,16 +88,13 @@ struct QuotaTrendCard: View {
     var history: [QuotaReading]
     var samples: [QuotaReading]
     var current: Bool
+    var confirmed = true
     @Environment(\.appAccent) private var accent
     @Environment(\.evaluationDate) private var evaluationDate
     private var points: [QuotaPlotPoint] { QuotaPlotPoint.build(history + [quota], for: quota.id) }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(quota.name + " · " + quota.windowLabel).font(.headline)
-            HStack(alignment: .firstTextBaseline) {
-                Text(CompactLiveCopy.percent(max(0, 100 - quota.used))).font(PageStyle.title)
-                Text(current ? "remaining at last reading" : "remaining when last observed").font(.caption).foregroundStyle(.secondary)
-            }
             if points.count >= 2 {
                 Chart(points) { point in
                     LineMark(x: .value("Observed", point.reading.date), y: .value("Quota left", max(0, 100 - point.reading.used)), series: .value("Segment", point.segment))
@@ -104,11 +102,10 @@ struct QuotaTrendCard: View {
                     PointMark(x: .value("Observed", point.reading.date), y: .value("Quota left", max(0, 100 - point.reading.used)))
                         .foregroundStyle(accent).symbolSize(10)
                 }.chartYScale(domain: 0...100).chartLegend(.hidden).frame(height: 130)
-            } else { Text("History begins with this reading. More samples will appear automatically.").font(.callout).foregroundStyle(.secondary).frame(minHeight: 90) }
+            }
             Text(quota.resetWhen.map { "Reset " + $0 } ?? "Reset unavailable").font(.caption).foregroundStyle(.secondary)
-            if current {
+            if current && confirmed {
                 let estimate = Runway.estimate(quota, samples: samples, now: evaluationDate ?? Date())
-                Text(estimate.message).font(.caption).foregroundStyle(.secondary)
                 if let rate = estimate.percentPerHour { Text(String(format: "Recent burn: %.2f percentage points/hour", rate)).font(.caption).foregroundStyle(.secondary) }
             }
         }.frame(maxWidth: .infinity, alignment: .leading)

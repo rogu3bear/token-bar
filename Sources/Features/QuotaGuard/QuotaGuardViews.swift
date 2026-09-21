@@ -17,16 +17,16 @@ struct QuotaGuardSummary: View {
     var body: some View {
         let warning = QuotaGuardChrome.hasWarning(coordinator.decisions)
         VStack(alignment: .leading, spacing: 8) {
-            if warning || expanded {
+            if warning {
                 HStack {
-                    if warning {
-                        Label("Quota Guard", systemImage: "exclamationmark.triangle")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.orange)
-                        if warnings.count > 1 { Text("\(warnings.count) allowance warnings").font(.caption).foregroundStyle(.secondary) }
-                    }
+                    Label("Quota Guard", systemImage: "exclamationmark.triangle")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.orange)
+                    if warnings.count > 1 { Text("\(warnings.count) allowance warnings").font(.caption).foregroundStyle(.secondary) }
                     Spacer()
-                    Button(expanded ? "Less" : "All allowances") { expanded.toggle() }.font(.caption)
+                    if warnings.count > 1 {
+                        Button(expanded ? "Less" : "More warnings") { expanded.toggle() }.font(.caption)
+                    }
                 }
                 if let first = warnings.first {
                     if expanded { row(first) } else { summary(first) }
@@ -34,14 +34,9 @@ struct QuotaGuardSummary: View {
                 if expanded {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            ForEach(coordinator.decisions.filter { $0.id != warnings.first?.id }) { row($0) }
+                            ForEach(warnings.filter { $0.id != warnings.first?.id }) { row($0) }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.frame(maxHeight: compact ? 180 : 260)
-                }
-            } else {
-                HStack {
-                    Spacer()
-                    Button("All allowances") { expanded.toggle() }.font(.caption)
                 }
             }
             if let error = coordinator.persistenceError { Text(error).font(.caption).foregroundStyle(.orange) }
@@ -70,7 +65,7 @@ struct QuotaGuardSummary: View {
             Text(decision.riskLabel + (decision.remaining.map { " · " + CompactLiveCopy.percent($0) + " remaining" } ?? "") +
                  (decision.forecast.map { " · " + Runway.clockLabel($0, now: decision.evaluated) } ?? ""))
                 .font(.caption).fixedSize(horizontal: false, vertical: true)
-        }.help(decision.reason.label + ". Expand All allowances for source and reset times.")
+        }.help(decision.reason.label + ". Open Allowances for source and reset times.")
     }
     private func actions(_ decision: QuotaGuardDecision) -> some View {
         HStack {

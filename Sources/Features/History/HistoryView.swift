@@ -33,8 +33,6 @@ struct HistoryView: View {
                         }.font(.caption).help(series.totals.total.formatted() + " processed tokens in the selected report")
                     }
                 }
-                Text("Total = input + output. Cached input is already in input; reasoning is already in output. These are processed tokens, not quota or billed cost.")
-                    .font(.caption).foregroundStyle(.secondary)
                 if model.report.entries.contains(where: { $0.tokens.cached > $0.tokens.input || $0.tokens.reasoning > $0.tokens.output }) {
                     StatusNotice(message: "Some source counters have inconsistent cached-input or reasoning subsets. The total still uses input + output; subset comparisons may be unreliable.", severity: .warning, dismissible: false)
                 }
@@ -68,6 +66,7 @@ struct HistoryView: View {
         .sheet(isPresented: $showMethod) {
             VStack(alignment: .leading, spacing: 18) {
                 Text("How history is counted").font(PageStyle.sectionTitle)
+                Text("Total = input + output. Cached input is already in input; reasoning is already in output. These are processed tokens, not quota or billed cost.")
                 Text("Reused context is counted on each processing pass, so totals are not unique written tokens. Repeated counter snapshots and inherited fork counters are deduplicated. Older records are grouped by day, task, and model; raw logs remain unchanged.")
                 Text("Account identity marked inferred comes from local sign-in observations, not execution or billing records. Historical usage without that evidence remains unattributed.")
                 SheetDoneButton { showMethod = false }

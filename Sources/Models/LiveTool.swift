@@ -19,18 +19,25 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
     static func idleNamed(remaining: (LiveTool) -> Double?) -> [LiveTool] {
         allCases.filter { remaining($0) != nil }
     }
-    /// Popover rows: working tools when any are working, plus any exhausted remaining; idle named remainings when none are working.
-    static func compact(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
+    /// Idle glance chairs: measured remaining, or a stale/failed/expired reading that is unconfirmed.
+    /// Never-seen unavailable does not mint a chair. Auto occupancy stays on `idleNamed`.
+    static func idleChairs(remaining: (LiveTool) -> Double?, unconfirmed: (LiveTool) -> Bool) -> [LiveTool] {
+        allCases.filter { remaining($0) != nil || unconfirmed($0) }
+    }
+    /// Popover rows: working tools when any are working, plus any exhausted remaining; idle chairs when none are working.
+    static func compact(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?,
+                        unconfirmed: (LiveTool) -> Bool = { _ in false }) -> [LiveTool] {
         let working = Set(active(codex: codex, claude: claude, grok: grok))
-        if working.isEmpty { return idleNamed(remaining: remaining) }
+        if working.isEmpty { return idleChairs(remaining: remaining, unconfirmed: unconfirmed) }
         return allCases.filter { working.contains($0) || remaining($0) == 0 }
     }
-    /// Now columns: working tools while any are working; measured remainings only when idle.
+    /// Now columns: working tools while any are working; idle chairs when nothing is working.
     /// Connection or discovery without a reading does not mint a seat.
-    static func nowOccupied(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?) -> [LiveTool] {
+    static func nowOccupied(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, remaining: (LiveTool) -> Double?,
+                            unconfirmed: (LiveTool) -> Bool = { _ in false }) -> [LiveTool] {
         let working = active(codex: codex, claude: claude, grok: grok)
         if !working.isEmpty { return working }
-        return allCases.filter { remaining($0) != nil }
+        return idleChairs(remaining: remaining, unconfirmed: unconfirmed)
     }
     func color(in palette: ToolPalette) -> Color { palette.color(rawValue, fallback: color) }
     var id: String { rawValue }
@@ -66,6 +73,8 @@ struct AccountAllowancePresentation {
     var estimate: Runway? { reading.map { Runway.estimate($0, samples: quota.samples, now: now, horizon: quota.horizon) } }
     /// Occupancy exception: remaining is a measured zero, not missing.
     var measuredZero: Bool { estimate.map { $0.remaining == 0 } ?? false }
+    /// Stale, expired, or failed remaining keeps a chair; never-seen unavailable does not.
+    var unconfirmedChair: Bool { estimate == nil && (quota.guardFailed || !matching.isEmpty) }
     var remaining: String { CompactLiveCopy.remaining(estimate) }
     var qualifier: String {
         if let estimate { return estimate.remaining == 0 ? "Exhausted" : "Remaining" }

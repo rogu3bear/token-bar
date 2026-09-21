@@ -97,12 +97,10 @@ struct AccountAllowanceSection: View {
         VStack(alignment: .leading, spacing: 8) {
             if tools.isEmpty {
                 if !sourcesKnown {
-                    Text("Account allowances").font(.headline)
                     Text(NowOccupancyCopy.noSources)
                         .font(.callout).foregroundStyle(.secondary)
                 }
             } else {
-                Text("Account allowances").font(.headline)
                 HStack(alignment: .top, spacing: PageStyle.section) {
                     ForEach(tools) { tool in
                         AccountAllowanceDisclosure(tool: tool, quota: quota(tool), now: now,

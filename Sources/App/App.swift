@@ -436,9 +436,11 @@ struct QuickLiveView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack { Text("Now").font(.headline); Spacer(); if monitor.busy { ProgressView().controlSize(.small) } }
                 let now = model.referenceDate ?? model.clock.now
-                let tools = LiveTool.compact(codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter) { tool in
+                let tools = LiveTool.compact(codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter, remaining: { tool in
                     AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
-                }
+                }, unconfirmed: { tool in
+                    AccountAllowancePresentation(quota: model.quota(for: tool), now: now).unconfirmedChair
+                })
                 ForEach(tools) { tool in
                     Button {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {

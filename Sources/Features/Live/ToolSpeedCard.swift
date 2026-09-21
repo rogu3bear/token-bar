@@ -18,23 +18,9 @@ struct ToolSpeedHeader: View {
                 }
             }
             RateReadout(measured: meter.rawRate, hasRate: meter.hasRate, unit: $meter.unit, size: rateSize)
-            if meter.hasRate {
-                Text("Estimated · \(meter.reportingCount) of \(meter.runningCount) reporting")
-                    .font(.caption).foregroundStyle(.secondary)
-                if let date = meter.lastReport {
-                    ReadAgeCaption(date: date, prefix: "Rate report", includesClock: false)
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            } else {
+            if !meter.hasRate {
                 Text("Speed unavailable")
                     .font(.caption).foregroundStyle(.secondary)
-                if let date = meter.lastReport {
-                    ReadAgeCaption(date: date, prefix: "Rate report", includesClock: false)
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("No current rate report")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
             }
         }.accessibilityElement(children: .contain)
             .accessibilityLabel(tool.label + " activity and speed")
