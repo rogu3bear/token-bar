@@ -27,7 +27,6 @@ struct CostSummary: View {
                 metric("ESTIMATED API EQUIVALENT", report.hasPricedRecords ? CostPricing.dollars(report.amounts.total) : "—", "USD · API equivalent")
                 metric("PRICING COVERAGE", report.coverageText,
                        report.calculatedAt == nil ? "Awaiting calculation" : report.lines.isEmpty ? "No selected usage" : "\(compact(report.unpricedTokens)) tokens unpriced")
-                metric("UNKNOWN REASONING LEVEL", report.lines.isEmpty ? "—" : compact(report.unknownEffortTokens), "tokens with no recorded effort")
             }
             Text(basis == .historical ? "Dated API rates where verified. Unknown historical tariffs and ambiguous price-change days remain unpriced. This is an API-equivalent estimate, not an amount paid." : "Valued at the \(CostRateCard.reference.observedOn) reference rates. This is not a bill or subscription charge.")
                 .font(.callout).foregroundStyle(.secondary)

@@ -38,7 +38,7 @@ roles, not smaller copies of the dashboard.
 | Supporting metric | `PageStyle.detailMetric`: native title3 | Cost component values below the primary summary |
 | Recorded contribution | `ReportMagnitudeStyle`: 10pt quantitative track, resolved accent, equal geometry when selected; true zero has no filled segment | History contribution buttons and Cost model/reasoning bars |
 | Chart series and legend | One explicit resolved foreground scale; native symbols and line styles distinguish tools | Shipping minute History chart, including generated legend |
-| Actions and selection | Native buttons/pickers; primary emphasis only for an explicit primary action; method links remain links | Header actions, filter/pricing/detail sheets and settings |
+| Actions and selection | Native buttons/pickers; primary emphasis only for an explicit primary action; method links remain links in native label ink, not the accent | Header actions, filter/pricing/detail sheets and settings |
 | Compact surface | Existing compact spacing, type and controls | Menu-bar readout and quick popover; not forced into full-page metrics |
 | Warnings and progress | Native warning color and explicit text; persistent integrity status survives closing details; native import progress retains measured fractions | Integrity, read failures, unavailable/unpriced data and import status |
 
@@ -349,10 +349,10 @@ write the production defaults or change the measurement calculation.
 Scope precedes results; results precede supporting evidence. Now puts activity,
 estimated speed and account allowance together, with one visible speed-unavailable
 label per tool; missing allowance remains a separate claim. History places the
-selected usage's contributions before its time series. Cost places model/effort
-comparisons immediately after valuation, ahead of time series and components.
-Its evidence completeness, account comparison and request export remain available
-in a named detail sheet; recovery, CSV and calculation method remain in the header.
+selected usage's contributions before its time series. Cost places valuation and
+coverage, then model/effort comparisons, then the time series. Account comparison,
+USD-per-output, published rate history and evidence completeness remain in Report
+details; recovery, CSV and calculation method remain in the header.
 
 Insights states its independent 30-day usage scope and Codex prompt sample before
 results. Integrity exclusions/repairs remain visible, with details and provenance
@@ -432,15 +432,18 @@ Keep the first view useful without a wall of controls or explanation. Welcome
 shows one local-access summary; Data & privacy opens the full explanation.
 History and Cost keep the period picker and plain removable active-filter labels visible while
 a Change filters button opens native filter pickers and a native search field. Cost's pricing button names the
-selected rate basis and service. Clear filters still preserves period/pricing.
+selected rate basis and service. Coverage sits with the estimate; account comparison,
+USD-per-output and published rates open from Report details. Clear filters still preserves period/pricing.
 Now opens account and estimate details in a sheet; missing quota/projection
-reasons remain visible. Compact quota panels retain their existing density.
+reasons remain visible. Compact quota panels retain their existing density. Quota Guard
+chrome appears only when a warning exists; All allowances remains as a quiet control.
 
 Insights leads with derived usage changes and measurable context evidence. It keeps
 three prompt statistics and bounded repeated-prompt findings visible, with sample
 methodology in native details. Read failures, partial
 coverage, sample scope and age remain visible. Menu bar settings lead with the
-preview, tool and units; Customize contains visibility, ordering and formatting.
+preview, tool and units; occupancy rules stay in Glance grammar, not a settings
+essay. Customize contains visibility, ordering and formatting.
 These detail sheets are local presentation state, not new saved preferences.
 
 
@@ -644,9 +647,10 @@ quota-burn claim is inferred without an appropriate comparable local baseline.
 
 Each live tool leads with activity and a numeric estimated output rate with its
 native s/m/h control, followed by reporting coverage and relative report age.
-A missing rate report stays “No current rate report”, not an invented clock.
-Remaining lives in that tool's provider column with the rate and dial, not on a
-full-bleed row above the gauges. The rate stays the large figure. Projected zero,
+A missing rate report stays “No current rate report”, not an invented clock;
+a visible rate does not print that missing-report line. Remaining lives in that
+tool's provider column below the rate, with the dial, not on a full-bleed row
+above the gauges. The rate stays the large figure. Projected zero,
 the quota reading timestamp, reset, projection limitations and account/estimate
 details remain evidence in the same column, not a second hero number or a
 full-width quota row.
@@ -724,9 +728,10 @@ differences separately when `--motion-raster` is requested.
 ### Now provider alignment
 
 Now uses equal-width active-provider columns with shared row heights for the
-remaining, speed header, gauge, separator and model/error detail. ProviderColumnsLayout
+speed header, remaining, gauge, separator and model/error detail. ProviderColumnsLayout
 centers each intrinsic header group on its own gauge; remaining and model/error detail use
-that same text width and center. Internal text stays leading aligned. This keeps
+that same text width and center. The speed header is the first identity row; remaining sits
+below it. Internal text stays leading aligned. This keeps
 the identity, remaining, rate and status attached to the dial as the active set changes
 between one, two and three tools. Asymmetric unavailable/error text grows the
 shared row without moving one gauge out of alignment with the others.
@@ -741,12 +746,14 @@ The same geometry owner supports minimum/default/wide dashboard sizes.
 ### Quota Guard
 
 Now and the 440-point popover share one compact allowance summary independent
-of live tool activity. It exposes the highest-priority warning and an expandable
-list of all supported allowances, including stale and unavailable evidence.
+of live tool activity. Warning chrome appears only when a decision's risk is not
+none. It exposes the highest-priority warning and an expandable list of all
+supported allowances, including stale and unavailable evidence. Idle Guard does
+not show a no-warning disclaimer. All allowances remains as a quiet control.
 No inactive speed panels or separate dashboard destination are added. Warning
 text names the tool, allowance window and bucket. The collapsed warning remains
 brief; All allowances and View quota expose reset/source times and full evidence.
-The shared provider layout places remaining, then the speed header, then the
+The shared provider layout places the speed header, then remaining, then the
 RPM gauge, ahead of detailed allowance disclosure. Gauges remain visible in the
 initial 900×700 dashboard with one, two or three active tools; an explicit
 expansion can use the existing page scroll. Native primary/secondary labels support Light and Dark with any accent.

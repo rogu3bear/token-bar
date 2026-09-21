@@ -17,12 +17,9 @@ struct CostView: View {
                 periodFilter
                 ReportFilters(model: model, includesCost: true)
                 pricingAssumptions
-                DetailSheet("Published model price history") { CostRateHistoryView(selectedModel: model.modelFilter) }
                 CostSummary(report: report, basis: model.costBasis, refreshing: model.busy || model.filtering,
                             sourceDate: model.lastSuccessfulUsageRead, sourceError: model.snapshot.error, sourceAvailable: model.costSourceAvailable)
                 if report.calculatedAt != nil && model.costSourceAvailable {
-                    CostUsageContext(model: model, monitor: model.live)
-                    CostOutputComparison(report: report, basis: model.costBasis)
                     VStack(alignment: .leading, spacing: 14) {
                         ChoiceRow(title: "Compare", selection: $breakdown, choices: [(0, "Models"), (1, "Reasoning levels")], segmented: true)
                         ForEach(Array((showAll ? rows : Array(rows.prefix(8))))) { row in costRow(row) }
@@ -42,7 +39,10 @@ struct CostView: View {
                 }
                 DetailSheet("Report details and exports") {
                     if report.calculatedAt != nil && model.costSourceAvailable {
-                        CostEvidenceView(model: model, monitor: model.live).padding(.top, 12)
+                        CostUsageContext(model: model, monitor: model.live).padding(.top, 12)
+                        CostOutputComparison(report: report, basis: model.costBasis)
+                        CostRateHistoryView(selectedModel: model.modelFilter)
+                        CostEvidenceView(model: model, monitor: model.live)
                     } else {
                         Text("Evidence details require an available calculated report. Recover details retries the local usage read.")
                             .font(.callout).foregroundStyle(.secondary).padding(.top, 12)

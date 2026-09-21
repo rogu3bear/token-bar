@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Quiet first-view chrome on Now, Cost, Quota Guard, and Menu bar settings. Guard no longer prints a no-warning disclaimer; Cost leads with estimate and coverage; the working column puts rate above remaining; method links use native label ink, not the accent; occupancy rules stay in Glance grammar rather than a settings essay.
+
 ## 0.1.12 — Released 2026-09-19
 
 - Align package identity with the built bundle, share preview/release and static-site paths, and keep website recordings synchronized with the native product.

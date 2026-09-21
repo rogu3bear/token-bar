@@ -27,6 +27,10 @@ struct CostEvidenceView: View {
                     Text("Depends on date, model, fields and chosen service")
                 }
             }.font(.callout).monospacedDigit()
+            if !model.costReport.lines.isEmpty && model.costReport.unknownEffortTokens > 0 {
+                Text(compact(model.costReport.unknownEffortTokens) + " tokens have no recorded reasoning level.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             HStack {
                 Text(model.retainedRequests.map { "\($0.formatted()) detailed records retained across all history." } ?? "Retained detail count is unavailable until the next scan.")
                 Spacer()

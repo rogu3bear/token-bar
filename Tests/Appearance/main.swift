@@ -478,6 +478,7 @@ MainActor.assumeIsolated {
                 assert(abs(remaining.midX - gauge.midX) < 1, "\(tool.label) remaining must share the gauge column center, not a full-bleed row")
                 assert(abs(header.midX - gauge.midX) < 1)
                 assert(remaining.width <= header.width + 1, "\(tool.label) remaining cannot span the dashboard while the speed header occupies one column")
+                assert(header.midY > remaining.midY && remaining.maxY <= header.minY + 1, "\(tool.label) rate header must sit above remaining")
             }
         }
     }

@@ -275,7 +275,6 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Text("Codex, Claude and Grok. Auto follows active speed and stays quiet about rate when nothing is running. Idle Auto still names measured Codex and Claude remaining. Unused Codex zeros and idle Grok remaining stay off the menu bar. Remaining allowance is labeled per tool. Grok remaining comes from the installed Grok agent. Missing or stale quota on a working or explicit tool stays labeled unavailable. A measured Fable zero or missing Fable budget is omitted rather than shown as Fable 0% or unavailable copy.").font(.caption).foregroundStyle(.secondary)
                 Picker("Rate units", selection: $preferences.configuration.unit) {
                     Text("Follow selected tool").tag("dashboard")
                     Text("Tokens / second").tag("s")
