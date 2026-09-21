@@ -31,7 +31,7 @@ roles, not smaller copies of the dashboard.
 
 | Role | Shared owner / rule | Consumers |
 | --- | --- | --- |
-| Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | Five product destinations |
+| Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | Four product destinations |
 | Page rhythm | `PageStyle`: 28pt gutter, 24pt sections, 16pt related content | Full pages; settings retain their narrower readable column |
 | Section heading | `PageStyle.sectionTitle`: native title2 semibold | History, Cost, Insights and tool headings; subordinate headings remain headline |
 | Summary metric | `SummaryMetric`: native caption label, 28pt rounded semibold monospaced value, optional secondary caption detail | History totals, Cost coverage/valuation, prompt sample metrics |
@@ -338,8 +338,10 @@ not competing hues. MenuBarPresentation.combined is shared by the status item,
 Settings and marketing recordings.
 Accounts & plans omits the Spark allowance bucket (`codex_bengalfox`)
 from its quota cards, retaining all stored observations and account/plan history.
-Accounts & plans covers Codex; Claude's passive current quota has no account or
-plan history page. Synthetic previews inject disposable preferences and never
+Allowances leads with current remaining for Codex, Claude, and Grok using the same
+`AccountAllowanceDisclosure` owner as Now. Codex account identity, plan history and
+Spark-omitted quota cards follow. Claude remaining is no longer only on Now.
+Synthetic previews inject disposable preferences and never
 write the production defaults or change the measurement calculation.
 
 ## Native page hierarchy
@@ -357,9 +359,10 @@ results. Integrity exclusions/repairs remain visible, with details and provenanc
 notices under Counting method and evidence. Prompt sample methodology and separate
 Codex quota trends have their own detail buttons. A successful empty prompt sample
 shows zero statistics without four repetitive empty pattern cards. Empty usage
-insights show one no-records explanation rather than repeated empty charts. Accounts &
-plans leads with supported account observations; collection/retention methodology
-is disclosed after observations. Availability, partial coverage, read age and
+insights show one no-records explanation rather than repeated empty charts. Insights
+remains hostable and unpublished from the capsule. Allowances leads with the three
+CLI remainings; Codex account observations and collection/retention methodology
+follow. Availability, partial coverage, read age and
 failure qualifiers stay visible rather than being hidden as methodology.
 
 ## Native control consistency
@@ -380,8 +383,9 @@ persistent limitation even when the error detail is dismissed.
 Full pages share a 28-point gutter, 24-point major-section rhythm and a 28-point
 rounded semibold heading matching their destination name. Settings retain their
 604-point readable column; compact popovers and tool cards retain denser spacing.
-The persistent navigation presents five product destinations: Now, History, Cost,
-Accounts & plans, and Insights. Menu bar fields and appearance live in the
+The persistent navigation presents four product destinations: Now, History, Cost,
+and Allowances. Insights remains hostable for diagnostic previews and is unpublished
+from the capsule. Menu bar fields and appearance live in the
 settings window from the popover. This is not a scene migration. Destination
 identity and saved preferences remain unchanged.
 
@@ -564,7 +568,7 @@ Tests/MenuBar checks all tool selections and Auto with competing legacy colors.
 
 ### Dashboard container hierarchy
 
-Now, History, Cost, Accounts and Insights share the continuous adaptive native
+Now, History, Cost, Allowances and Insights share the continuous adaptive native
 window canvas. Spacing and headings group metrics; native Dividers separate tool
 columns and accounts. Ordinary statistics, evidence text, account observations,
 contribution details and compact rows have no decorative background or border.

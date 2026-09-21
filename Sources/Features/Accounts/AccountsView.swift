@@ -7,6 +7,8 @@ struct AccountsView: View {
     @Bindable var signIns: SignInTimeline
     @Environment(\.appAccent) private var accent
     @Environment(\.evaluationDate) private var evaluationDate
+    @Environment(\.presentationClock) private var clock
+    private var now: Date { evaluationDate ?? clock.now }
     private var accounts: [LiveAccount] {
         monitor.state.accounts.values.sorted {
             if ($0.id == monitor.currentID) != ($1.id == monitor.currentID) { return $0.id == monitor.currentID }
@@ -16,10 +18,15 @@ struct AccountsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader(.accounts, subtitle: "Supported account observations: Codex. Claude’s current cached quota appears on Now; Claude account and plan history is not available here.") {
+                PageHeader(.accounts, subtitle: "Current remaining from installed Codex, Claude Code, and Grok.") {
                     if monitor.busy { ProgressView().controlSize(.small) }
                 }
                 if let error = monitor.error { ErrorNotice(message: error) }
+                VStack(alignment: .leading, spacing: PageStyle.related) {
+                    ForEach(LiveTool.allCases) { tool in
+                        AccountAllowanceDisclosure(tool: tool, quota: model.quota(for: tool), now: now)
+                    }
+                }
                 if accounts.isEmpty {
                     Text("No saved Codex account observations. Sign in through Codex; the account and plan appear after a successful reading.")
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)

@@ -28,7 +28,8 @@ not application state or UI code.
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
-| `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `InsightsView`, `DashboardNavigation` | five product destinations plus capsule chrome | query state via `UsageModel` |
+| `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `DashboardNavigation` | four product destinations plus capsule chrome | query state via `UsageModel` |
+| `InsightsView` | Hostable Insights destination, unpublished from the capsule | query state via `UsageModel` |
 | `MenuBarSettingsView`, `AppearanceSettingsView` | Settings owner: menu-bar fields and appearance. They are not equal capsule destinations and not a third SwiftUI scene | `UserDefaults` preferences |
 | `UpdateCheck`, `UpdateCheckControl` | Optional launch-time read of the site's public `release.json` over an ephemeral session with no cookies, cache, or app version; numeric version ordering; offers only a newer, notarized GitHub Release asset and opens it in the browser on click. Previews never construct a live check | `updateCheck.enabled.v1`; outcome is process-owned |
 | `site/public/feedback*.js`, `site/worker.js` | local report drafting; advanced-mode static fallback and retired API responses | browser local storage for the draft |
