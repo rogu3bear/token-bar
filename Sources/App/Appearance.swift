@@ -75,44 +75,51 @@ struct AppearanceHost<Content: View>: View {
         content().environment(\.presentationClock, clock ?? PresentationClockKey.defaultValue).environment(\.toolPalette, preferences.toolPalette).environment(\.appAccent, preferences.foreground).tint(preferences.foreground).accentColor(preferences.foreground).preferredColorScheme(preferences.scheme)
     }
 }
+struct AppearanceControls: View {
+    @Bindable var preferences: AppearancePreferences
+    var body: some View {
+        VStack(alignment: .leading, spacing: PageStyle.section) {
+            Picker("Appearance", selection: $preferences.mode) {
+                ForEach(["System", "Dark", "Light"], id: \.self) { Text($0).tag($0) }
+            }.pickerStyle(.segmented)
+            HStack(spacing: 12) {
+                Picker("Accent preset", selection: $preferences.hex) {
+                    ForEach(AppearancePreferences.accentChoices, id: \.1) { name, hex in
+                        Text(name).tag(hex)
+                    }
+                    if !AppearancePreferences.accentChoices.contains(where: { $0.1 == preferences.hex }) {
+                        Text("Custom").tag(preferences.hex)
+                    }
+                }.pickerStyle(.menu)
+                Spacer()
+                ColorPicker("Custom accent", selection: Binding(get: { preferences.color }, set: { preferences.setColor($0) }), supportsOpacity: false)
+            }
+            HStack {
+                Circle().fill(preferences.color).frame(width: 14, height: 14)
+                if preferences.followsSystemAccent {
+                    Text("macOS accent")
+                } else {
+                    Text("Accent #" + preferences.hex).monospaced()
+                }
+                Spacer()
+                Button("Match website preview") { preferences.websitePreset() }.buttonStyle(.borderedProminent)
+            }
+            Text("macOS follows the accent in System Settings. One accent is shared by all tools, charts, and controls. Tool names and chart symbols identify each tool.")
+                .font(.callout).foregroundStyle(.secondary)
+            Text("Warnings keep their warning color.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
 struct AppearanceSettingsView: View {
     @Bindable var preferences: AppearancePreferences
     var body: some View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 PageHeader("Appearance", subtitle: "Choose your appearance and colors. Changes apply everywhere and save automatically.")
-                Picker("Appearance", selection: $preferences.mode) {
-                    ForEach(["System", "Dark", "Light"], id: \.self) { Text($0).tag($0) }
-                }.pickerStyle(.segmented)
-                HStack(spacing: 12) {
-                    Picker("Accent preset", selection: $preferences.hex) {
-                        ForEach(AppearancePreferences.accentChoices, id: \.1) { name, hex in
-                            Text(name).tag(hex)
-                        }
-                        if !AppearancePreferences.accentChoices.contains(where: { $0.1 == preferences.hex }) {
-                            Text("Custom").tag(preferences.hex)
-                        }
-                    }.pickerStyle(.menu)
-                    Spacer()
-                    ColorPicker("Custom accent", selection: Binding(get: { preferences.color }, set: { preferences.setColor($0) }), supportsOpacity: false)
-                }
-                HStack {
-                    Circle().fill(preferences.color).frame(width: 14, height: 14)
-                    if preferences.followsSystemAccent {
-                        Text("macOS accent")
-                    } else {
-                        Text("Accent #" + preferences.hex).monospaced()
-                    }
-                    Spacer()
-                    Button("Match website preview") { preferences.websitePreset() }.buttonStyle(.borderedProminent)
-                }
-                Text("macOS follows the accent in System Settings. One accent is shared by all tools, charts, and controls. Tool names and chart symbols identify each tool.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Text("Warnings keep their warning color.").font(.caption).foregroundStyle(.secondary)
+                AppearanceControls(preferences: preferences)
             }
         }
     }
-
 }
 
 /// Shared by settings tabs and the standalone menu-bar settings window.

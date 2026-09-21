@@ -247,6 +247,7 @@ struct MenuBarSettingsView: View {
     @Environment(\.evaluationDate) private var evaluationDate
     @Environment(\.toolPalette) private var palette
     @Bindable var preferences: MenuBarPreferences
+    @Bindable var appearance: AppearancePreferences
     @Bindable var meter: Tachometer
     @Bindable var claudeMeter: Tachometer
     @Bindable var grokMeter: Tachometer
@@ -282,6 +283,8 @@ struct MenuBarSettingsView: View {
                     Text("Tokens / hour").tag("h")
                 }.pickerStyle(.segmented)
                 Text("Follow selected tool uses its dashboard unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
+                Text("Appearance").font(PageStyle.sectionTitle)
+                AppearanceControls(preferences: appearance)
                 DetailSheet("Customize") {
                     VStack(alignment: .leading, spacing: 16) {
                         Toggle("Reorder fields", isOn: $reordering)

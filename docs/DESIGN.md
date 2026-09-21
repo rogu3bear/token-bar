@@ -31,7 +31,7 @@ roles, not smaller copies of the dashboard.
 
 | Role | Shared owner / rule | Consumers |
 | --- | --- | --- |
-| Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | All seven dashboard destinations |
+| Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | Five product destinations |
 | Page rhythm | `PageStyle`: 28pt gutter, 24pt sections, 16pt related content | Full pages; settings retain their narrower readable column |
 | Section heading | `PageStyle.sectionTitle`: native title2 semibold | History, Cost, Insights and tool headings; subordinate headings remain headline |
 | Summary metric | `SummaryMetric`: native caption label, 28pt rounded semibold monospaced value, optional secondary caption detail | History totals, Cost coverage/valuation, prompt sample metrics |
@@ -366,8 +366,8 @@ failure qualifiers stay visible rather than being hidden as methodology.
 
 ## Native control consistency
 
-Entry labels name the surface they open. The quick popover's Menu bar settings
-action opens the existing dedicated Menu bar settings window; Dashboard reopens
+Entry labels name the surface they open. The quick popover's Settings
+action opens the existing dedicated settings window; Dashboard reopens
 the dashboard at its retained destination. This separate settings presentation
 is not an additional dashboard destination or an implementation of the proposed
 scene migration. Dashboard and settings window titles match those entry labels.
@@ -382,8 +382,9 @@ persistent limitation even when the error detail is dismissed.
 Full pages share a 28-point gutter, 24-point major-section rhythm and a 28-point
 rounded semibold heading matching their destination name. Settings retain their
 604-point readable column; compact popovers and tool cards retain denser spacing.
-The persistent navigation presents seven equal destination tabs, including Menu
-bar and Appearance, without an inline Settings heading or divider. Destination
+The persistent navigation presents five product destinations: Now, History, Cost,
+Accounts & plans, and Insights. Menu bar fields and appearance live in the
+settings window from the popover. This is not a scene migration. Destination
 identity and saved preferences remain unchanged.
 
 Navigation retains one restrained selection capsule and independent keyboard focus.
@@ -409,7 +410,7 @@ Before the first local scan or account poll, a short native welcome explains
 local history, the Codex app-server, permissions, storage and user-initiated
 exports. Start local monitoring acknowledges the explanation and opens the
 dashboard; Quit does not acknowledge or start monitoring. The explanation is
-available again in Menu bar settings. This acknowledgement is distinct from
+available again in Settings. This acknowledgement is distinct from
 macOS access controls and never grants an OS permission.
 
 The dashboard has one visible import progress bar fixed below page content, owned by UsageModel's typed
@@ -441,9 +442,9 @@ chrome appears only when a warning exists; All allowances remains as a quiet con
 Insights leads with derived usage changes and measurable context evidence. It keeps
 three prompt statistics and bounded repeated-prompt findings visible, with sample
 methodology in native details. Read failures, partial
-coverage, sample scope and age remain visible. Menu bar settings lead with the
+coverage, sample scope and age remain visible. Settings lead with the
 preview, tool and units; occupancy rules stay in Glance grammar, not a settings
-essay. Customize contains visibility, ordering and formatting.
+essay. Appearance mode and accent sit with those controls. Customize contains visibility, ordering and formatting.
 These detail sheets are local presentation state, not new saved preferences.
 
 
@@ -761,7 +762,7 @@ expansion can use the existing page scroll. Native primary/secondary labels supp
 View quota opens the existing dashboard at Now and presents that exact allowance.
 The detail updates within a verified account/period and labels old-account or
 old-period snapshots as historical. Snooze applies to that allowance and period,
-not every window for the account. Menu bar settings owns notification opt-in,
+not every window for the account. Settings owns notification opt-in,
 sound, low-remaining threshold and forecast lead. The optional Quota Guard warning
 field preserves existing field order and enabled choices during migration.
 Notification delivery remains subject to macOS; in-app evidence is always the

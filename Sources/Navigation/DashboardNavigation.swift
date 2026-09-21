@@ -25,6 +25,10 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
     var requiresDetailedReporting: Bool {
         self == .history || self == .cost
     }
+
+    /// Persistent dashboard tabs. Menu bar and Appearance stay hostable, not capsule members.
+    static var capsule: [Destination] { [.now, .history, .cost, .accounts, .insights] }
+    static var settings: [Destination] { [.menuBar, .appearance] }
 }
 
 extension PageHeader {
@@ -45,7 +49,7 @@ struct DashboardNavigation: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var indicator
     @FocusState private var focused: Destination?
-    private let destinations = Destination.allCases
+    private let destinations = Destination.capsule
 
     private func move(from destination: Destination, by offset: Int) {
         guard let index = destinations.firstIndex(of: destination) else { return }
