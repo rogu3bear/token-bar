@@ -611,7 +611,7 @@ struct QuickLiveView: View {
     }
     func configureNavigationActions() {
         observeQuotaGuard()
-        model.quotaGuard.reveal = { [weak self] in self?.openDetails(destination: .now) }
+        model.quotaGuard.reveal = { [weak self] in self?.openDetails(destination: .accounts) }
         model.showDetails = { [weak self] in self?.openDetails() }
         model.showHistory = { [weak self] in self?.openDetails(destination: .history) }
         model.showMenuBarSettings = { [weak self] in self?.openMenuBarSettings() }

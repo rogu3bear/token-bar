@@ -81,16 +81,16 @@ enum QuotaGuardPreview {
             guard let target = model.quotaGuard.decisions.first(where: { $0.risk != .none }) else { throw CocoaError(.coderInvalidValue) }
             model.quotaGuard.view(target)
             let window = delegate.detailWindow; let host = window?.contentViewController
-            guard window != nil, delegate.dashboardSelection.destination == .now, model.quotaGuard.selected?.id == target.id else { throw CocoaError(.coderInvalidValue) }
+            guard window != nil, delegate.dashboardSelection.destination == .accounts, model.quotaGuard.selected?.id == target.id else { throw CocoaError(.coderInvalidValue) }
             model.quotaGuard.selected = nil
-            delegate.dashboardSelection.destination = .accounts
+            delegate.dashboardSelection.destination = .history
             window?.orderOut(nil)
             model.quotaGuard.view(target)
             guard delegate.detailWindow === window, delegate.detailWindow?.contentViewController === host,
-                  delegate.dashboardSelection.destination == .now else { throw CocoaError(.coderInvalidValue) }
+                  delegate.dashboardSelection.destination == .accounts else { throw CocoaError(.coderInvalidValue) }
             model.quotaGuard.selected = nil
             window?.orderOut(nil)
-            print("PASS: View quota opens Now with exact allowance and reuses the dashboard window/controller")
+            print("PASS: View quota opens Allowances with exact allowance and reuses the dashboard window/controller")
         }
         let compact = arguments.contains("--sample-compact")
         let width: CGFloat = arguments.contains("--sample-default-size") ? 1120 : 900

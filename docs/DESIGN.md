@@ -762,7 +762,7 @@ RPM gauge, ahead of detailed allowance disclosure. Gauges remain visible in the
 initial 900×700 dashboard with one, two or three active tools; an explicit
 expansion can use the existing page scroll. Native primary/secondary labels support Light and Dark with any accent.
 
-View quota opens the existing dashboard at Now and presents that exact allowance.
+View quota opens the existing dashboard at Allowances and presents that exact allowance.
 The detail updates within a verified account/period and labels old-account or
 old-period snapshots as historical. Snooze applies to that allowance and period,
 not every window for the account. Settings owns notification opt-in,
