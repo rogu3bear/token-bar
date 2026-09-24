@@ -120,7 +120,9 @@ struct UsageInsightsSummary {
     var busy = false
     private(set) var hasResult = false
     private(set) var sourceUnavailable = false
-    private let queue = DispatchQueue(label: "local.codex-token-bar.usage-insights", qos: .background, autoreleaseFrequency: .workItem)
+    // Requested report work must make progress while other applications are busy.
+    // Match ReportScheduler; background QoS may defer even tiny visible queries.
+    private let queue = DispatchQueue(label: "local.codex-token-bar.usage-insights", qos: .utility, autoreleaseFrequency: .workItem)
     @ObservationIgnored private var pending: ([Entry], [String: TaskInfo], UUID?, UInt64?)?
     @ObservationIgnored private var inFlightEntries: [Entry]?
     @ObservationIgnored private var inFlightCatalog: [String: TaskInfo]?
