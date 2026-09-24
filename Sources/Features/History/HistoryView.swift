@@ -5,20 +5,20 @@ struct HistoryView: View {
     @Bindable var model: UsageModel
     @Environment(\.appAccent) private var accent
     @Environment(\.toolPalette) private var palette
-    @State private var breakdown = 0
-    @State private var metric = UsageMetric.output
+    private var breakdown: Int { model.reporting.historyBreakdown }
+    private var metric: UsageMetric { model.reporting.historyMetric }
     @State private var showMethod = false
     var body: some View {
+        @Bindable var reporting = model.reporting
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 header
                 if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
                 periodFilter
                 filters
-                ReadStatusView(state: ReadPresentation(hasResult: hasResult,
-                    refreshing: model.busy || model.filtering, failed: model.snapshot.error != nil,
-                    partial: model.snapshot.integrity.map { !$0.isClean } ?? false), date: model.lastSuccessfulUsageRead)
-                if let error = model.snapshot.error { ErrorNotice(message: error) }
+                ReadStatusView(state: ReadPresentation(snapshot: model.snapshot,
+                    refreshing: model.busy || model.filtering), date: model.lastSuccessfulUsageRead)
+                UsageDiagnosticsView(health: model.snapshot.readHealth)
                 HStack(alignment: .top, spacing: PageStyle.related) {
                     card(UsageMetric.total, model.totals)
                     card("INPUT", model.totals.input)
@@ -35,10 +35,10 @@ struct HistoryView: View {
                 if model.report.entries.contains(where: { $0.tokens.cached > $0.tokens.input || $0.tokens.reasoning > $0.tokens.output }) {
                     StatusNotice(message: "Some source counters have inconsistent cached-input or reasoning subsets. The total still uses input + output; subset comparisons may be unreliable.", severity: .warning, dismissible: false)
                 }
-                ChoiceRow(title: "Measure", selection: $metric, choices: UsageMetric.allCases.map { ($0, $0.rawValue) }, segmented: true)
+                ChoiceRow(title: "Measure", selection: $reporting.historyMetric, choices: UsageMetric.allCases.map { ($0, $0.rawValue) }, segmented: true)
                 VStack(alignment: .leading, spacing: 18) {
                     Text("Where the usage went").font(PageStyle.sectionTitle)
-                    ChoiceRow(title: "Compare", selection: $breakdown, choices: [(0, "Tasks"), (1, "Models"), (2, "Accounts"), (3, "Days"), (4, "Tools"), (5, "Projects")])
+                    ChoiceRow(title: "Compare", selection: $reporting.historyBreakdown, choices: [(0, "Tasks"), (1, "Models"), (2, "Accounts"), (3, "Days"), (4, "Tools"), (5, "Projects")])
                     ContributionChart(rows: rows, metric: metric)
                     if breakdown == 2 { Text("Account associations are inferred from local sign-in observations. Unattributed history stays separate.").font(.caption).foregroundStyle(.secondary) }
                 }
@@ -70,7 +70,7 @@ struct HistoryView: View {
     }
     private var periodFilter: some View { ReportPeriodFilter(model: model) }
     private var filters: some View { ReportFilters(model: model) }
-    private var hasResult: Bool { model.lastSuccessfulUsageRead != nil || !model.snapshot.entries.isEmpty }
+    private var hasResult: Bool { model.snapshot.hasUsageResult }
     private var rows: [UsageRow] {
         switch breakdown {
         case 1: return model.report.models

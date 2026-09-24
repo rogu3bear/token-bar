@@ -80,7 +80,7 @@ enum PreviewModelScope {
                         close(window)
                     }
                     if mode == "throw" { throw Expected.failure }
-                    if mode == "pending-report" { model.detailedReporting = true; model.rebuild() }
+                    if mode == "pending-report" { model.rebuild() }
                     if mode == "retained-owner" { held = model; heldArchive = model.scanner.requestArchive }
                 }
             } catch Expected.failure { caught = true }

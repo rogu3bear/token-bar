@@ -10,7 +10,7 @@ struct InsightsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 PageHeader(.insights, subtitle: "Changes and interpretation limits in local evidence, updated quietly in the background.")
-                if let error = usage.snapshot.error { ErrorNotice(message: error) }
+                UsageDiagnosticsView(health: usage.snapshot.readHealth)
                 if trends.sourceUnavailable {
                     ErrorNotice(message: trends.hasResult ? "Usage refresh unavailable. Previous trends remain visible and may be stale." : "Usage trends unavailable. No successful usage result is available.")
                     if trends.hasResult, let date = usage.lastSuccessfulUsageRead {
@@ -36,7 +36,7 @@ struct InsightsView: View {
                 while !Task.isCancelled {
                     if !usage.busy && !usage.filtering && usage.progress == nil {
                         trends.refresh(entries: usage.snapshot.entries, catalog: usage.catalog,
-                                       sourceAvailable: usage.snapshot.error == nil || !usage.snapshot.entries.isEmpty,
+                                       sourceAvailable: usage.snapshot.hasUsageResult,
                                        revision: usage.snapshot.contentID, catalogRevision: usage.reporting.catalogRevision)
                         if !trends.busy { model.refresh(home: home) }
                     }

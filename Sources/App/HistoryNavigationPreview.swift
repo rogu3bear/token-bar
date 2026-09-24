@@ -32,39 +32,42 @@ enum HistoryNavigationPreview {
             try require(!model.filtering, "Report publication settled")
             delegate.detailWindow?.contentView?.layoutSubtreeIfNeeded()
         }
-        model.showDetails?()
+        delegate.commands.reports(nil)
         try settle()
         try require(delegate.dashboardSelection.destination == .history, "Reports defaults to History")
         try require(delegate.detailWindow?.title == "Token Bar — Reports", "Reports entry and window title agree")
         try require(!Destination.capsule.contains(.now), "Live is not a competing report destination")
-        model.showMenuBarSettings?()
+        delegate.commands.settings()
         let settingsWindow = delegate.settingsWindow
-        model.showMenuBarSettings?()
+        delegate.commands.settings()
         try require(delegate.settingsWindow === settingsWindow, "Settings reuses its existing window")
         delegate.settingsWindow?.orderOut(nil)
         // The exact callback used by the Today chart opens History.
-        model.showHistory?()
+        delegate.commands.reports(.history)
         try settle()
         try require(delegate.dashboardSelection.destination == .history, "Today opens History on first window creation")
-        try require(model.detailedReporting, "First-open History enables detailed reporting")
         let window = delegate.detailWindow
         let host = window?.contentViewController
         model.search = "gpt"
+        model.reporting.historyMetric = .cached
+        model.reporting.historyBreakdown = 5
+        model.reporting.costBreakdown = 1
         delegate.dashboardSelection.destination = .cost
         try settle()
-        model.showDetails?()
+        delegate.commands.reports(nil)
         try require(delegate.dashboardSelection.destination == .cost, "Reports preserves the selected Cost destination")
         window?.orderOut(nil)
-        model.showHistory?()
+        delegate.commands.reports(.history)
         try settle()
         try require(delegate.dashboardSelection.destination == .history, "Today selects History in an existing hidden window")
         try require(delegate.detailWindow === window && delegate.detailWindow?.contentViewController === host,
                     "Navigation preserves the window and hosting controller")
         try require(model.search == "gpt", "Navigation preserves report filters")
+        try require(model.reporting.historyMetric == .cached && model.reporting.historyBreakdown == 5 && model.reporting.costBreakdown == 1,
+                    "Navigation preserves History measure and both report breakdowns")
         delegate.dashboardSelection.destination = .now
         try settle()
-        try require(!model.detailedReporting, "Returning to Now disables detailed reporting")
-        model.showDetails?()
+        delegate.commands.reports(nil)
         try require(delegate.dashboardSelection.destination == .now, "Reports preserves Now")
         if CommandLine.arguments.contains("--large-history") {
             let now = model.referenceDate ?? Date()

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — Read health and native architecture qualification
+
+- Distinguish a completed usage read with incomplete coverage from a failed refresh; retain accepted totals, diagnostic scope and the last successful read across restart.
+- Share structured diagnostic details across Live, History and Cost, with separate coverage warnings and operational failures.
+- Give report scheduling and native window commands explicit owners; keep completed reports visible during source updates and reject obsolete filter results.
+- Retain History measure and breakdown and Cost breakdown across report navigation; reopen the live popover when the app is opened again.
+
 ## 0.2.0 — Live, Reports and Settings
 
 - Make the menu-bar popover the canonical live surface, with stable expandable provider modules and explicit speed and remaining labels.

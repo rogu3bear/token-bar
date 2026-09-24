@@ -84,10 +84,12 @@ units, allowance window, reset, read age, projection and task detail. Module
 occupancy never creates a token, quota or speed value. The status item's existing
 one-hour remaining rule is separate from module retention.
 
-`ReadPresentation` keeps result availability, coverage and freshness independent
+`Snapshot.readHealth` and `ReadPresentation` keep result availability, coverage and freshness independent
 of numeric values. History, Cost and prompt sampling use the same status row.
 Refreshing retains prior results; failed refreshes label their age; partial
-coverage stays visible. A successful empty result and a measured zero remain
+coverage stays visible. A completed scan with continuity gaps says “Read completed
+· coverage incomplete” and uses a warning, not the refresh-failure state. Structured
+details distinguish sources, scan scopes, failures and retained historical gaps. A successful empty result and a measured zero remain
 valid values. No presentation type changes provider horizons or Guard eligibility.
 
 Synthetic native previews render shipping views and use disposable roots and
@@ -289,7 +291,7 @@ coverage and no estimate; mixed coverage is a partial estimate. Headline and
 evidence views use the same coverage value and the same tenth-percent face;
 a missing coverage is an em dash. Loading retains an existing
 calculation, and a failed source cannot become an empty-selection claim.
-The last successful usage-read time is retained in memory across failed reads
+The last successful usage-read time is retained in checkpoint metadata across restart and failed reads
 and shown beside available cost results. Cost, Insights, and prompt-sample results
 share one read-age caption: a prefix, relative age, and absolute clock. History,
 contribution activity, and rate reports use its relative-only form. A missing

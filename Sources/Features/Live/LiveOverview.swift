@@ -6,11 +6,12 @@ struct LiveOverview: View {
     @Bindable var model: UsageModel
     @Bindable var monitor: LiveMonitor
     var initiallyExpanded: LiveTool? = nil
+    @Environment(\.nativeCommands) private var commands
     @State private var showMethod = false
     @State private var showSources = false
 
     private var sourceErrors: [String] {
-        ([monitor.error, model.snapshot.error, model.quotaGuard.persistenceError] +
+        ([monitor.error, model.quotaGuard.persistenceError] +
          LiveTool.allCases.map { model.meter(for: $0).activity.error }).compactMap { $0 }
     }
     var body: some View {
@@ -22,8 +23,8 @@ struct LiveOverview: View {
                 MethodButton(title: "Method") { showMethod = true }
             }
             LiveToolPanels(model: model, codex: meter, claude: model.claudeMeter, initiallyExpanded: initiallyExpanded)
-            CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: model.showHistory)
-            if !sourceErrors.isEmpty {
+            CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: { commands.reports(.history) })
+            if !sourceErrors.isEmpty || !model.snapshot.readHealth.diagnostics.isEmpty {
                 Button { showSources = true } label: {
                     Label("Sources need attention", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
@@ -36,8 +37,8 @@ struct LiveOverview: View {
             if let message = model.message { Text(message).font(.caption).foregroundStyle(.secondary) }
             Divider()
             HStack {
-                Button("Reports") { model.showDetails?() }.keyboardShortcut("r", modifiers: .command)
-                Button("Settings") { model.showMenuBarSettings?() }.keyboardShortcut(",", modifiers: .command)
+                Button("Reports") { commands.reports(nil) }.keyboardShortcut("r", modifiers: .command)
+                Button("Settings") { commands.settings() }.keyboardShortcut(",", modifiers: .command)
                 Spacer()
                 Menu {
                     Button("Feedback") {
@@ -53,6 +54,7 @@ struct LiveOverview: View {
         .sheet(isPresented: $showMethod) { LiveMethod { showMethod = false } }
         .sheet(isPresented: $showSources) {
             MethodSheet(title: "Data sources", done: { showSources = false }) {
+                UsageDiagnosticsView(health: model.snapshot.readHealth)
                 ForEach(Array(sourceErrors.enumerated()), id: \.offset) { _, error in
                     ErrorNotice(message: error)
                 }

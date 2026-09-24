@@ -25,6 +25,7 @@ parser.add_argument("output", type=Path, help="New disposable .app path")
 mode = parser.add_mutually_exclusive_group()
 mode.add_argument("--allowance", choices=["now", "popover"], help="Use shipping synthetic allowance views")
 mode.add_argument("--accounts", action="store_true", help="Exercise Accounts navigation with saved plans and hidden Spark windows")
+mode.add_argument("--coverage", action="store_true", help="Exercise retained continuity diagnostics with a completed read")
 args = parser.parse_args()
 preview_arguments = (["--preview-tools", "--sample-width", "900", "--sample-height", "700"]
                      + (["--sample-compact"] if args.allowance == "popover" else [])) if args.allowance else [
@@ -32,6 +33,9 @@ preview_arguments = (["--preview-tools", "--sample-width", "900", "--sample-heig
 if args.accounts:
     preview_arguments = ["--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "populated",
                          "--sample-spark-accounts", "--sample-account-history"]
+if args.coverage:
+    preview_arguments = ["--preview-cost-navigation", "--preview-native-interaction", "--sample-state", "partial",
+                         "--sample-many-diagnostics", "--sample-history"]
 root = Path(__file__).resolve().parent.parent
 source = built_app(root)
 output = args.output.absolute()

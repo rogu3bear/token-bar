@@ -1216,3 +1216,91 @@ do {
     assert(EventTime.parse(1 as Any?) == nil)
 }
 print("PASS: event timestamps share one ISO-8601 parse; missing stamps stay unavailable")
+
+// A completed scan with retained continuity gaps is current, partial evidence.
+// A read failure must remain a separate state across save/restart/recovery.
+do {
+    var (owner, file, state) = try continuityFixture("read-health")
+    try (continuityMeta("original") + continuityRecord("A", 100, at: now) + continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
+    let partial = owner.scan(changedPaths: [file])
+    assert(partial.error != nil && partial.readHealth.partial && !partial.readHealth.failed)
+    assert(partial.readHealth.affectedFiles == 1 && partial.readHealth.continuityCount == 1)
+    assert(ReadPresentation(snapshot: partial).freshness == .current)
+    assert(ReadPresentation(snapshot: partial).coverage == .partial)
+    assert(partial.successfulReadAt != nil)
+    try owner.saveIfNeeded(force: true)
+    let accepted = owner.ledger.entries
+    let first = partial.readHealth.diagnostics.first?.firstChecked
+    owner.eventIndex = nil; owner.requestArchive = nil
+    owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
+    assert(owner.currentSnapshot().successfulReadAt == partial.successfulReadAt)
+    assert(owner.currentSnapshot().readHealth.diagnostics.first?.firstChecked == first)
+    owner.codexReadWillRun = { _, _ in throw POSIXError(.EACCES) }
+    let failed = owner.scan(changedPaths: [file])
+    assert(failed.readHealth.failed && failed.readHealth.partial)
+    assert(failed.successfulReadAt == partial.successfulReadAt)
+    assert(ReadPresentation(snapshot: failed).freshness == .stale)
+    assert(failed.entries == accepted)
+    owner.codexReadWillRun = nil
+    let recovered = owner.scan(changedPaths: [file])
+    assert(!recovered.readHealth.failed && recovered.readHealth.partial)
+    assert(recovered.readHealth.diagnostics.first?.firstChecked == first)
+    assert(recovered.entries == accepted)
+    var catalogFailure = recovered
+    catalogFailure.recordFailure("Task catalog unavailable", provider: "Task catalog")
+    assert(catalogFailure.readHealth.failed && catalogFailure.readHealth.continuityCount == 1)
+    print("PASS: scanner gaps, real failure, restart and recovery reach distinct report states without changing accepted usage")
+}
+do {
+    let emptyHome = temp.appendingPathComponent("empty-read-health")
+    try FileManager.default.createDirectory(at: emptyHome.appendingPathComponent("sessions"), withIntermediateDirectories: true)
+    let owner = UsageScanner(home: emptyHome, stateURL: emptyHome.appendingPathComponent("ledger.json"))
+    owner.readAccount = false
+    assert(!owner.currentSnapshot().hasUsageResult && owner.currentSnapshot().readHealth.lastSuccessfulRead == nil,
+           "Loading a new store is not evidence of a completed scan")
+    let zero = owner.scan()
+    assert(zero.entries.isEmpty && zero.hasUsageResult && !zero.readHealth.failed)
+    let unavailable = Snapshot(error: "Source unavailable")
+    assert(!unavailable.hasUsageResult && unavailable.readHealth.failed)
+    let conflict = UsageDiagnostic.decodeLegacy(scope: "Claude", message: "Conflicting Claude counter revisions were retained without guessing a total.")
+    assert(conflict.count == 1 && !conflict[0].isFailure)
+    let mixed = UsageDiagnostic.decodeLegacy(scope: "Codex", message: "Source continuity is incomplete; retained prior totals and admitted only independently supported requests. Unknown read failure.")
+    assert(mixed[0].isFailure)
+    assert(UsageDiagnostic.classify("Unknown read failure. Source was replaced by a different session; prior totals retained.") == .readFailure)
+    print("PASS: successful empty scan, first failure, counter conflict and unknown mixed diagnostic remain distinct")
+}
+
+do {
+    let state = ReportState()
+    let scheduler = ReportScheduler(state: state, storageURL: temp.appendingPathComponent("scheduled-report.json"))
+    let date = Date()
+    func inputs(_ search: String) -> ReportRevisionInputs {
+        ReportRevisionInputs(entries: 1, catalog: 1,
+            query: UsageQuery(period: 1, start: date, end: date, model: "All models", account: "All accounts", search: search, harness: "All tools"),
+            effort: "All levels", service: .standard, basis: .historical)
+    }
+    let archive = temp.appendingPathComponent("absent-scheduler-archive.sqlite")
+    for search in ["first", "second", "latest"] {
+        scheduler.request(source: [], inputs: inputs(search), catalog: [:], now: date, sourceID: nil, archiveURL: archive) { _ in }
+    }
+    let deadline = Date().addingTimeInterval(10)
+    while state.filtering && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    assert(!state.filtering && scheduler.publicationCount == 1)
+    scheduler.request(source: [], inputs: inputs("latest"), catalog: [:], now: date, sourceID: nil, archiveURL: archive) { _ in }
+    assert(!state.filtering && scheduler.publicationCount == 1)
+    print("PASS: report scheduler coalesces rapid queries, publishes only the latest and reuses a warm report")
+    for revision in [UInt64(2), 3] {
+        var updated = inputs("latest"); updated.entries = revision
+        scheduler.request(source: [], inputs: updated, catalog: [:], now: date, sourceID: nil, archiveURL: archive) { _ in }
+    }
+    while state.filtering && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    assert(!state.filtering && scheduler.publicationCount == 3,
+           "Source updates must publish completed reports while coalescing newer usage")
+    for search in ["away", "latest", "away"] {
+        scheduler.request(source: [], inputs: inputs(search), catalog: [:], now: date, sourceID: nil, archiveURL: archive) { _ in }
+    }
+    while state.filtering && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    assert(!state.filtering && scheduler.publicationCount == 4,
+           "Returning to identical selection values must not admit an obsolete generation")
+    print("PASS: source updates publish without starvation and away/back selections reject obsolete generations")
+}

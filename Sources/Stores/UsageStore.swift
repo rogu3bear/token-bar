@@ -35,6 +35,9 @@ import Observation
 }
 
 @Observable final class ReportState {
+    var historyMetric = UsageMetric.output
+    var historyBreakdown = 0
+    var costBreakdown = 0
     @ObservationIgnored var queryChanged: (() -> Void)?
     @ObservationIgnored private(set) var catalogRevision: UInt64 = 0
     var period = 0 { didSet { if oldValue != period { queryChanged?() } } }

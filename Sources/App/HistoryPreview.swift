@@ -37,7 +37,6 @@ enum HistoryPreview {
         model.appearance.websitePreset()
         precondition(model.snapshot.entries.count == 4, "Saved usage must be available before a scan")
         model.period = 4; model.startDate = today; model.endDate = today
-        model.detailedReporting = true
         model.busy = true
         model.progress = .codex(completed: 25, total: 100)
         model.rebuild()

@@ -4,12 +4,13 @@ import Charts
 struct CostView: View {
     @Bindable var model: UsageModel
     @Environment(\.appAccent) private var accent
-    @State private var breakdown = 0
+    private var breakdown: Int { model.reporting.costBreakdown }
     @State private var showMethod = false
     @State private var showAll = false
     private var report: CostReport { model.costReport }
     private var rows: [CostRow] { breakdown == 0 ? report.models : report.efforts }
     var body: some View {
+        @Bindable var reporting = model.reporting
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 header
@@ -18,10 +19,11 @@ struct CostView: View {
                 ReportFilters(model: model, includesCost: true)
                 pricingAssumptions
                 CostSummary(report: report, refreshing: model.busy || model.filtering,
-                            sourceDate: model.lastSuccessfulUsageRead, sourceError: model.snapshot.error, sourceAvailable: model.costSourceAvailable)
+                            sourceDate: model.lastSuccessfulUsageRead, sourceAvailable: model.costSourceAvailable,
+                            sourceHealth: model.snapshot.readHealth)
                 if report.calculatedAt != nil && model.costSourceAvailable {
                     VStack(alignment: .leading, spacing: 14) {
-                        ChoiceRow(title: "Compare", selection: $breakdown, choices: [(0, "Models"), (1, "Reasoning levels")], segmented: true)
+                        ChoiceRow(title: "Compare", selection: $reporting.costBreakdown, choices: [(0, "Models"), (1, "Reasoning levels")], segmented: true)
                         ForEach(Array((showAll ? rows : Array(rows.prefix(8))))) { row in costRow(row) }
                         if rows.count > 8 { Button { showAll.toggle() } label: { Text(showAll ? "Show fewer" : "Show all \(rows.count)").foregroundStyle(accent) }.buttonStyle(.link) }
                         if rows.isEmpty { Text("No usage matches these filters.").foregroundStyle(.secondary) }

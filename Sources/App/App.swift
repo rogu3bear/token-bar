@@ -11,7 +11,7 @@ import ServiceManagement
     let clock = PresentationClock()
     private var sourceRevision: UInt64 { usageStore.revision }
     private var catalogRevision: UInt64 { reporting.catalogRevision }
-    private let reportEngine: ReportEngine
+    let reportScheduler: ReportScheduler
     var snapshot: Snapshot { get { usageStore.snapshot } set { usageStore.snapshot = newValue } }
     var lastSuccessfulUsageRead: Date? { get { usageStore.lastSuccessfulUsageRead } set { usageStore.lastSuccessfulUsageRead = newValue } }
     var busy: Bool { get { usageStore.busy } set { usageStore.busy = newValue } }
@@ -34,24 +34,17 @@ import ServiceManagement
     var costRecoveryMessage: String? { get { usageStore.costRecoveryMessage } set { usageStore.costRecoveryMessage = newValue } }
     var progress: ImportProgress? { get { usageStore.progress } set { usageStore.progress = newValue } }
     var filtering: Bool { get { reporting.filtering } set { reporting.filtering = newValue } }
-    var detailedReporting = false
     @ObservationIgnored private var cachedCatalog: [String: TaskInfo] = [:]
     @ObservationIgnored private var catalogUpdated = Date.distantPast
     var availableModels: [String] { get { reporting.availableModels } set { reporting.availableModels = newValue } }
     var availableAccounts: [Account] { get { reporting.availableAccounts } set { reporting.availableAccounts = newValue } }
     var catalog: [String: TaskInfo] { get { reporting.catalog } set { reporting.catalog = newValue } }
-    var showDetails: (() -> Void)?
-    var showHistory: (() -> Void)?
-    var showMenuBarSettings: (() -> Void)?
     var referenceDate: Date?
     let allowsSystemSettings: Bool
     let menuBarPreferences: MenuBarPreferences
     let appearance: AppearancePreferences
     let provenanceNotices: ProvenanceNotices
     let updateCheck: UpdateCheck
-    private let reportQueue = DispatchQueue(label: "local.codex-token-bar.report", qos: .utility, autoreleaseFrequency: .workItem)
-    @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var reportPending = false
     var message: String? { get { usageStore.message } set { usageStore.message = newValue } }
     var changed: (() -> Void)?
     var scanner: UsageScanner { usageStore.scanner }
@@ -144,7 +137,7 @@ import ServiceManagement
         quotaGuard = QuotaGuardCoordinator(url: support.appendingPathComponent("CodexTokenBar/quota-guard.json"),
             adapter: previewRoot == nil ? QuotaGuardNotifications() : nil, clock: { referenceDate ?? Date() })
         insights = InsightsModel(clock: { referenceDate ?? Date() }, storageURL: support.appendingPathComponent("CodexTokenBar/prompt-index"), home: home)
-        reportEngine = ReportEngine(storageURL: support.appendingPathComponent("CodexTokenBar/report-index.json"))
+        reportScheduler = ReportScheduler(state: reporting, storageURL: support.appendingPathComponent("CodexTokenBar/report-index.json"))
         // A preview never reads real transcripts. Otherwise each tool is
         // enabled only where it is actually installed.
         let claudeHome = previewRoot == nil ? HarnessDiscovery.claudeCode() : nil
@@ -196,7 +189,7 @@ import ServiceManagement
         }
         reporting.queryChanged = { [weak self] in
             guard let self else { return }
-            self.queryGeneration &+= 1; self.rebuild()
+            self.rebuild()
         }
         live.comparisonChanged = { [weak self] in self?.refreshComparisons() }
         publish(snapshot)
@@ -222,52 +215,18 @@ import ServiceManagement
     }
     var entries: [Entry] { report.entries }
     var totals: Tokens { report.totals }
-    @ObservationIgnored private var queryGeneration: UInt64 = 0
-    @ObservationIgnored private(set) var reportPublicationCount = 0
-    @ObservationIgnored var reportPublished: ((UsageReport) -> Void)?
-    @ObservationIgnored private var reportInputs: ReportRevisionInputs?
-    @ObservationIgnored private var inFlightInputs: ReportRevisionInputs?
-    @ObservationIgnored private var reportValidity: ReportValidity?
+    var reportPublicationCount: Int { reportScheduler.publicationCount }
+    var reportPublished: ((UsageReport) -> Void)? {
+        get { reportScheduler.published }
+        set { reportScheduler.published = newValue }
+    }
     func rebuild() {
-        // Keep the process-owned report warm; navigation only consumes it.
         refreshComparisons()
-        let now = referenceDate ?? Date()
-        let inputs = ReportRevisionInputs(entries: sourceRevision, catalog: catalogRevision, query: costQuery, effort: costEffort, service: costService, basis: costBasis)
-        if !filtering, inputs == reportInputs, reportValidity?.contains(now) == true { return }
-        if filtering && inputs == inFlightInputs { return }
-        generation += 1
-        if filtering { reportPending = true; return }
-        reportPending = false
-        let version = generation
-        let queryVersion = queryGeneration
-        let query = costQuery
-        let source = snapshot.entries, catalog = catalog
-        let sourceID = snapshot.contentID
-        let effort = costEffort, service = costService, basis = costBasis
-        filtering = true
-        inFlightInputs = inputs
-        let archiveURL = scanner.requestArchiveURL
-        reportQueue.async {
-            let (result, costs) = self.reportEngine.build(source: source, inputs: inputs, catalog: catalog, now: now, sourceID: sourceID) { selected in
-                guard let archive = try? RequestArchive(url: archiveURL, readOnly: true) else { return nil }
-                return try? TimelineDetail.expand(selected, archive: archive)
-            }
-            let validity = self.reportEngine.validity
-            let storageError = self.reportEngine.storageError
-            DispatchQueue.main.async {
-                if self.queryGeneration == queryVersion && self.costQuery == query && self.costEffort == effort && self.costService == service && self.costBasis == basis {
-                    self.report = result; self.costReport = costs
-                    if let storageError { self.message = storageError }
-                    self.reportPublicationCount += 1
-                    self.reportPublished?(result)
-                    self.reportInputs = inputs
-                    self.reportValidity = validity
-                }
-                self.filtering = false
-                self.inFlightInputs = nil
-                if self.reportPending || self.generation != version { self.rebuild() }
-            }
-        }
+        let inputs = ReportRevisionInputs(entries: sourceRevision, catalog: catalogRevision, query: costQuery,
+                                          effort: costEffort, service: costService, basis: costBasis)
+        reportScheduler.request(source: snapshot.entries, inputs: inputs, catalog: catalog,
+                                now: referenceDate ?? Date(), sourceID: snapshot.contentID,
+                                archiveURL: scanner.requestArchiveURL) { [weak self] error in self?.message = error }
     }
     func refreshComparisons() {
         comparisons.refresh(source: snapshot.entries, revision: sourceRevision, quotaRevision: live.comparisonRevision,
@@ -277,7 +236,7 @@ import ServiceManagement
     @ObservationIgnored private var publishedRevision: UInt64?
     private func publish(_ result: Snapshot) {
         snapshot = result
-        if result.error == nil { lastSuccessfulUsageRead = result.updated }
+        if let completed = result.readHealth.lastSuccessfulRead { lastSuccessfulUsageRead = completed }
         if publishedRevision != sourceRevision {
             for entry in result.entries {
                 switch HistoryTool.recorded(entry) {
@@ -296,7 +255,7 @@ import ServiceManagement
         rebuild()
         if !usageInsights.hasResult {
             usageInsights.refresh(entries: result.entries, catalog: catalog,
-                                  sourceAvailable: result.error == nil || !result.entries.isEmpty,
+                                  sourceAvailable: result.hasUsageResult,
                                   revision: result.contentID, catalogRevision: catalogRevision)
         }
         changed?()
@@ -350,7 +309,7 @@ import ServiceManagement
                     self.cachedCatalog = try TaskCatalog.read(home: self.scanner.home)
                     self.catalogUpdated = Date()
                 } catch {
-                    result.error = [result.error, error.localizedDescription].compactMap { $0 }.joined(separator: "; ")
+                    result.recordFailure(error.localizedDescription, provider: "Task catalog")
                 }
             }
             self.scheduleSave()
@@ -371,7 +330,7 @@ import ServiceManagement
             }
         }
     }
-    var costSourceAvailable: Bool { snapshot.error == nil || lastSuccessfulUsageRead != nil || !costReport.lines.isEmpty }
+    var costSourceAvailable: Bool { snapshot.hasUsageResult || !costReport.lines.isEmpty }
     var costQuery: UsageQuery {
         UsageQuery(period: period, start: period == 5 ? (signIns.lastSwitchDate ?? Date()) : startDate, end: endDate, model: modelFilter, account: accountFilter, search: search, harness: toolFilter)
     }
@@ -443,6 +402,14 @@ struct QuickLiveView: View {
     let dashboardSelection = DashboardSelection()
     var detailWindow: NSWindow?
     var settingsWindow: NSWindow?
+    var commands: NativeCommands {
+        NativeCommands(reports: { [weak self] in self?.openDetails(destination: $0) },
+                       settings: { [weak self] in self?.openMenuBarSettings() })
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag && !popover.isShown { toggle() }
+        return true
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         let firstRun = FirstRunAccess.needsExplanation(.standard)
@@ -455,7 +422,7 @@ struct QuickLiveView: View {
         item.button?.title = "◈ …"
         item.button?.target = self; item.button?.action = #selector(toggle)
         popover.behavior = .transient
-        let quickHost = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) })
+        let quickHost = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }.environment(\.nativeCommands, commands))
         quickHost.sizingOptions = [.preferredContentSize]
         popover.contentViewController = quickHost
         model.changed = { [weak self] in
@@ -482,7 +449,7 @@ struct QuickLiveView: View {
             self.model.claudeMeter.tick(now: now)
             self.model.grokMeter.tick(now: now)
             self.updateStatusItem(now: now)
-            if self.detailWindow?.isVisible == true && self.model.detailedReporting { self.model.rebuild() }
+            if self.detailWindow?.isVisible == true && self.dashboardSelection.destination.requiresDetailedReporting { self.model.rebuild() }
             }
         }
         if let meterTimer { RunLoop.main.add(meterTimer, forMode: .common) }
@@ -570,21 +537,16 @@ struct QuickLiveView: View {
     func configureNavigationActions() {
         observeQuotaGuard()
         model.quotaGuard.reveal = { [weak self] in self?.openDetails(destination: .accounts) }
-        model.showDetails = { [weak self] in self?.openDetails() }
-        model.showHistory = { [weak self] in self?.openDetails(destination: .history) }
-        model.showMenuBarSettings = { [weak self] in self?.openMenuBarSettings() }
     }
     func openDetails(destination: Destination? = nil) {
         if let destination { dashboardSelection.destination = destination }
         popover.performClose(nil)
         if detailWindow == nil {
-            model.detailedReporting = dashboardSelection.destination.requiresDetailedReporting
-            if model.detailedReporting { model.rebuild() }
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 800),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: ReportWindowGeometry.width, height: ReportWindowGeometry.height),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
             window.title = "Token Bar — Reports"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model, dashboardSelection] in DashboardRoot(model: model, selection: dashboardSelection) })
-            window.contentMinSize = NSSize(width: 900, height: 700)
+            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model, dashboardSelection] in DashboardRoot(model: model, selection: dashboardSelection) }.environment(\.nativeCommands, commands))
+            window.contentMinSize = NSSize(width: ReportWindowGeometry.minWidth, height: ReportWindowGeometry.minHeight)
             if model.allowsSystemSettings { window.setFrameAutosaveName("UsageDetails") }
             window.isReleasedWhenClosed = false
             window.center()
@@ -598,7 +560,7 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Settings"
-            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in DestinationHost(destination: .menuBar, model: model) })
+            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in DestinationHost(destination: .menuBar, model: model) }.environment(\.nativeCommands, commands))
             host.sizingOptions = [.intrinsicContentSize]
             window.contentViewController = host
             window.isReleasedWhenClosed = false

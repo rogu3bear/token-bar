@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the 0.2.0 release-candidate source. Known limitations are listed separately;
+> Describes the 0.2.1 release-candidate source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
@@ -17,7 +17,9 @@ not application state or UI code.
 
 | Component | Responsibility | Owns |
 |---|---|---|
-| `AppDelegate`, `UsageModel` (`App.swift`) | status item, live popover, Reports and Settings windows, timers, flag dispatch; observable hub for views | refresh cadence, query state |
+| `AppDelegate`, `UsageModel` (`App.swift`) | AppDelegate owns native surfaces, commands and clocks; UsageModel connects process stores and services | host lifetime and orchestration |
+| `UsageReadHealth`, `UsageDiagnostic` | Structured source failure and coverage evidence; completed read clock, scope and recovery | Derived snapshot evidence; first-recorded diagnostic dates in ledger metadata |
+| `ReportScheduler`, `ReportState` | Utility-queue report work, latest-request publication and retained report choices | Derived reports and query state |
 | `UsageScanner` (`Usage.swift`) with `EventIndex`, `RequestArchive`, `UsageMetadata` | tail Codex logs from byte cursors, deduplicate, admit, compact | `ledger.json`, `ledger.events.sqlite`, `ledger.requests.sqlite` |
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
@@ -311,9 +313,57 @@ Provider quota freshness is separate from usage/report cache freshness.
 ## Native state and clocks
 
 UsageModel coordinates process-owned UsageStore (scanner, snapshot, import state)
-and ReportState (shared query and reports). Live monitors, meters, preferences
+and ReportState (shared query, report choices and results). ReportScheduler owns
+queueing, coalescing, cache validity and publication. Obsolete query generations
+cannot publish, including an away/back selection; source-only updates may publish
+a completed report while the latest data queues. NativeCommands is injected
+by AppDelegate; data models do not hold window callbacks. Navigation only changes
+the selected destination; it never sets a global reporting mode. Live monitors, meters, preferences
 and insight models use property-level Observation; queue implementation state
 is excluded. Navigation and window identity retain their existing owners. One
 app-owned one-second clock updates labels and rate expiry; observed rate, quota
 and preference changes publish the status item directly. Equal attributed titles
 are left untouched.
+
+
+### Usage read health and diagnostic lifecycle
+
+A completed read may have incomplete coverage. `Snapshot.readHealth` derives
+failure, coverage and availability from scanner-supplied diagnostics and the
+last completed read clock. Legacy `Snapshot.error` remains a compatibility text
+projection. History, Cost, Live and hostable Insights use the structured owner.
+Unrecognized diagnostics fail closed. Source errors remain scoped until the
+owning source scan recovers; an unrelated successful path cannot clear them.
+
+Diagnostics carry provider, source and live/history scope. Cursor reconciliation
+and admitted boundaries distinguish unresolved recovery from resumed supported
+usage; the old gap remains disclosed. Counts distinguish occurrences from unique
+source files. Optional `diagnosticObservations` metadata records when this version
+first reported each issue, without inventing the historical gap's onset. The
+completed-read clock survives restart through the existing checkpoint. Repeated
+poll timestamps alone do not force a save. No counter, admission, cursor reset,
+ledger replacement or historical backfill is part of this migration.
+
+### Native host and geometry owners
+
+The adopted host is AppDelegate with NSStatusItem, an intrinsic-height NSPopover,
+a retained Reports NSWindow and a retained Settings NSWindow. The earlier local
+MenuBarExtra/sidebar/NavigationSplitView/Settings-scene proposal is retired.
+
+| Owner | Geometry and identity |
+|---|---|
+| ReportWindowGeometry | Reports default 1120×800 and minimum 900×700; shared by AppKit and DashboardRoot |
+| DashboardRoot / DestinationHost | Stable navigation and host; only the selected report changes |
+| Feature scroll region / PageStyle | One document scroll and shared gutter; no second destination inset |
+| QuickLiveView / PanelFit | 440-point width and unconstrained live content height; expanded modules retain the footer |
+| SettingsPage | One settings scroll and bounded content width |
+| ReportState | History measure/breakdown and Cost breakdown survive navigation and window reopening within the process |
+
+NativeCommands supplies Reports, History and Settings actions through the host
+environment. Guard reveal retains its exact Allowances route. Feature state owns
+transient sheets and disclosures; persisted preferences retain their existing stores.
+
+The dated qualification in docs/VERIFICATION.md binds scanner state transitions,
+restart/recovery, report publication, native navigation, keyboard, VoiceOver and
+installation to an actual candidate. Rendering and routing receipts alone do not
+prove interaction or installation.

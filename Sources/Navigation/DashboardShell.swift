@@ -24,10 +24,7 @@ struct DashboardRoot: View {
             DestinationHost(destination: selection.destination, model: model)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if selection.destination != .now { ImportStatusView(model: model) }
-        }.onChange(of: selection.destination) { _, value in
-            model.detailedReporting = value.requiresDetailedReporting
-            if value.requiresDetailedReporting { model.rebuild() }
-        }.padding(8).frame(minWidth: 900, minHeight: 700)
+        }.padding(8).frame(minWidth: ReportWindowGeometry.minWidth, minHeight: ReportWindowGeometry.minHeight)
 
     }
 }

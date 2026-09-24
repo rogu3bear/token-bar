@@ -83,7 +83,6 @@ enum CostPreview {
         if interactive { model.availableAccounts = [sampleAccount] }
         model.costReport = CostReport.build(source: entries, query: UsageQuery(period: 2), catalog: [:], now: now)
         model.costRecoveryMessage = "Sample data only. No real account or usage records were read."
-        model.detailedReporting = true
         model.rebuild()
         if navigation { try verifyScope(model, root: root) }
         if navigation { try configurePageState(model, root: root, entries: entries) }
@@ -146,7 +145,7 @@ enum CostPreview {
         quick.title = "Token Bar · Synthetic controls"
         let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) {
             QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)
-        })
+        }.environment(\.nativeCommands, delegate.commands))
         host.sizingOptions = [.preferredContentSize]
         quick.contentViewController = host
         defer {
@@ -155,7 +154,7 @@ enum CostPreview {
             PreviewModelScope.close(quick)
         }
         NSApp.setActivationPolicy(.regular)
-        model.showHistory?()
+        delegate.commands.reports(.history)
         quick.center()
         quick.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -232,6 +231,7 @@ enum CostPreview {
         }
         if state == "failed" {
             try sql("DROP TABLE threads")
+            model.snapshot.diagnostics = nil
             model.snapshot.error = "Synthetic usage refresh failed."
             model.live.error = "Synthetic Codex account read failed."
             model.tachometer.activity.error = "Synthetic activity read failed."
@@ -240,6 +240,7 @@ enum CostPreview {
             try PreviewFixture.settle("failed prompt read") { !model.insights.busy }
         }
         if arguments.contains("--sample-many-diagnostics") {
+            model.snapshot.diagnostics = nil
             model.snapshot.error = PreviewFixture.sourceDiagnostics
             // Exercise other consumers of the same shared notice without a live provider.
             model.live.error = "Synthetic account service unavailable."

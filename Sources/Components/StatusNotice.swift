@@ -126,16 +126,21 @@ struct ReadPresentation: Equatable {
         freshness = refreshing ? (hasResult ? .refreshing : .loading) : failed && hasResult ? .stale : hasResult ? .current : .waiting
         self.failed = failed
     }
+    init(snapshot: Snapshot, refreshing: Bool = false, additionalPartial: Bool = false) {
+        self.init(hasResult: snapshot.hasUsageResult, refreshing: refreshing,
+                  failed: snapshot.readHealth.failed,
+                  partial: snapshot.readHealth.partial || additionalPartial || snapshot.integrity.map { !$0.isClean } == true)
+    }
     var caption: String {
         let base: String
         switch freshness {
         case .loading: base = "Loading…"
         case .refreshing: base = "Updating · previous results remain visible"
         case .stale: base = "Refresh failed · previous results may be stale"
-        case .current: base = "Current reading"
+        case .current: base = "Read completed"
         case .waiting: base = failed ? "Unavailable · no successful reading" : "Awaiting a reading"
         }
-        return base + (coverage == .partial ? " · partial coverage" : "")
+        return base + (coverage == .partial ? " · coverage incomplete" : "")
     }
     var needsAttention: Bool { failed || coverage == .partial }
 }

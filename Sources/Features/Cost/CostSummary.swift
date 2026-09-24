@@ -7,11 +7,14 @@ struct CostSummary: View {
     var sourceDate: Date?
     var sourceError: String?
     var sourceAvailable = true
+    var sourceHealth: UsageReadHealth?
     var body: some View {
         VStack(alignment: .leading, spacing: PageStyle.related) {
             ReadStatusView(state: ReadPresentation(hasResult: report.calculatedAt != nil && sourceAvailable,
-                refreshing: refreshing, failed: sourceError != nil, partial: report.unpricedTokens > 0), date: sourceDate)
-            if let sourceError { ErrorNotice(message: "Usage read failed or was incomplete. " + sourceError) }
+                refreshing: refreshing, failed: sourceHealth?.failed ?? (sourceError != nil),
+                partial: report.unpricedTokens > 0 || sourceHealth?.partial == true), date: sourceDate)
+            if let sourceHealth { UsageDiagnosticsView(health: sourceHealth) }
+            else if let sourceError { ErrorNotice(message: sourceError) }
             if !refreshing || report.calculatedAt != nil { Text(report.statusMessage(sourceAvailable: sourceAvailable)).foregroundStyle(.secondary) }
             HStack(alignment: .top, spacing: PageStyle.related) {
                 metric("ESTIMATED API EQUIVALENT", report.hasPricedRecords ? CostPricing.dollars(report.amounts.total) : "—", "USD · API equivalent")

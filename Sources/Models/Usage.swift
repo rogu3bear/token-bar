@@ -172,6 +172,8 @@ struct Ledger: Codable {
     var openCodePending: [String: Set<String>]?
     var sourceErrors: [String: String]?
     var sourceErrorPaths: [String: Set<String>]?
+    var lastSuccessfulRead: Date?
+    var diagnosticObservations: [String: DiagnosticObservation]?
 }
 struct Snapshot {
     var contentID: UUID?
@@ -187,6 +189,8 @@ struct Snapshot {
     var accounts: [Account] = []
     var additions: [Entry] = []
     var integrity: IntegrityReport?
+    var diagnostics: [UsageDiagnostic]?
+    var successfulReadAt: Date?
 }
 final class UsageScanner {
     let home: URL
@@ -228,9 +232,10 @@ final class UsageScanner {
     private var lastPublication = Date.distantPast
     func currentSnapshot(now: Date = Date()) -> Snapshot {
         Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, quotas: Array(ledger.quotas.values), account: ledger.lastAccount,
-            updated: now, started: ledger.started, error: loadError ?? ledger.historyError,
+            updated: now, started: ledger.started, error: loadError ?? legacyDiagnosticText,
             historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values),
-            accounts: Array((ledger.accounts ?? [:]).values), integrity: ledger.integrity)
+            accounts: Array((ledger.accounts ?? [:]).values), integrity: ledger.integrity,
+            diagnostics: readDiagnostics(), successfulReadAt: ledger.lastSuccessfulRead)
     }
     var readAccount = true
     var requestArchiveURL: URL { stateURL.deletingPathExtension().appendingPathExtension("requests.sqlite") }
@@ -623,17 +628,29 @@ final class UsageScanner {
             ledger.historyImportedAt = Date()
             ledger.historyError = errors.isEmpty ? nil : Set(errors).sorted().joined(separator: " ")
         }
-        if let loadError { return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, account: account, error: loadError) }
+        if loadError != nil { return currentSnapshot(now: now) }
         do { try requestArchive?.commit() }
-        catch { loadError = error.localizedDescription; return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, error: loadError) }
+        catch { loadError = error.localizedDescription; return currentSnapshot(now: now) }
         if observesAccount {
             if ledger.lastAccount != account { markMetadataDirty() }
             ledger.lastPoll = now; ledger.lastAccount = account
         }
+        var diagnostics = readDiagnostics(now: now)
+        let previousSuccessfulRead = ledger.lastSuccessfulRead
+        if !diagnostics.contains(where: \.isFailure) {
+            ledger.lastSuccessfulRead = now
+            if previousSuccessfulRead == nil { markMetadataDirty() }
+        }
         do {
             try saveIfNeeded(now: now, force: historical)
-        } catch { errors.append("Usage history could not be saved: \(error.localizedDescription)") }
+        } catch {
+            ledger.lastSuccessfulRead = previousSuccessfulRead
+            let message = "Usage history could not be saved: \(error.localizedDescription)"
+            errors.append(message)
+            diagnostics += UsageDiagnostic.decodeLegacy(scope: "Storage", message: message)
+        }
         return Snapshot(contentID: ledger.reportRevision, entries: ledger.entries, quotas: ledger.quotas.values.sorted { $0.name < $1.name }, account: account,
-            updated: now, started: ledger.started, error: errors.isEmpty ? ledger.historyError : Set(errors).sorted().joined(separator: " "), files: count, historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values).sorted { $0.lastSeen > $1.lastSeen }, accounts: Array((ledger.accounts ?? [:]).values).sorted { $0.label < $1.label }, additions: historical ? [] : Array(ledger.entries.dropFirst(initialCount)), integrity: ledger.integrity)
+            updated: now, started: ledger.started, error: errors.isEmpty ? legacyDiagnosticText : Set(errors).sorted().joined(separator: " "), files: count, historyImportedAt: ledger.historyImportedAt, plans: Array((ledger.plans ?? [:]).values).sorted { $0.lastSeen > $1.lastSeen }, accounts: Array((ledger.accounts ?? [:]).values).sorted { $0.label < $1.label }, additions: historical ? [] : Array(ledger.entries.dropFirst(initialCount)), integrity: ledger.integrity,
+            diagnostics: diagnostics, successfulReadAt: ledger.lastSuccessfulRead)
     }
 }
