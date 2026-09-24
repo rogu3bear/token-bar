@@ -1,0 +1,60 @@
+{
+  "generated": "2026-09-24T02:34:29.636Z",
+  "releases": [
+    {
+      "version": "0.1.13",
+      "date": "2026-09-23",
+      "notes": "- Quiet first-view chrome on Now, Cost, Quota Guard, and Menu bar settings. Guard no longer prints a no-warning disclaimer; Cost leads with estimate and coverage; the working column puts rate above remaining; method links use native label ink, not the accent; occupancy rules stay in Glance grammar rather than a settings essay.\n- Keep configuration in the settings window. Menu bar and Appearance leave the capsule; the popover Settings control opens the existing window, not a SwiftUI Settings scene.\n- Name measured Grok remaining on idle Auto and the popover the same way as Codex and Claude, including a measured zero. Unavailable remaining still does not mint a name; working Auto still omits idle neighbors.\n- Capsule is Now, History, Cost, and Allowances. Allowances leads with the three CLI remainings; Insights stays in tree without a tab.\n- After an end-to-end stills pass: Guard chrome only when a warning exists; View quota opens Allowances; idle Now and the popover keep unconfirmed chairs for stale or failed remaining; Allowances does not reprint Codex remaining under the disclosures; Settings Rate units stays a readable label; welcome and empty Allowances name all three CLIs."
+    },
+    {
+      "version": "0.1.12",
+      "date": "2026-09-19",
+      "notes": "- Align package identity with the built bundle, share preview/release and static-site paths, and keep website recordings synchronized with the native product.\n\n- Converge report evidence and native presentation: shared read age, scoped calculations, output-based Today totals, provider-column layout, and macOS accent defaults.\n\n- Align allowance windows, reset clocks, forecast lookback, and notification actions across Now, Accounts, Guard and previews. Keep provider display horizons distinct from Guard freshness, snooze and Fable pacing; missing reset and remaining remain independent.\n\n- Reconcile provider discovery, event identity and timestamp parsing, account-attribution copy, and optional cache-write counters with their shared owners. Publish private ledgers, checkpoints and recovery files through the same protected replacement path.\n\n- Keep History, Cost and Insights usable with thousands of retained source warnings: show a compact incomplete-coverage summary and selectable details on demand, without deleting diagnostics.\n- Keep diagnostic ordering stable across refreshes and let native selectable text expose its own accessibility label, avoiding recursive accessibility reads when navigating to Cost.\n- Avoid a false replacement warning when replaying a fork log containing copied parent metadata before the original child. Recovery still requires the child’s exact counter boundary; genuine and previously retained gaps stay explicit.\n\n### 0.1.11 development work included in 0.1.12\n\nThese changes shipped in 0.1.12; there was no separate public 0.1.11 release.\n\n- Retain the installed optional launch-time update check, its saved opt-out and privacy disclosures; downloads remain a manual browser action.\n- Preserve console-user reopen after installation.\n- Verify development package contents against an exact commit with explicit `--development`; the default release verifier still requires Developer ID signing and notarization.\n- Keep idle Auto and the popover focused on measured Codex/Claude remaining, with no invented speed field; preserve working-only Now columns and each tool’s gauge alignment.\n- Share remaining and speed copy across Now, Accounts, the status item and VoiceOver. Apply the same account, source-failure and freshness checks before displaying allowance, while qualifying speed and reset time independently.\n- Put remaining in the same Now column as that tool's rate and dial. Working Codex no longer shows 64% remaining on a full-bleed row while the gauge sits in a separate centered column.\n- Admit Claude remaining when the cache still has utilization even if `resets_at` is null. A missing reset stays unavailable and is not a projected-zero clock; a failed decode is not a measured zero."
+    },
+    {
+      "version": "0.1.9",
+      "date": "2026-09-16",
+      "notes": "- Keep Now columns aligned with working tools. Auto already stayed quiet and the popover already omitted unused remaining; Now still minted an empty Claude chair from a connection with no reading, so one Codex dial sat between two names. While any tool is working, Now shows exactly those tools. Measured remainings stay when nothing is working. Connection without a reading is not a seat."
+    },
+    {
+      "version": "0.1.8",
+      "date": "2026-09-16",
+      "notes": "- Keep the menu bar quiet when nothing is running. Auto no longer invents an idle Codex readout, omits unused remaining (including unused Fable remaining and unused Codex or Grok zeros) and a measured Fable zero, and keeps Codex off the bar until it has a measured rate or is running. The dropdown still shows Claude at 0% when that remaining is a measured zero. Fable time left still says no recent use on an explicit or working Claude line. An enabled Quota Guard warning may appear on idle Auto as warning text, not occupancy. `docs/DESIGN.md` states that occupancy rule as a closed glance grammar: Claude-at-zero is the one named idle exception, not a pattern for the next tool."
+    },
+    {
+      "version": "0.1.7",
+      "date": "2026-09-16",
+      "notes": "- Name History, Accounts and Settings owners in source so DestinationHost matches dashboard titles. The dashboard still uses the capsule destinations; this is not a scene rewrite.\n- Declare CFBundlePackageType APPL so Launch Services treats the bundle as an application. The app already launched without it; this fills the omitted application package type."
+    },
+    {
+      "version": "0.1.6",
+      "date": "2026-09-16",
+      "notes": "- Keep the menu-bar line readable while values change. The status item crossfaded every update, and when a number changed its digit count the whole line shifted, so for a moment it drew two offset copies of itself; with the Fable fields enabled this read as the line rolling to a different value. Text now crossfades only when the old and new lines align exactly, and otherwise switches at once while the speed dial still moves smoothly."
+    },
+    {
+      "version": "0.1.5",
+      "date": "2026-09-16",
+      "notes": "- Replace an installed 2.x development build. macOS Installer compared short versions first, so 0.1.x packages reported a successful install while leaving the older 2.x app in place. The installer now compares build numbers itself, and refuses a newer installed build with a visible message instead of silently skipping."
+    },
+    {
+      "version": "0.1.4",
+      "date": "2026-09-15",
+      "notes": "- Keep Claude Code allowance current: every 15 minutes Token Bar asks the installed Claude Code for usage, without a prompt or saved session, and reads only its account-matched cache. The status-line relay still supplies no quota.\n- Add optional Fable quota and Fable time-left menu-bar fields. Fable quota is the lowest remaining of Claude’s 5-hour, weekly and Fable weekly limits, named by the limit that binds; time left projects the first of them to run out from a time-weighted average of recent burn.\n- Compare Claude reset times at whole seconds so readings from one period line up, letting Claude projected zero and Quota Guard forecasts form."
+    },
+    {
+      "version": "0.1.3",
+      "date": "2026-09-15",
+      "notes": "- Keep each active tool’s name, rate, status and model details attached to its speed gauge, with aligned column separators and provider-specific accessibility groups.\n- Keep account allowances visible while tools are idle; hide Spark allowance cards on Accounts & plans without deleting saved account or plan history.\n- Warn on fresh, account-bound quota exhaustion risk while keeping stale or unavailable readings explicit.\n- Recover Codex log continuity and delayed appends without recounting previously admitted usage.\n- Release synthetic preview models and database owners before removing their temporary files, including interactive close and failure paths."
+    },
+    {
+      "version": "0.1.2",
+      "date": "2026-09-13",
+      "notes": "- Restore equal active-provider columns and aligned separators, quota rows and large gauges on Now, with complete rate digits and explicit units.\n- Compare full request cost per output token, with daily/model coverage, and inspect sourced model API rate changes by effective date.\n- Compare account-bound Codex allowance changes with the locally observed input/output/cache mix over matching retained intervals. Resets, gaps and ambiguous evidence remain explicit; no model-specific subscription tariff or host identity is inferred.\n- Reuse background comparison results across navigation and matching archived timing when available. Bound archived timing recovery to relevant groups, reuse unchanged history, and retry visible failures with backoff.\n\n### 0.1.1 work included in 0.1.2\n\nThese changes shipped in 0.1.2; there was no separate public 0.1.1 release.\n\n- Keep History and Cost reports warm across navigation; publish completed results while new usage is queued.\n- Persist the report index and extend it with appended usage instead of rebuilding settled entries.\n- Persist private per-chat prompt statistics and byte checkpoints; relaunch and repeat reads reuse processed chats, and changed chats read only their new tail. Prompt text stays out of storage.\n- Show native menu-bar and dashboard previews at the top of README."
+    },
+    {
+      "version": "0.1.0",
+      "date": "Initial public release",
+      "notes": "- Native macOS menu-bar readout for active AI tools, with explicit output-rate units.\n- Local usage history for Codex, Claude Code, Grok and OpenCode.\n- Account allowance where supported, with freshness and availability labels.\n- Durable incremental storage and lazy report updates across launches and pages.\n- History filters, CSV exports, API-equivalent cost estimates and local insights.\n- Configurable menu-bar fields, rate units, appearance and accent color.\n- Product website and private-contact feedback flow in the same source repository.\n\nThe public version sequence starts at 0.1.0. A Developer ID signed and\nApple-notarized macOS installer is available in the [v0.1 GitHub Release](https://github.com/rogu3bear/token-bar/releases/tag/v0.1).\nAn OCI archive with the identical installer was uploaded to GitHub Packages at\nlaunch; that listing is private and is not the current installer. The\npublic website and README used the direct v0.1 Release asset at launch.\nInstallation needs no build tools or reboot.\nClaude after-turn account allowance refresh remains unavailable; the\naccount-matched local cache is used when fresh. OpenCode provides history only."
+    }
+  ]
+}
