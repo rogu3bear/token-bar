@@ -50,6 +50,11 @@ struct ActivitySnapshot {
     var agentCount: Int { running.filter { $0.kind == .agent }.count }
     var unknownCount: Int { running.filter { $0.kind == .unknown }.count }
     var uncertain: Int { turns.values.filter { $0.running && (referenceDate ?? Date()).timeIntervalSince($0.observed) >= 300 }.count }
+    /// Latest dated lifecycle or counter evidence at or before `now`; never a read time or file mtime.
+    func lastEvidence(at now: Date) -> Date? {
+        (turns.values.map(\.eventDate) + measurements.values.map(\.date))
+            .filter { $0 != .distantPast && $0 <= now }.max()
+    }
     func freshMeasurements(at now: Date) -> [RateMeasurement] {
         active(at: now).compactMap { task in
             guard let sample = measurements[task.session], sample.turn == task.turn,

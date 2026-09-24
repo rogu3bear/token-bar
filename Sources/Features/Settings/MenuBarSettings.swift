@@ -71,56 +71,22 @@ struct MenuBarPresentation {
                 now: now
             ).estimate?.remaining
         }
-        func appendQuota(_ result: NSMutableAttributedString, tools: [LiveTool]) {
-            guard settings.enabled.contains(.quota) else { return }
-            for tool in tools {
-                if auto && tool == .grok && !hasQuotaReading(.grok, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota) { continue }
-                let text = values(settings, meter: meter(tool), monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota)[.quota] ?? ""
-                let glue = result.length == 0 ? "" : settings.separator
-                result.append(NSAttributedString(string: glue + text,
-                    attributes: [.foregroundColor: NSColor(tool.color(in: palette)), .font: NSFont.systemFont(ofSize: 12)]))
-            }
-        }
+        // Auto's remaining line names every tool used in the last hour that has a measured remaining.
+        let recent = auto && settings.enabled.contains(.quota)
+            ? LiveTool.recent(codex: codex, claude: claude, grok: grok, now: now).compactMap { tool in remainingValue(tool).map { (tool, $0) } }
+            : []
+        let recentFace = recent.isEmpty ? nil : remainingLine(recent, palette: palette)
         if auto && working.isEmpty {
             var quiet = settings
             quiet.enabled.subtract([.rate, .dial, .activity, .zero, .fable, .fablePace])
-            let named = settings.enabled.contains(.quota) ? LiveTool.idleNamed(remaining: remainingValue) : []
-            if named.count == 1, let tool = named.first {
-                return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now,
-                                  accent: NSColor(tool.color(in: palette)),
-                                  tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+            guard let recentFace else {
+                // Nothing used within the hour: the clean idle face, no stale remaining.
+                quiet.enabled.remove(.quota)
+                return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
+                                  claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
             }
-            if named.count > 1 {
-                let result = NSMutableAttributedString()
-                let glue = NSAttributedString(string: settings.separator, attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular),
-                    .foregroundColor: NSColor.labelColor
-                ])
-                func append(_ face: NSAttributedString) {
-                    if result.length > 0 { result.append(glue) }
-                    result.append(face)
-                }
-                for part in quiet.order where quiet.enabled.contains(part) {
-                    if part == .risk && riskText == nil { continue }
-                    var field = quiet
-                    field.enabled = [part]
-                    if part == .quota {
-                        for tool in named {
-                            append(attributed(field, meter: Tachometer(), monitor: monitor, now: now,
-                                              accent: NSColor(tool.color(in: palette)), tool: tool,
-                                              claudeQuota: claudeQuota, grokQuota: grokQuota))
-                        }
-                    } else {
-                        append(attributed(field, meter: Tachometer(), monitor: monitor, now: now,
-                                          accent: NSColor(palette.accent), claudeQuota: claudeQuota,
-                                          grokQuota: grokQuota, riskText: riskText))
-                    }
-                }
-                return result
-            }
-            quiet.enabled.remove(.quota)
             return attributed(quiet, meter: Tachometer(), monitor: monitor, now: now, accent: NSColor(palette.accent),
-                              claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+                              claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText, quotaFace: recentFace)
         }
         if tools.count <= 1 {
             let tool = tools.first ?? selected
@@ -128,11 +94,14 @@ struct MenuBarPresentation {
             let grokAuto = auto && tool == .grok
             let grokHasQuota = hasQuotaReading(.grok, monitor: monitor, now: now, claudeQuota: claudeQuota, grokQuota: grokQuota)
             if grokAuto && !grokHasQuota {
-                speed.enabled.remove(.quota)
                 speed.enabled.remove(.zero)
+                if recentFace == nil { speed.enabled.remove(.quota) }
             }
+            // The title already names a lone tool; others used within the hour join by name.
+            let others = recent.contains { $0.0 != tool }
             return attributed(speed, meter: meter(tool), monitor: monitor, now: now,
-                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, riskText: riskText)
+                              accent: NSColor(tool.color(in: palette)), tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota,
+                              riskText: riskText, quotaFace: others ? recentFace : nil)
         }
         let total = Tachometer()
         total.unit = meter(selected).unit
@@ -150,7 +119,30 @@ struct MenuBarPresentation {
         let partial = tools.contains { !meter($0).hasRate }
         let result = NSMutableAttributedString(string: partial ? "Total (partial) · " : "Total · ", attributes: [.foregroundColor: NSColor.labelColor])
         result.append(attributed(summary, meter: total, monitor: monitor, now: now, accent: NSColor(palette.accent), claudeQuota: claudeQuota, riskText: riskText))
-        appendQuota(result, tools: tools)
+        guard settings.enabled.contains(.quota) else { return result }
+        if let recentFace {
+            result.append(NSAttributedString(string: settings.separator, attributes: [.foregroundColor: NSColor.labelColor]))
+            result.append(recentFace)
+        }
+        // Unavailable is not zero: a working tool without a measured remaining still says so.
+        for tool in tools where remainingValue(tool) == nil && tool != .grok {
+            result.append(NSAttributedString(string: settings.separator + tool.label + " quota unavailable",
+                attributes: [.foregroundColor: NSColor(tool.color(in: palette)), .font: NSFont.systemFont(ofSize: 12)]))
+        }
+        return result
+    }
+    /// `Claude 45% Grok 80% Codex 12% remaining`: tool-colored names and figures, the word once.
+    static func remainingLine(_ entries: [(LiveTool, Double)], palette: ToolPalette) -> NSAttributedString {
+        let figure = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        let result = NSMutableAttributedString()
+        for (index, entry) in entries.enumerated() {
+            let color = NSColor(entry.0.color(in: palette))
+            if index > 0 { result.append(NSAttributedString(string: " ", attributes: [.font: figure])) }
+            result.append(NSAttributedString(string: entry.0.label + " ", attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: color]))
+            result.append(NSAttributedString(string: CompactLiveCopy.percent(entry.1), attributes: [.font: figure, .foregroundColor: color]))
+        }
+        result.append(NSAttributedString(string: " remaining", attributes: [.font: figure, .foregroundColor: NSColor.labelColor]))
+        assert(result.string == CompactLiveCopy.remainingLine(entries.map { ($0.0.label, $0.1) }))
         return result
     }
     static func quotaState(for tool: LiveTool?, monitor: LiveMonitor, claudeQuota: ToolQuotaState?, grokQuota: ToolQuotaState? = nil) -> ToolQuotaState {
@@ -204,7 +196,7 @@ struct MenuBarPresentation {
     static func title(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil) -> String {
         (tool.map { $0.label + " · " } ?? "") + settings.title(values: values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false))
     }
-    static func attributed(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, accent: NSColor? = nil, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, riskText: String? = nil) -> NSAttributedString {
+    static func attributed(_ settings: MenuBarConfiguration, meter: Tachometer, monitor: LiveMonitor, now: Date, accent: NSColor? = nil, tool: LiveTool? = nil, claudeQuota: ToolQuotaState? = nil, grokQuota: ToolQuotaState? = nil, riskText: String? = nil, quotaFace: NSAttributedString? = nil) -> NSAttributedString {
         let accent = accent ?? .labelColor
         let values = values(settings, meter: meter, monitor: monitor, now: now, tool: tool, claudeQuota: claudeQuota, grokQuota: grokQuota, labelQuota: false)
         let result = NSMutableAttributedString()
@@ -216,7 +208,9 @@ struct MenuBarPresentation {
             if part == .risk && riskText == nil { continue }
             if (part == .fablePace || part == .fable) && (values[part] ?? "").isEmpty { continue }
             if result.length > 0 { result.append(NSAttributedString(string: settings.separator, attributes: attributes)) }
-            if part == .risk {
+            if part == .quota, let quotaFace {
+                result.append(quotaFace)
+            } else if part == .risk {
                 result.append(NSAttributedString(string: riskText ?? "", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.systemOrange]))
             } else if part == .fablePace {
                 // Smaller and secondary: a projection beside the measured figure.
@@ -263,7 +257,7 @@ struct MenuBarSettingsView: View {
     var body: some View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader(.menuBar, subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
+                PageHeader("Menu bar", subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
                 Group {
                     let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
                         monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota, riskText: quotaGuard?.menuText(selection: preferences.configuration.tool))

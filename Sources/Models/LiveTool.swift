@@ -11,6 +11,21 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         if let grok, grok.hasRate || grok.runningCount > 0 { tools.append(.grok) }
         return tools
     }
+    /// Menu-bar remaining occupancy: tools with dated activity inside `window`, most recent first.
+    /// Working tools count as current; an hour idle drops the tool.
+    static let recentWindow: TimeInterval = 3600
+    static func recent(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil, now: Date,
+                       window: TimeInterval = recentWindow) -> [LiveTool] {
+        let working = Set(active(codex: codex, claude: claude, grok: grok))
+        let dated: [(LiveTool, Date)] = allCases.compactMap { tool in
+            guard let meter = tool == .codex ? codex : tool == .claude ? claude : grok else { return nil }
+            guard let date = working.contains(tool) ? now : meter.activity.lastEvidence(at: now),
+                  now.timeIntervalSince(date) < window else { return nil }
+            return (tool, date)
+        }
+        return dated.enumerated().sorted { $0.element.1 != $1.element.1 ? $0.element.1 > $1.element.1 : $0.offset < $1.offset }
+            .map(\.element.0)
+    }
     /// Occupancy alias of `active`. Idle no longer invents a Codex placeholder.
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         active(codex: codex, claude: claude, grok: grok)
@@ -20,7 +35,7 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         allCases.filter { remaining($0) != nil }
     }
     /// Idle glance chairs: measured remaining, or a stale/failed/expired reading that is unconfirmed.
-    /// Never-seen unavailable does not mint a chair. Auto occupancy stays on `idleNamed`.
+    /// Never-seen unavailable does not mint a chair. The menu-bar remaining line uses `recent`.
     static func idleChairs(remaining: (LiveTool) -> Double?, unconfirmed: (LiveTool) -> Bool) -> [LiveTool] {
         allCases.filter { remaining($0) != nil || unconfirmed($0) }
     }
@@ -153,6 +168,10 @@ enum CompactLiveCopy {
     }
     static func percent(_ remaining: Double) -> String {
         String(format: "%.0f%%", remaining)
+    }
+    /// One remaining line for several tools: full names, the word once at the end.
+    static func remainingLine(_ entries: [(label: String, remaining: Double)]) -> String {
+        entries.map { $0.label + " " + percent($0.remaining) }.joined(separator: " ") + " remaining"
     }
     static func remaining(_ estimate: Runway?) -> String {
         estimate.map { percent($0.remaining) } ?? "—"
