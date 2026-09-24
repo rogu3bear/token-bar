@@ -21,11 +21,15 @@ Later site and documentation commits do not move the native release tag.
 
 ## Preparing the successor
 
-The working successor is **0.2.1**, build **30201**: shared expandable live
+The working successor is **0.2.2**, build **30202**: shared expandable live
 modules, a three-destination Reports window, one Settings destination and common
-measurement-state language, structured read health and explicit report scheduling. Signing and source binding are separate from publication.
+measurement-state language, structured read health and explicit report scheduling,
+with Frost branding, a glass gauge icon and native glass controls on macOS 26+.
+Signing and source binding are separate from publication.
 For each successor, bump `VERSION`, prepare changelog notes, and advance the build number. Leave public download links and
 `site/public/release.json` on 0.1.14 until the next release is verified.
+The generated public changelog includes dated releases and the historical
+initial public release only; candidate sections remain in the source changelog.
 
 ## One-time credential setup
 

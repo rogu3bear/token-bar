@@ -69,10 +69,14 @@ test("changelog versions are in descending order", async () => {
   }
 });
 
-test("changelog page exists and references changelog.json", async () => {
+test("changelog page loads its data and styles under the site's self-only CSP", async () => {
   const changelogHtml = await read("public/changelog/index.html");
-  assert.match(changelogHtml, /\/changelog\.json/, 
-    "changelog page should reference changelog.json");
+  const changelogScript = await read("public/changelog.js");
+  assert.match(changelogHtml, /src="\/changelog\.js/);
+  assert.match(changelogHtml, /href="\/changelog\.css/);
+  assert.doesNotMatch(changelogHtml, /<script(?![^>]*\bsrc=)|<style[\s>]/);
+  assert.match(changelogScript, /\/changelog\.json/,
+    "changelog renderer should reference changelog.json");
   assert.match(changelogHtml, /<h1>Changelog<\/h1>/, 
     "changelog page should have a Changelog heading");
 });

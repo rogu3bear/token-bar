@@ -10,15 +10,15 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar menu bar while idle: named Codex and Claude remaining](site/public/menu-bar-idle.png)
 
-**Dashboard**
+**Live modules**
 
-![Token Bar native dashboard showing estimated Codex output speed and account allowance](site/public/dashboard-demo.png)
+![Current Token Bar live modules with output speed, allowance and recorded Today history](site/public/live-modules.png)
 
 **Idle popover**
 
-![Token Bar popover while idle: named remaining, Quota Guard, and recorded Today output](site/public/popover-idle.png)
+![Token Bar popover while idle: provider remaining and recorded Today output](site/public/popover-idle.png)
 
-*Native previews of Token Bar 0.1.14 with synthetic sample data.*
+*Upcoming 0.2.2 design, captured from the native app with synthetic sample data. The public download remains v0.1.14.*
 
 Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps

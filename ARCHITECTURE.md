@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the 0.2.1 release-candidate source. Known limitations are listed separately;
+> Describes the 0.2.2 release-candidate source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape

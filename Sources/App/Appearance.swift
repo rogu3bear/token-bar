@@ -19,9 +19,9 @@ extension EnvironmentValues {
     var appAccent: Color { get { self[AppAccentKey.self] } set { self[AppAccentKey.self] = newValue } }
 }
 @Observable final class AppearancePreferences {
-    static let marketingAccent = "D5F566"
+    static let marketingAccent = "A9C9EC"
     static let systemAccent = "SYSTEM"
-    static let presets = [("Mint", "65E0BB"), ("Lime", "D5F566"), ("Blue", "67B9FF"), ("Coral", "FFAB91")]
+    static let presets = [("Frost", marketingAccent), ("Mint", "65E0BB"), ("Blue", "67B9FF"), ("Coral", "FFAB91")]
     static var accentChoices: [(String, String)] { [("macOS", systemAccent)] + presets }
     var mode: String { didSet { defaults.set(mode, forKey: "appearance.mode") } }
     var hex: String { didSet { defaults.set(hex, forKey: "appearance.accent") } }

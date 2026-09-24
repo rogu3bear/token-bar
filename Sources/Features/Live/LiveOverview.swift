@@ -36,17 +36,19 @@ struct LiveOverview: View {
             }
             if let message = model.message { Text(message).font(.caption).foregroundStyle(.secondary) }
             Divider()
-            HStack {
-                Button("Reports") { commands.reports(nil) }.keyboardShortcut("r", modifiers: .command)
-                Button("Settings") { commands.settings() }.keyboardShortcut(",", modifiers: .command)
-                Spacer()
-                Menu {
-                    Button("Feedback") {
-                        if !Feedback.open() { model.message = "Could not open feedback in your browser." }
-                    }
-                    Button("Quit Token Bar") { NSApplication.shared.terminate(nil) }
-                } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("Token Bar actions")
+            GlassControlGroup {
+                HStack {
+                    Button("Reports") { commands.reports(nil) }.keyboardShortcut("r", modifiers: .command)
+                    Button("Settings") { commands.settings() }.keyboardShortcut(",", modifiers: .command)
+                    Spacer()
+                    Menu {
+                        Button("Feedback") {
+                            if !Feedback.open() { model.message = "Could not open feedback in your browser." }
+                        }
+                        Button("Quit Token Bar") { NSApplication.shared.terminate(nil) }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                        .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("Token Bar actions")
+                }
             }.controlSize(.small)
         }
         .padding(16).frame(maxWidth: 480, alignment: .leading)

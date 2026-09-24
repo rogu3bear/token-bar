@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 — Frost and glass (unreleased)
+
+- Replace lime marketing colors with graphite, silver and Frost; use one glass gauge icon for the app and website.
+- Add native Liquid Glass to live footer controls and report navigation on macOS 26+, with native material or solid controls on earlier systems and when transparency is reduced.
+- Preserve saved accents and System defaults; Frost replaces Lime in the preset list.
+- Refresh the website and native sample captures; public downloads remain on the last published, notarized package.
+- Keep candidate notes out of the public release list and load the changelog script and styles through files allowed by the site's Content Security Policy.
+
 ## 0.2.1 — Read health and native architecture qualification
 
 - Distinguish a completed usage read with incomplete coverage from a failed refresh; retain accepted totals, diagnostic scope and the last successful read across restart.

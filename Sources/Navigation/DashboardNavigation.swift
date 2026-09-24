@@ -104,6 +104,7 @@ struct DashboardNavigation: View {
         }
         .padding(3)
         .frame(maxWidth: 840)
+        .modifier(ReportNavigationMaterial())
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selection)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Reports navigation")

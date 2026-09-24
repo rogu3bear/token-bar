@@ -55,6 +55,13 @@ async function generateChangelog() {
         currentRelease.notes = currentContent.join('\n').trim();
         releases.push(currentRelease);
       }
+      // Candidate sections belong in the source changelog, not in the public
+      // release list. Only the historical initial-release heading is undated.
+      if (initialMatch[2] !== 'Initial public release') {
+        currentRelease = null;
+        currentContent = [];
+        continue;
+      }
       
       currentRelease = {
         version: initialMatch[1],

@@ -1,11 +1,11 @@
 :root {
   color-scheme: dark;
-  --bg: #0b0d0e;
-  --panel: #131618;
-  --edge: #2a2e30;
-  --text: #f2f4f3;
-  --muted: #a3aaa9;
-  --accent: #d5f566;
+  --bg: #0d1016;
+  --panel: #171b23;
+  --edge: #303846;
+  --text: #edf2f8;
+  --muted: #aab5c4;
+  --accent: #a9c9ec;
   --page-gutter: clamp(20px, 4vw, 32px);
   --space-related: 12px;
   --space-group: 24px;
@@ -132,7 +132,7 @@ h1 {
   margin: 27px 0;
 }
 h1 span {
-  color: #8a9492;
+  color: #a6b6c9;
 }
 .intro {
   font-size: 19px;
@@ -161,22 +161,22 @@ h1 span {
 }
 .primary {
   background: var(--accent);
-  color: #172008;
+  color: #101923;
 }
 .primary:hover {
-  background: #e3ff91;
+  background: #d6e8fa;
 }
 .secondary {
   border-color: var(--edge);
-  background: #15191a;
+  background: #1a202a;
 }
 .secondary:hover {
-  border-color: #74817b;
+  border-color: #8193a9;
 }
 .release-note {
   font-size: 11px;
   line-height: 1.8;
-  color: #959e9a;
+  color: #a3afbf;
   margin-top: 20px;
 }
 .demo-topline {
@@ -202,7 +202,7 @@ h1 span {
   font-size: 11px;
   line-height: 1.7;
   text-align: center;
-  color: #8c9590;
+  color: #a3afbf;
   margin: 19px 0 0;
 }
 .details {
@@ -228,7 +228,7 @@ h2 {
 }
 .index {
   font-size: 11px;
-  color: #819078;
+  color: #98a9bd;
   padding-top: 5px;
 }
 .feature-list h3 {
@@ -244,9 +244,9 @@ h2 {
   margin: 0 0 10px;
 }
 .privacy-band {
-  background: #121711;
-  border-top: 1px solid #273222;
-  border-bottom: 1px solid #273222;
+  background: #141922;
+  border-top: 1px solid #303846;
+  border-bottom: 1px solid #303846;
 }
 .privacy-grid {
   display: grid;
@@ -256,7 +256,7 @@ h2 {
 }
 .privacy-mark {
   font-size: 170px;
-  color: #3a4a30;
+  color: #516377;
   font-weight: 300;
   align-self: center;
   justify-self: center;
@@ -268,7 +268,7 @@ h2 {
   display: inline-block;
   font-size: 12px;
   margin-top: 16px;
-  color: #e0e9d8;
+  color: #dbe6f2;
 }
 .faq {
   padding-block: var(--space-section);
@@ -323,7 +323,7 @@ footer {
 }
 footer > span {
   font-size: 10px;
-  color: #8e9791;
+  color: #a3afbf;
 }
 footer nav {
   font-size: 11px;
@@ -364,8 +364,8 @@ footer nav {
 .field input,
 .field textarea {
   width: 100%;
-  background: #151a18;
-  border: 1px solid #394039;
+  background: #181e28;
+  border: 1px solid #3a4657;
   border-radius: 6px;
   padding: 12px;
   color: var(--text);
@@ -575,7 +575,7 @@ footer nav {
   padding: var(--space-group);
   border: 1px solid var(--edge);
   border-radius: 12px;
-  background: #191e1d;
+  background: #181e28;
 }
 .surface-heading {
   display: flex;

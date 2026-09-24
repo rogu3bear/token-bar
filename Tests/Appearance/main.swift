@@ -12,7 +12,7 @@ assert(style.mode == "System" && style.followsSystemAccent)
 assert(sameColor(style.color, Color(nsColor: .controlAccentColor)), "absent accent follows the macOS control accent")
 style.websitePreset()
 let restored = AppearancePreferences(defaults: defaults)
-assert(restored.mode == "Dark" && restored.hex == "D5F566")
+assert(restored.mode == "Dark" && restored.hex == AppearancePreferences.marketingAccent)
 restored.setColor(.init(red: 1, green: 0, blue: 0))
 assert(AppearancePreferences(defaults: defaults).hex == "FF0000")
 defaults.set("invalid", forKey: "appearance.accent")
@@ -21,6 +21,8 @@ assert(recovered.followsSystemAccent && sameColor(recovered.color, Color(nsColor
 defaults.set("65E0BB", forKey: "appearance.accent")
 let keptMint = AppearancePreferences(defaults: defaults)
 assert(keptMint.hex == "65E0BB" && !keptMint.followsSystemAccent, "a saved Mint hex is not migrated")
+defaults.set("D5F566", forKey: "appearance.accent")
+assert(AppearancePreferences(defaults: defaults).hex == "D5F566", "a saved Lime hex remains a custom accent")
 print("PASS: appearance defaults follow macOS accent, website preset, custom persistence, invalid recovery and saved Mint")
 
 assert(Destination.capsule == [.history, .cost, .accounts])
@@ -81,7 +83,7 @@ let custom = AppearancePreferences(defaults: defaults)
 assert(custom.mode == "Light" && custom.hex == "AB70E0")
 assert(custom.toolColors["codex"] == "0000FF", "Theme repair preserves old saved values")
 assert(sameColor(custom.toolPalette.color("claude", fallback: .orange), custom.foreground))
-print("PASS: canonical Dark/Lime preset and customized Light/accent both resolve exactly one accent")
+print("PASS: canonical Dark/Frost preset and customized Light/accent both resolve exactly one accent")
 
 struct ThemeProbe: View {
     @Environment(\.appAccent) var accent
@@ -114,7 +116,7 @@ struct ContrastControls: View {
 MainActor.assumeIsolated {
 _ = NSApplication.shared
 // Opposite host appearance catches split AppKit/SwiftUI drawing contexts.
-for (mode, hex) in [("Dark", "D5F566"), ("Light", "D5F566"), ("Light", "174A70"), ("Dark", "174A70"), ("Light", "AB70E0"), ("Light", "767676"), ("Dark", "777777")] {
+for (mode, hex) in [("Dark", AppearancePreferences.marketingAccent), ("Light", AppearancePreferences.marketingAccent), ("Light", "174A70"), ("Dark", "174A70"), ("Light", "AB70E0"), ("Light", "767676"), ("Dark", "777777")] {
     NSApp.appearance = NSAppearance(named: mode == "Dark" ? .aqua : .darkAqua)
     colors.mode = mode; colors.hex = hex
     let host = NSHostingView(rootView: AppearanceHost(preferences: colors) { ThemeProbe() })
@@ -129,8 +131,8 @@ for (mode, hex) in [("Dark", "D5F566"), ("Light", "D5F566"), ("Light", "174A70")
     // Bitmap output is display-color-managed. Compare consumers to the actual
     // root accent swatch, not untransformed preference RGB values.
     let expected = bitmap.colorAt(x: bitmap.pixelsWide / 8, y: bitmap.pixelsHigh / 2)!.usingColorSpace(.sRGB)!
-    if mode == "Dark" && hex == "D5F566" {
-        assert(expected.greenComponent > expected.blueComponent + 0.2, "Canonical Dark/Lime must retain lime")
+    if mode == "Dark" && hex == AppearancePreferences.marketingAccent {
+        assert(expected.blueComponent > expected.redComponent + 0.1, "Canonical Dark/Frost must retain frost")
     } else if mode == "Light" && hex == "174A70" {
         assert(expected.blueComponent > expected.redComponent + 0.1, "Legible custom hue must survive")
     } else {
@@ -216,7 +218,7 @@ for case let file as URL in enumerator where file.pathExtension == "swift" {
 let product = try String(contentsOf: sourceRoot.appendingPathComponent("App/ProductPreview.swift"), encoding: .utf8)
 assert(product.contains("else { DashboardRoot(model: model, initialDestination: .now) }"), "Live still must render the shipping host")
 let motion = try String(contentsOf: sourceRoot.appendingPathComponent("App/ProductMotionPreview.swift"), encoding: .utf8)
-assert(motion.contains("DashboardRoot(model: model, initialDestination: .now)"))
+assert(motion.contains("QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)"))
 assert(motion.contains("MenuBarPresentation.combined("))
 assert(!motion.contains("MenuBarPresentation.attributed("))
 print("PASS: all hosting/capture routes retain the appearance boundary and marketing uses shipping composition")
@@ -284,7 +286,7 @@ MainActor.assumeIsolated {
     let codex = UsageTimeline(points: [DailyUsage(date: date, tokens: first), DailyUsage(date: date.addingTimeInterval(60), tokens: second)], minuteResolution: true)
     let claude = UsageTimeline(points: [DailyUsage(date: date, tokens: second), DailyUsage(date: date.addingTimeInterval(60), tokens: second)], minuteResolution: true)
     let series = [ToolUsageTimeline(tool: .codex, totals: second, timeline: codex), ToolUsageTimeline(tool: .claude, totals: second, timeline: claude)]
-    for (mode, hex) in [("Dark", "D5F566"), ("Light", "D5F566"), ("Light", "174A70")] {
+    for (mode, hex) in [("Dark", AppearancePreferences.marketingAccent), ("Light", AppearancePreferences.marketingAccent), ("Light", "174A70")] {
         colors.mode = mode; colors.hex = hex
         NSApp.appearance = NSAppearance(named: mode == "Dark" ? .aqua : .darkAqua)
         let host = NSHostingView(rootView: AppearanceHost(preferences: colors) {
@@ -304,7 +306,7 @@ MainActor.assumeIsolated {
                 let pixel = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
                 let r = pixel.redComponent, g = pixel.greenComponent, b = pixel.blueComponent
                 guard max(r, g, b) - min(r, g, b) > 0.10 else { continue }
-                let matches = mode == "Dark" ? (g > b + 0.10 && r > b) :
+                let matches = mode == "Dark" ? (b > r + 0.10 && g > r) :
                     hex == "174A70" ? (b > r + 0.10 && g > r) : false
                 if matches { accentPixels += 1 } else { unexpected += 1 }
             }
@@ -354,7 +356,7 @@ MainActor.assumeIsolated {
             var filled = 0
             for x in start..<end {
                 let pixel = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
-                if pixel.greenComponent > 0.5 && pixel.greenComponent > pixel.blueComponent + 0.2 { filled += 1 }
+                if pixel.blueComponent > 0.5 && pixel.blueComponent > pixel.redComponent + 0.1 { filled += 1 }
             }
             assert(abs(Double(filled) / Double(end - start) - value) < 0.02, "Recorded magnitude must preserve its actual fraction, including zero")
             window.close()
@@ -382,7 +384,7 @@ MainActor.assumeIsolated {
         try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/tests/allowance-" + name + ".png"))
         let height = host.frame.height; window.close(); return height
     }
-    for (mode, hex) in [("Dark", "D5F566"), ("Light", "D5F566"), ("Light", "2345AF")] {
+    for (mode, hex) in [("Dark", AppearancePreferences.marketingAccent), ("Light", AppearancePreferences.marketingAccent), ("Light", "2345AF")] {
         colors.mode = mode; colors.hex = hex
         let collapsed = capture("collapsed-" + mode + hex,
             CompactToolRate(tool: .codex, meter: idleMeter, quota: quota, now: now), width: 408)

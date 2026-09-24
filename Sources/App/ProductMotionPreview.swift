@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Captures the real dashboard and menu presentation on an isolated synthetic
+/// Captures the real live popover and menu presentation on an isolated synthetic
 /// measurement stream. No production monitor, ledger, or preference is used.
 enum ProductMotionPreview {
     @MainActor static func render(to directory: URL) throws {
@@ -37,16 +37,30 @@ enum ProductMotionPreview {
         var claudeFirst = claudeQuota
         claudeFirst.used = 53
         claudeFirst.date = now.addingTimeInterval(-300)
-        // This fixture introduces Claude's account and activity together. A
-        // quota-only companion must not reserve Claude's panel before it joins.
+        // Claude is installed and idle before its sample workload joins. Keep
+        // its measured allowance available while activity changes.
+        model.claudeQuota.quota.samples = [claudeFirst]
+        model.claudeQuota.quota.readings = [claudeQuota]
         model.claudeMeter.unit = .minute
+        var history = model.snapshot
+        for index in 0..<8 {
+            let stamp = now.addingTimeInterval(TimeInterval(-1800 * (7 - index)))
+            var entry = Entry(date: stamp, session: "motion-sample-\(index)", model: "sample-model",
+                              tokens: Tokens(["output_tokens": 400 + index * 120, "input_tokens": 200]))
+            entry.harness = "codex-desktop"
+            history.entries.append(entry)
+        }
+        history.contentID = nil
+        model.snapshot = history
+        precondition(model.usageStore.compactUsage.timeline.points.contains { $0.tokens.total > 0 },
+                     "The live recording requires populated synthetic Today history")
 
         let dashboard = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
-            DashboardRoot(model: model, initialDestination: .now)
-                .frame(width: 1064, height: 800, alignment: .top)
+            QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)
+                .frame(width: 440, height: 400, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.environment(\.colorScheme, .dark))
-        dashboard.frame = NSRect(x: 0, y: 0, width: 1064, height: 800)
+        dashboard.frame = NSRect(x: 0, y: 0, width: 440, height: 400)
         let window = NSWindow(contentRect: dashboard.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.appearance = NSAppearance(named: .darkAqua)
@@ -100,7 +114,7 @@ enum ProductMotionPreview {
             precondition(remaining.string.contains("Claude") && remaining.string.contains("remaining"), remaining.string)
             precondition(!remaining.string.contains("tok/"), remaining.string)
             let receipt: [String: Any] = ["synthetic": true, "idle": true, "fixtureDate": now.ISO8601Format(),
-                "dashboard": "DashboardRoot / LiveToolPanels", "menu": "MenuBarPresentation.combined",
+                "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels", "menu": "MenuBarPresentation.combined",
                 "appearance": "Dark", "accent": AppearancePreferences.marketingAccent,
                 "statusItem": remaining.string]
             try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
@@ -176,7 +190,7 @@ enum ProductMotionPreview {
             let claudeRunway = Runway.estimate(claudeQuota, samples: model.claudeQuota.quota.samples, now: tickDate)
             rows.append(["frame": frame, "seconds": elapsed, "codexQuotaRemaining": codexRunway.remaining, "claudeQuotaRemaining": claudeRunway.remaining, "codexProjectedZero": codexRunway.exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "claudeProjectedZero": claudeRunway.exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "codexOutputTokensPerSecond": model.tachometer.rawRate, "claudeOutputTokensPerSecond": model.claudeMeter.rawRate, "codexAvailable": model.tachometer.hasRate, "claudeAvailable": model.claudeMeter.hasRate, "menuTool": model.menuTool.rawValue, "visibleTools": LiveTool.visible(codex: model.tachometer, claude: model.claudeMeter).map(\.rawValue)])
         }
-        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "DashboardRoot / LiveToolPanels / ToolSpeedCard / RPMGauge", "menu": "MenuBarPresentation.combined", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
+        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels / CompactToolRate", "menu": "MenuBarPresentation.combined", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
         try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("capture.json"))
         print("Evaluated \(frames) synthetic motion samples; native raster capture: \(!receiptsOnly); output: \(directory.path)")

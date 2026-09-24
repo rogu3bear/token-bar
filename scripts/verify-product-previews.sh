@@ -16,5 +16,5 @@ for page in now history cost; do
   cp "$output/first/$page.png" "$output/$page.png"
 done
 shasum -a 256 "$output/now.png" "$output/history.png" "$output/cost.png" > "$output/SHA256SUMS"
-printf '%s\n' 'PASS: Now, History and Cost stills match across independent processes' 'Dark / Lime / synthetic UTC fixture / shipping DashboardRoot' > "$output/verification.txt"
+printf '%s\n' 'PASS: Now, History and Cost stills match across independent processes' 'Dark / Frost / synthetic UTC fixture / shipping DashboardRoot' > "$output/verification.txt"
 cat "$output/verification.txt"
