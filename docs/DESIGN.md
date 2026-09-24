@@ -2,8 +2,8 @@
 
 Reference: [Linear on Refero Styles](https://styles.refero.design/style/90ce5883-bb24-4466-93f7-801cd617b0d1), inspected September 8, 2026.
 
-Use a dark instrument-panel canvas, crisp system typography, thin structural
-borders, and a restrained yellow-green action accent. This is Token Bar's own
+Use the approved charcoal canvas, crisp system typography, thin structural
+borders, and the adaptive native accent. Marketing uses Frost. This is Token Bar's own
 design, not a copy of another product's branding or paid fonts.
 
 ## Design review and qualification
@@ -32,11 +32,11 @@ roles, not smaller copies of the dashboard.
 | Role | Shared owner / rule | Consumers |
 | --- | --- | --- |
 | Page header | `PageHeader`: 28pt rounded semibold title, native callout secondary subtitle, 6pt label gap; regular native action controls, content-sized widths | Three reports |
-| Page rhythm | `PageStyle`: 28pt gutter, 24pt sections, 16pt related content | Full pages; settings retain their narrower readable column |
+| Page rhythm | `PageStyle`: 28pt gutter, 24pt sections (18pt in reports), 16pt related content | Full pages; settings retain their narrower readable column |
 | Section heading | `PageStyle.sectionTitle`: native title2 semibold | History, Cost, Insights and tool headings; subordinate headings remain headline |
-| Summary metric | `SummaryMetric`: native caption label, 28pt rounded semibold monospaced value, optional secondary caption detail | History totals, Cost coverage/valuation, prompt sample metrics |
+| Summary metric | `SummaryMetric`: native caption label, 28pt rounded semibold monospaced value, optional secondary detail; Cost emphasizes its estimate at 38pt | History totals, Cost coverage/valuation, prompt sample metrics |
 | Supporting metric | `PageStyle.detailMetric`: native title3 | Cost component values below the primary summary |
-| Recorded contribution | `ReportMagnitudeStyle`: 10pt quantitative track, resolved accent, equal geometry when selected; true zero has no filled segment | History contribution buttons and Cost model/reasoning bars |
+| Recorded contribution | `ReportMagnitudeStyle`: 10pt quantitative track, resolved accent, equal geometry when selected; true zero has no filled segment | Compact History contribution rows; Cost uses priced/unpriced table rows |
 | Chart series and legend | One explicit resolved foreground scale; native symbols and line styles distinguish tools | Shipping minute History chart, including generated legend |
 | Actions and selection | Native buttons/pickers; primary emphasis only for an explicit primary action; method links remain links in native label ink, not the accent | Header actions, filter/pricing/detail sheets and settings |
 | Compact surface | Existing compact spacing, type and controls | Menu-bar readout and quick popover; not forced into full-page metrics |
@@ -44,8 +44,8 @@ roles, not smaller copies of the dashboard.
 
 Preserve content-driven control widths, native disabled/selected/focus behavior,
 Return/Escape sheet actions, stable navigation identity and reduced-motion gates.
-Do not add cards or containers solely to group content already grouped by type,
-space or dividers. Warning color communicates a warning and is not a second
+Use modules for summary claims, charts and grouped settings; keep report scope
+controls and routine source-coverage metadata compact and unboxed. Warning color communicates a warning and is not a second
 application accent. Saved accent swatches show the user's choice; functional ink
 uses the adaptive foreground when that choice is not legible.
 
@@ -96,6 +96,32 @@ Synthetic native previews render shipping views and use disposable roots and
 preferences. The website uses those native captures, names any preview ahead of
 the public installer, and keeps sample data explicit. Stills prove appearance;
 interaction and installation have separate qualification.
+
+## Report hierarchy
+
+History leads with title/actions, one period/filter/freshness row, then a single
+summary module. Total processed is explicitly input + output; input includes
+cached input and output includes reasoning. The tool split is inside that same
+module with a proportional strip and labeled amounts. The selected measure and
+Compare controls belong to the contribution section. Ranked rows use a bounded
+bar width, nearby values and retained drill-down; the shown/total count precedes
+the rows. The time series follows attribution.
+
+Cost leads with title/actions, compact scope and pricing basis, then the estimate
+and pricing coverage in one module. The estimate remains an API equivalent, not
+an amount paid; unpriced usage is explicitly excluded. Cost composition follows,
+then the time series, then model/reasoning attribution and diagnostics/recovery.
+Unpriced rows have no quantitative track. A measured zero cost remains $0.00.
+Rebuild pricing details names the existing local-log enrichment action; it does
+not contact a pricing service or change its reconciliation/rollback rules.
+
+Source coverage and pricing coverage are independent. Routine continuity gaps
+use compact neutral copy with a warning icon and a details link; a source read
+failure keeps its failure treatment and previous-result qualification. Dismissal
+removes warning emphasis while retaining a neutral partial-coverage label and
+diagnostic access. Do not invent lost-token quantities from warning counts.
+Composition strips use disjoint recorded totals, have no minimum nonzero segment,
+and retain text values/percentages; zero and unavailable remain distinct.
 
 ## Spacing and interaction
 
@@ -390,10 +416,10 @@ The account filter uses the same label in its picker and removable selection,
 including the inferred qualifier. Unattributed is the consistent label for
 history without account evidence. During report rebuilding, shared status text
 identifies previous results and unavailable export; headers do not repeat a
-spinner. History read failures qualify the figures above the results, with a
-persistent limitation even when the error detail is dismissed.
+spinner. History read failures qualify the retained figures with persistent freshness
+metadata even when the error detail is dismissed.
 
-Full pages share a 28-point gutter, 24-point major-section rhythm and a 28-point
+Full pages share a 28-point gutter, 18-point report rhythm (24 elsewhere) and a 28-point
 rounded semibold heading matching their destination name. Settings retain their
 604-point readable column; compact popovers and tool cards retain denser spacing.
 The persistent report navigation presents History, Cost and Allowances. Insights remains hostable for diagnostic previews and is unpublished
@@ -401,7 +427,7 @@ from the capsule. Menu bar fields and appearance live in the
 settings window from the popover. This is not a scene migration. Destination
 identity and saved preferences remain unchanged.
 
-Navigation retains one restrained selection capsule and independent keyboard focus.
+Navigation uses compact section tabs with a moving underline and independent keyboard focus.
 Small stable report choices use native segmented pickers; larger or changing
 option sets use menu pickers. Comparisons keep an explicit Compare label;
 commands use native buttons.
@@ -612,13 +638,13 @@ Tests/MenuBar checks all tool selections and Auto with competing legacy colors.
 `AppSurface` owns the live dropdown's treatment across Reports, Settings, welcome
 and detail sheets: charcoal `#111314` in Dark, an adaptive pale canvas in Light,
 and modules with 12-point corners and subtle raised fills and borders. Report
-metrics, charts, filter groups and account observations use the same module
-family. Settings groups follow the same spacing and shape. Increased Contrast
+metrics, charts and account observations use the same module family. Report
+period, pricing basis and filters share a compact unboxed scope row. Settings groups follow the same spacing and shape. Increased Contrast
 strengthens boundaries; the canvas and data modules are opaque under every
 transparency setting. `AppearanceHost` owns the shared canvas and session notice
 state. Synthetic renderers use that same canvas instead of overriding it.
 
-Glass remains on commands and navigation, with the existing native fallbacks.
+Glass remains on live commands, with the existing native fallbacks.
 Native controls retain system behavior and focus. Current System/Light/Dark and
 saved accent choices remain intact. Orange identifies an affected tool or an
 undismissed warning; it is not a global accent. Dismissing an allowance notice

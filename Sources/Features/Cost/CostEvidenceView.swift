@@ -37,7 +37,7 @@ struct CostEvidenceView: View {
                 Button(model.exportingRequests ? "Exporting…" : "Export request details") { model.exportRequests() }
                     .disabled(model.busy || model.filtering || model.exportingRequests || model.retainedRequests == nil)
             }.font(.callout)
-            Text("A usage record can contain several requests. Only exact single-request deltas receive a request size; timestamps, turn settings, field presence and recorded tiers are retained before daily aggregation. Requested tier and usage-reported tier are separate. Recover details backfills only groups that match existing totals and counts.")
+            Text("A usage record can contain several requests. Only exact single-request deltas receive a request size; timestamps, turn settings, field presence and recorded tiers are retained before daily aggregation. Requested tier and usage-reported tier are separate. Rebuild pricing details backfills only groups that match existing totals and counts.")
                 .font(.caption).foregroundStyle(.secondary)
 
         }

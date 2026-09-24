@@ -55,7 +55,7 @@ extension PageHeader where Actions == EmptyView {
     }
 }
 
-/// A shared selection capsule moves between destinations; page content stays still.
+/// Compact section tabs keep report navigation distinct from chart measure pickers.
 struct DashboardNavigation: View {
     @Binding var selection: Destination
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -71,29 +71,29 @@ struct DashboardNavigation: View {
     }
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 16) {
             ForEach(destinations) { destination in
                 Button {
                     selection = destination
                     focused = destination
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: destination.icon)
-                            .font(.system(size: 11, weight: selection == destination ? .semibold : .medium))
+                            .font(.system(size: 13, weight: selection == destination ? .semibold : .medium))
                         Text(destination.title)
-                            .font(.system(size: 12, weight: selection == destination ? .semibold : .medium))
+                            .font(.system(size: 14, weight: selection == destination ? .semibold : .medium))
                     }
                     .foregroundStyle(selection == destination ? .primary : .secondary)
-                    .frame(maxWidth: .infinity, minHeight: 30)
-                    .contentShape(Capsule())
+                    .padding(.horizontal, 8).frame(minHeight: 36)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(PressFeedbackStyle(cornerRadius: 15))
+                .buttonStyle(PressFeedbackStyle(cornerRadius: 6))
                 .focused($focused, equals: destination)
-                .overlay(Capsule().stroke(focused == destination ? Color.primary.opacity(0.6) : .clear, lineWidth: 2))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(focused == destination ? Color.primary.opacity(0.6) : .clear, lineWidth: 2))
                 .help("Open " + destination.title)
-                .background {
+                .overlay(alignment: .bottom) {
                     if selection == destination {
-                        Capsule().fill(.primary.opacity(0.12))
+                        Capsule().fill(.primary).frame(height: 2)
                             .matchedGeometryEffect(id: "selection", in: indicator)
                     }
                 }
@@ -102,9 +102,9 @@ struct DashboardNavigation: View {
                 .onKeyPress(.rightArrow) { move(from: destination, by: 1); return .handled }
             }
         }
-        .padding(3)
-        .frame(maxWidth: 840)
-        .modifier(ReportNavigationMaterial())
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 4)
+        .overlay(alignment: .bottom) { Rectangle().fill(.primary.opacity(0.10)).frame(height: 1) }
         .animation(InteractionMotion.selection(reduceMotion), value: selection)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Reports navigation")

@@ -4,25 +4,45 @@ import SwiftUI
 /// a diagnostic or changes admitted usage.
 struct UsageDiagnosticsView: View {
     var health: UsageReadHealth
+    var compact = false
     @State private var showingDetails = false
     @Environment(\.noticeDismissals) private var notices
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let key = NoticeDismissals.key(health.diagnostics.map(\.id))
         if !health.diagnostics.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                if !notices.contains(key) {
-                    HStack(alignment: .top) {
-                        Label(health.summary, systemImage: health.failed ? "exclamationmark.circle" : "exclamationmark.triangle")
-                            .foregroundStyle(health.failed ? Color.red : .orange)
-                            .textSelection(.enabled)
-                        Spacer(minLength: 8)
-                        DismissNoticeButton(label: "Dismiss source warnings") { notices.dismiss(key) }
-                    }.transition(.opacity)
+            Group {
+                if compact && !health.failed {
+                    HStack(spacing: 8) {
+                        if !notices.contains(key) {
+                            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                            Text("Partial source coverage · " + health.diagnostics.count.formatted() + " warnings" +
+                                 (health.affectedFiles > 0 ? " across " + health.affectedFiles.formatted() + " files" : "") + ". Retained usage included.")
+                                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text("Partial source coverage").foregroundStyle(.secondary)
+                        }
+                        Button("View details") { showingDetails = true }.buttonStyle(.link)
+                            .accessibilityLabel("View diagnostic details")
+                        Spacer(minLength: 0)
+                        if !notices.contains(key) {
+                            DismissNoticeButton(label: "Dismiss source warnings") { notices.dismiss(key) }
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !notices.contains(key) {
+                            HStack(alignment: .top) {
+                                Label(health.summary, systemImage: health.failed ? "exclamationmark.circle" : "exclamationmark.triangle")
+                                    .foregroundStyle(health.failed ? Color.red : .orange).textSelection(.enabled)
+                                Spacer(minLength: 8)
+                                DismissNoticeButton(label: "Dismiss source warnings") { notices.dismiss(key) }
+                            }.transition(.opacity)
+                        }
+                        Button("View diagnostic details") { showingDetails = true }
+                    }.moduleSurface(padding: 12, warning: !notices.contains(key))
                 }
-                Button("View diagnostic details") { showingDetails = true }
             }.font(.callout).frame(maxWidth: .infinity, alignment: .leading)
-                .moduleSurface(padding: 12, warning: !notices.contains(key))
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: notices.contains(key))
                 .sheet(isPresented: $showingDetails) { UsageDiagnosticDetails(health: health) }
         }

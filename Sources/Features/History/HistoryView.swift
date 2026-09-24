@@ -3,44 +3,31 @@ import Charts
 
 struct HistoryView: View {
     @Bindable var model: UsageModel
-    @Environment(\.appAccent) private var accent
-    @Environment(\.toolPalette) private var palette
     private var breakdown: Int { model.reporting.historyBreakdown }
     private var metric: UsageMetric { model.reporting.historyMetric }
     @State private var showMethod = false
     var body: some View {
         @Bindable var reporting = model.reporting
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: PageStyle.section) {
+            VStack(alignment: .leading, spacing: PageStyle.reportSection) {
                 header
-                if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
                 HStack(alignment: .top, spacing: PageStyle.related) {
-                    periodFilter
-                    Spacer()
+                    periodFilter.frame(maxWidth: model.period == 4 ? .infinity : 280, alignment: .leading)
                     filters
-                }.moduleSurface()
-                ReadStatusView(state: ReadPresentation(snapshot: model.snapshot,
-                    refreshing: model.busy || model.filtering), date: model.lastSuccessfulUsageRead)
-                UsageDiagnosticsView(health: model.snapshot.readHealth)
-                HStack(alignment: .top, spacing: PageStyle.related) {
-                    card(UsageMetric.total, model.totals)
-                    card("INPUT", model.totals.input)
-                    card(UsageMetric.output, model.totals)
+                    Spacer(minLength: 8)
+                    ReportFreshness(state: ReadPresentation(snapshot: model.snapshot,
+                        refreshing: model.busy || model.filtering), date: model.lastSuccessfulUsageRead)
                 }
-                ChoiceFlow(spacing: 14) {
-                    ForEach(model.report.toolTimelines) { series in
-                        HStack(spacing: 5) {
-                            Circle().fill(series.tool.color(in: palette)).frame(width: 8, height: 8)
-                            Text(series.id + ": " + UsageMetric.total.formatted(series.totals))
-                        }.font(.caption).help(series.totals.total.formatted() + " processed tokens in the selected report")
-                    }
-                }
+                summary
+                UsageDiagnosticsView(health: model.snapshot.readHealth, compact: true)
+                if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
                 if model.report.entries.contains(where: { $0.tokens.cached > $0.tokens.input || $0.tokens.reasoning > $0.tokens.output }) {
                     StatusNotice(message: "Some source counters have inconsistent cached-input or reasoning subsets. The total still uses input + output; subset comparisons may be unreliable.", severity: .warning)
                 }
-                ChoiceRow(title: "Measure", selection: $reporting.historyMetric, choices: UsageMetric.allCases.map { ($0, $0.rawValue) }, segmented: true)
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Where the usage went").font(PageStyle.sectionTitle)
+                    ChoiceRow(title: "Measure", selection: $reporting.historyMetric, choices: UsageMetric.allCases.map { ($0, $0.rawValue) }, segmented: true)
+                        .frame(maxWidth: 540)
                     ChoiceRow(title: "Compare", selection: $reporting.historyBreakdown, choices: [(0, "Tasks"), (1, "Models"), (2, "Accounts"), (3, "Days"), (4, "Tools"), (5, "Projects")])
                     ContributionChart(rows: rows, metric: metric)
                     if breakdown == 2 { Text("Account associations are inferred from local sign-in observations. Unattributed history stays separate.").font(.caption).foregroundStyle(.secondary) }
@@ -65,7 +52,7 @@ struct HistoryView: View {
         }
     }
     private var header: some View {
-        PageHeader(.history, subtitle: model.snapshot.historyImportedAt.map { "Local history checked " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Local history is being gathered automatically") {
+        PageHeader(.history) {
             MethodButton(title: "How history is counted") { showMethod = true }
             Button("Refresh history") { model.refresh(history: true) }.disabled(model.busy)
             Button("Export CSV") { model.export() }.disabled(model.filtering || model.busy)
@@ -84,14 +71,23 @@ struct HistoryView: View {
         default: return model.report.tasks
         }
     }
-    private func card(_ metric: UsageMetric, _ tokens: Tokens) -> some View {
-        SummaryMetric(title: metric.rawValue.uppercased(), value: hasResult ? metric.formatted(tokens) : "—")
-            .moduleSurface()
-            .help(hasResult ? metric.amount(tokens).formatted() + " tokens" : "Reading unavailable")
-    }
-    private func card(_ label: String, _ value: Int) -> some View {
-        SummaryMetric(title: label, value: hasResult ? compact(value) : "—")
-            .moduleSurface()
-            .help(hasResult ? value.formatted() + " tokens" : "Reading unavailable")
+    private var summary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: PageStyle.related) {
+                SummaryMetric(title: "TOTAL PROCESSED", value: hasResult ? UsageMetric.total.formatted(model.totals) : "—",
+                              detail: "Input + output")
+                    .help(hasResult ? model.totals.total.formatted() + " processed tokens" : "Reading unavailable")
+                SummaryMetric(title: "INPUT", value: hasResult ? compact(model.totals.input) : "—", detail: "Includes cached input")
+                    .help(hasResult ? model.totals.input.formatted() + " input tokens" : "Reading unavailable")
+                SummaryMetric(title: "OUTPUT", value: hasResult ? compact(model.totals.output) : "—", detail: "Includes reasoning")
+                    .help(hasResult ? model.totals.output.formatted() + " output tokens" : "Reading unavailable")
+            }
+            if hasResult && !model.report.toolTimelines.isEmpty {
+                Divider()
+                ReportComposition(parts: model.report.toolTimelines.map {
+                    CompositionPart(id: $0.id, amount: Double($0.totals.total), value: UsageMetric.total.formatted($0.totals))
+                })
+            }
+        }.moduleSurface()
     }
 }

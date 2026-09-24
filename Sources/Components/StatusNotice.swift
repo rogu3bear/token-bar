@@ -158,3 +158,27 @@ struct ReadStatusView: View {
             .accessibilityElement(children: .combine)
     }
 }
+
+/// Report toolbar freshness; coverage is explained once beside the summary.
+struct ReportFreshness: View {
+    var state: ReadPresentation
+    var date: Date?
+    private var caption: String {
+        switch state.freshness {
+        case .loading: return "Loading history…"
+        case .refreshing: return "Updating · previous results shown"
+        case .stale: return "Refresh failed · previous history shown"
+        case .waiting: return state.failed ? "History unavailable" : "Waiting for history"
+        case .current:
+            return date.map { "Updated " + $0.formatted(date: .omitted, time: .shortened) } ?? "History loaded"
+        }
+    }
+    var body: some View {
+        Group {
+            if state.freshness == .current, let date {
+                ReadAgeCaption(date: date, prefix: "Updated", includesClock: false)
+            } else { Text(caption) }
+        }.font(.caption).foregroundStyle(.secondary)
+            .help(date.map { "Last successful history read " + $0.formatted(date: .abbreviated, time: .shortened) } ?? caption)
+    }
+}

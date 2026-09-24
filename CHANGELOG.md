@@ -3,7 +3,7 @@
 ## 0.2.2 — Frost and glass (unreleased)
 
 - Replace lime marketing colors with graphite, silver and Frost; use one glass gauge icon for the app and website.
-- Add native Liquid Glass to live footer controls and report navigation on macOS 26+, with native material or solid controls on earlier systems and when transparency is reduced.
+- Add native Liquid Glass to live footer controls on macOS 26+, with native material or solid controls on earlier systems and when transparency is reduced.
 - Preserve saved accents and System defaults; Frost replaces Lime in the preset list.
 - Refresh the website and native sample captures; public downloads remain on the last published, notarized package.
 - Keep candidate notes out of the public release list and load the changelog script and styles through files allowed by the site's Content Security Policy.
@@ -13,6 +13,8 @@
 - Add session dismissal to source, continuity, integrity and allowance warnings; keep diagnostics reachable and resurface changed or escalated warnings.
 - Keep the native Settings window at its explicit size instead of collapsing its scrolling content to a zero-size window.
 - Brand the macOS installer with the app's glass gauge icon and bind its welcome artwork and distribution metadata into release verification.
+
+- Lead History and Cost with their summary, compact source coverage and scope controls, distinguish report tabs from chart measures, and tighten attribution rows. Add proportional tool/cost composition and keep unpriced cost rows distinct from zero.
 
 ## 0.2.1 — Read health and native architecture qualification
 

@@ -68,12 +68,16 @@ struct ContributionChart: View {
     var body: some View {
         let shown = Array(ranked.prefix(limit))
         let maximum = max(1, shown.first.map { metric.amount($0.tokens) } ?? 1)
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 4) {
+            if !shown.isEmpty {
+                Text("Top \(shown.count) of \(ranked.count.formatted())").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    .padding(.bottom, 6)
+            }
             if shown.isEmpty { Text("No recorded usage in this selection.").foregroundStyle(.secondary).padding(.vertical, PageStyle.section) }
             ForEach(shown) { row in
                 rowButton(row, maximum: maximum)
             }
-            if ranked.count > limit { Text("Top \(limit) of \(ranked.count.formatted()). Export CSV includes every matching record.").font(.caption).foregroundStyle(.secondary) }
+            if ranked.count > limit { Text("Export CSV includes every matching record.").font(.caption).foregroundStyle(.secondary) }
             if let row = rows.first(where: { $0.id == selectedID }) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(row.title).font(.headline)
@@ -95,7 +99,7 @@ struct ContributionChart: View {
         }
         .buttonStyle(.plain)
         .focused($focusedID, equals: row.id)
-        .padding(6)
+        .padding(4)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(focusedID == row.id ? Color.primary.opacity(0.6) : .clear, lineWidth: 2))
         .help(isSelected ? "Hide contribution details" : "Show contribution details")
         .accessibilityHint("Show or hide contribution details")
@@ -112,16 +116,16 @@ private struct ContributionBar: View {
     var selected: Bool
     @Environment(\.appAccent) private var accent
     var body: some View {
-        VStack(alignment: .leading, spacing: PageStyle.labelGap) {
-            HStack {
-                Text(title).lineLimit(1)
-                Spacer(minLength: 16)
-                Text(compact(value)).monospacedDigit().foregroundStyle(.secondary)
-                Image(systemName: selected ? "chevron.down" : "chevron.right").font(.caption).foregroundStyle(.secondary)
-            }.font(.callout)
+        HStack(spacing: 12) {
+            Text(title).lineLimit(1).frame(width: 180, alignment: .leading)
             ProgressView(value: fraction)
                 .progressViewStyle(ReportMagnitudeStyle(emphasized: selected))
-                .accessibilityHidden(true) // The enclosing button exposes the exact token value.
-        }.contentShape(Rectangle())
+                .frame(maxWidth: 360)
+                .accessibilityHidden(true) // The button exposes the exact value.
+            Text(compact(value)).monospacedDigit().frame(width: 68, alignment: .trailing)
+            Image(systemName: selected ? "chevron.down" : "chevron.right")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }.font(.callout).frame(minHeight: 24).contentShape(Rectangle())
     }
 }

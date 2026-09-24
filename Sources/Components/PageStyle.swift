@@ -4,6 +4,7 @@ import SwiftUI
 enum PageStyle {
     static let gutter: CGFloat = 28
     static let section: CGFloat = 24
+    static let reportSection: CGFloat = 18
     static let related: CGFloat = 16
     static let labelGap: CGFloat = 6
     static let title = Font.system(size: 28, weight: .semibold, design: .rounded)
@@ -64,9 +65,9 @@ struct ReportMagnitudeStyle: ProgressViewStyle {
     func makeBody(configuration: Configuration) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Capsule().fill(accent.opacity(0.10))
+                Capsule().fill(Color.primary.opacity(0.08))
                 if let fraction = configuration.fractionCompleted, fraction > 0 {
-                    Capsule().fill(accent.opacity(emphasized ? 1 : 0.65))
+                    Capsule().fill(accent.opacity(emphasized ? 1 : 0.85))
                         .frame(width: max(3, geometry.size.width * CGFloat(fraction)))
                 }
             }

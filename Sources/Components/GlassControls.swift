@@ -16,18 +16,3 @@ struct GlassControlGroup<Content: View>: View {
         }
     }
 }
-
-struct ReportNavigationMaterial: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if reduceTransparency {
-            content.background(Color(nsColor: .controlBackgroundColor), in: Capsule())
-                .overlay(Capsule().strokeBorder(.primary.opacity(0.15)))
-        } else if #available(macOS 26, *) {
-            content.glassEffect(.regular, in: Capsule())
-        } else {
-            content.background(.regularMaterial, in: Capsule())
-        }
-    }
-}
