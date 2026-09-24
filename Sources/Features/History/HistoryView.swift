@@ -15,11 +15,10 @@ struct HistoryView: View {
                 if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
                 periodFilter
                 filters
-                if let error = model.snapshot.error {
-                    Text("Usage read failed or was incomplete. Results below may be stale or incomplete.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    ErrorNotice(message: error)
-                }
+                ReadStatusView(state: ReadPresentation(hasResult: hasResult,
+                    refreshing: model.busy || model.filtering, failed: model.snapshot.error != nil,
+                    partial: model.snapshot.integrity.map { !$0.isClean } ?? false), date: model.lastSuccessfulUsageRead)
+                if let error = model.snapshot.error { ErrorNotice(message: error) }
                 HStack(alignment: .top, spacing: PageStyle.related) {
                     card(UsageMetric.total, model.totals)
                     card("INPUT", model.totals.input)
@@ -51,36 +50,27 @@ struct HistoryView: View {
                     }
                     UsageTimelineChart(timeline: model.report.timeline, metric: metric, tools: model.report.toolTimelines)
                 }
-                HStack {
-                    MethodButton(title: "How history is counted") { showMethod = true }
-                    Spacer()
-                    if let updated = model.snapshot.updated {
-                        ReadAgeCaption(date: updated, prefix: "Updated", includesClock: false).font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("Loading…").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
                 if let message = model.message { Text(message).font(.callout).foregroundStyle(.secondary) }
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())
         }
         .sheet(isPresented: $showMethod) {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("How history is counted").font(PageStyle.sectionTitle)
+            MethodSheet(title: "How history is counted", done: { showMethod = false }) {
                 Text("Total = input + output. Cached input is already in input; reasoning is already in output. These are processed tokens, not quota or billed cost.")
                 Text("Reused context is counted on each processing pass, so totals are not unique written tokens. Repeated counter snapshots and inherited fork counters are deduplicated. Older records are grouped by day, task, and model; raw logs remain unchanged.")
                 Text("Account identity marked inferred comes from local sign-in observations, not execution or billing records. Historical usage without that evidence remains unattributed.")
-                SheetDoneButton { showMethod = false }
-            }.padding(PageStyle.gutter).frame(width: 500).onExitCommand { showMethod = false }
+            }
         }
     }
     private var header: some View {
         PageHeader(.history, subtitle: model.snapshot.historyImportedAt.map { "Local history checked " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Local history is being gathered automatically") {
+            MethodButton(title: "How history is counted") { showMethod = true }
             Button("Refresh history") { model.refresh(history: true) }.disabled(model.busy)
             Button("Export CSV") { model.export() }.disabled(model.filtering || model.busy)
         }
     }
     private var periodFilter: some View { ReportPeriodFilter(model: model) }
     private var filters: some View { ReportFilters(model: model) }
+    private var hasResult: Bool { model.lastSuccessfulUsageRead != nil || !model.snapshot.entries.isEmpty }
     private var rows: [UsageRow] {
         switch breakdown {
         case 1: return model.report.models
@@ -92,11 +82,11 @@ struct HistoryView: View {
         }
     }
     private func card(_ metric: UsageMetric, _ tokens: Tokens) -> some View {
-        SummaryMetric(title: metric.rawValue.uppercased(), value: metric.formatted(tokens))
-            .help(metric.amount(tokens).formatted() + " tokens")
+        SummaryMetric(title: metric.rawValue.uppercased(), value: hasResult ? metric.formatted(tokens) : "—")
+            .help(hasResult ? metric.amount(tokens).formatted() + " tokens" : "Reading unavailable")
     }
     private func card(_ label: String, _ value: Int) -> some View {
-        SummaryMetric(title: label, value: compact(value))
-            .help(value.formatted() + " tokens")
+        SummaryMetric(title: label, value: hasResult ? compact(value) : "—")
+            .help(hasResult ? value.formatted() + " tokens" : "Reading unavailable")
     }
 }

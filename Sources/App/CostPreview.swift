@@ -75,6 +75,7 @@ enum CostPreview {
             model.live.state.quotaHistory = samples
         }
         model.snapshot = Snapshot(entries: entries, updated: now)
+        model.lastSuccessfulUsageRead = now
         model.snapshot.historyImportedAt = now
         model.availableModels = Array(Set(entries.map(\.model))).sorted()
         model.availableTools = Array(Set(entries.compactMap(\.harness))).sorted()
@@ -172,7 +173,7 @@ enum CostPreview {
             NSApp.appearance = NSAppearance(named: mode == "Light" ? .aqua : .darkAqua)
             for size in sizes {
                 for reduced in [NSWorkspace.shared.accessibilityDisplayShouldReduceMotion] {
-                    for page in Destination.capsule {
+                    for page in Destination.capsule + Destination.settings {
                         let host = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
                             DashboardRoot(model: model, initialDestination: page).frame(width: size.width, height: size.height)
                                 .background(Color(nsColor: .windowBackgroundColor))

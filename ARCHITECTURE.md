@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-> Describes the 0.1.14 release-candidate source. Known limitations are listed separately;
+> Describes the 0.2.0 release-candidate source. Known limitations are listed separately;
 > a future scene or navigation migration is not current implementation.
 
 ## Runtime shape
@@ -17,7 +17,7 @@ not application state or UI code.
 
 | Component | Responsibility | Owns |
 |---|---|---|
-| `AppDelegate`, `UsageModel` (`App.swift`) | status item, popover, dashboard, timers, flag dispatch; observable hub for views | refresh cadence, query state |
+| `AppDelegate`, `UsageModel` (`App.swift`) | status item, live popover, Reports and Settings windows, timers, flag dispatch; observable hub for views | refresh cadence, query state |
 | `UsageScanner` (`Usage.swift`) with `EventIndex`, `RequestArchive`, `UsageMetadata` | tail Codex logs from byte cursors, deduplicate, admit, compact | `ledger.json`, `ledger.events.sqlite`, `ledger.requests.sqlite` |
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
@@ -28,9 +28,9 @@ not application state or UI code.
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
 | `SignInTimeline`, `PlanHistory` | sign-in switches and plan observations | `sign-ins.json`, ledger plans |
 | `Cost*`, `CoverageAudit`, `UsageComparisonStore` | dated API-equivalent estimates, rate history, matched allowance/token observations, coverage, recovery, audit | shipped rate data; process-owned background comparison cache |
-| `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `DashboardNavigation` | four product destinations plus capsule chrome | query state via `UsageModel` |
+| `LiveOverview`, `HistoryView`, `CostView`, `AccountsView`, `DashboardNavigation` | one canonical live module tree plus three Reports destinations and navigation | query state via `UsageModel` |
 | `InsightsView` | Hostable Insights destination, unpublished from the capsule | query state via `UsageModel` |
-| `MenuBarSettingsView`, `AppearanceSettingsView` | Settings owner: menu-bar fields and appearance. They are not equal capsule destinations and not a third SwiftUI scene | `UserDefaults` preferences |
+| `MenuBarSettingsView`, `AppearanceControls` | Settings owner: menu-bar fields and appearance. They are not equal capsule destinations and not a third SwiftUI scene | `UserDefaults` preferences |
 | `UpdateCheck`, `UpdateCheckControl` | Optional launch-time read of the site's public `release.json` over an ephemeral session with no cookies, cache, or app version; numeric version ordering; offers only a newer, notarized GitHub Release asset and opens it in the browser on click. Previews never construct a live check | `updateCheck.enabled.v1`; outcome is process-owned |
 | `site/public/feedback*.js`, `site/worker.js` | local report drafting; advanced-mode static fallback and retired API responses | browser local storage for the draft |
 
@@ -274,9 +274,13 @@ about speed. Its remaining line names each tool with dated activity in the last
 hour (`LiveTool.recent`), full names, “remaining” once; with none recent, idle
 Auto is the clean idle face. Unavailable remaining stays off. Opt-in Fable fields cannot restore
 an idle Codex speed line. An enabled Quota Guard warning is risk text, not
-occupancy. `LiveTool.nowOccupied` owns Now columns: working tools while any
-are working, measured remainings when idle. Remaining sits in the same column as
-that tool's rate and dial. `UsageModel.quota(for:)`
+occupancy. `LiveTool.modules` owns the live provider modules: known providers,
+working providers and retained allowance evidence. Module identity persists
+through idle or unavailable states; missing values never become zero.
+`QuickLiveView` and the hostable Now route use the same `LiveOverview` tree.
+Reports defaults to History and exposes History, Cost and Allowances; Settings
+reuses one dedicated window. `MethodSheet` and `ReadPresentation` share method
+geometry and independent availability, coverage and freshness language. `UsageModel.quota(for:)`
 uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to Codex quota.
 
 ## Persistence and lazy work

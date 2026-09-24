@@ -21,8 +21,10 @@ Later site and documentation commits do not move the native release tag.
 
 ## Preparing the successor
 
-After publication, bump `VERSION`, prepare changelog RC notes, and advance the
-build number for the next candidate. Leave public download links and
+The working successor is **0.2.0**, build **30200**: shared expandable live
+modules, a three-destination Reports window, one Settings destination and common
+measurement-state language. Signing and source binding are separate from publication.
+For each successor, bump `VERSION`, prepare changelog notes, and advance the build number. Leave public download links and
 `site/public/release.json` on 0.1.14 until the next release is verified.
 
 ## One-time credential setup

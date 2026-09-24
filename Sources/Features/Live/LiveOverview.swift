@@ -1,49 +1,83 @@
 import SwiftUI
 
+/// Canonical live face. The popover and optional larger host use this same tree.
 struct LiveOverview: View {
-    @Environment(\.appAccent) private var accent
-    @Environment(\.evaluationDate) private var evaluationDate
     @Bindable var meter: Tachometer
-    @State private var showMethod = false
-    @State private var showActivity = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: UsageModel
     @Bindable var monitor: LiveMonitor
-    @Environment(\.presentationClock) private var clock
+    var initiallyExpanded: LiveTool? = nil
+    @State private var showMethod = false
+    @State private var showSources = false
+
+    private var sourceErrors: [String] {
+        ([monitor.error, model.snapshot.error, model.quotaGuard.persistenceError] +
+         LiveTool.allCases.map { model.meter(for: $0).activity.error }).compactMap { $0 }
+    }
     var body: some View {
-        Group {
-            ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader(.now) {
-                    if monitor.busy { ProgressView().controlSize(.small) }
-                }
-                QuotaGuardSummary(coordinator: model.quotaGuard)
-                LiveToolPanels(model: model, codex: meter, claude: model.claudeMeter)
-                if let error = monitor.error { ErrorNotice(message: error) }
-                MethodButton(title: "How activity and speed are measured") { showMethod = true }
-                    .sheet(isPresented: $showMethod) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Activity and speed are separate").font(PageStyle.sectionTitle)
-                            Text(LiveTool.liveCoverage)
-                            Text("Chat and agent identity comes from the connected app’s task catalog. The latest start, completion or interruption determines each task’s state; copied turns count once. Five minutes without a log update makes activity unconfirmed, shown separately. Select the activity count to inspect the tasks.")
-                            Text("Each tool has an independent rate and range. Claude activity comes from transcript user, assistant and completion records; its rate uses increasing message counters and logged elapsed time, including time between messages. Claude quota comes from its account-bound local usage cache. A reading stays current for 30 minutes; its age is shown after two minutes. Missing or stale cache is unavailable; age is not. Each tool’s projected zero uses only its own quota changes, never token speed.")
-                            Text("Speed uses output-counter differences divided by the actual time between reports, summed only across currently active tasks. Bootstrap reads existing reports immediately. Measurements stay valid for 30–120 seconds depending on reporting cadence. Reporting coverage and age are in this explanation; completed tasks stop contributing immediately. Logs are batched, so this remains an estimate.")
-                            Text("Quota priority uses the earliest projected exhaustion. Without a projection, it shows the allowance with least remaining. Runway assumes the recent account burn continues; it is not computed from token speed.")
-                            SheetDoneButton { showMethod = false }
-                        }.padding(PageStyle.gutter).frame(width: 500).onExitCommand { showMethod = false }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Now").font(.headline)
+                Spacer()
+                if monitor.busy { ProgressView().controlSize(.small).accessibilityLabel("Refreshing allowances") }
+                MethodButton(title: "Method") { showMethod = true }
+            }
+            LiveToolPanels(model: model, codex: meter, claude: model.claudeMeter, initiallyExpanded: initiallyExpanded)
+            CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: model.showHistory)
+            if !sourceErrors.isEmpty {
+                Button { showSources = true } label: {
+                    Label("Sources need attention", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }.buttonStyle(.plain)
+            }
+            ImportStatusView(model: model, inset: 0)
+            if let release = model.updateCheck.availableRelease {
+                UpdateAvailableNotice(check: model.updateCheck, release: release)
+            }
+            if let message = model.message { Text(message).font(.caption).foregroundStyle(.secondary) }
+            Divider()
+            HStack {
+                Button("Reports") { model.showDetails?() }.keyboardShortcut("r", modifiers: .command)
+                Button("Settings") { model.showMenuBarSettings?() }.keyboardShortcut(",", modifiers: .command)
+                Spacer()
+                Menu {
+                    Button("Feedback") {
+                        if !Feedback.open() { model.message = "Could not open feedback in your browser." }
                     }
-            }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())
+                    Button("Quit Token Bar") { NSApplication.shared.terminate(nil) }
+                } label: { Image(systemName: "ellipsis.circle") }
+                    .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("Token Bar actions")
+            }.controlSize(.small)
+        }
+        .padding(16).frame(maxWidth: 480, alignment: .leading)
+        .environment(\.evaluationDate, model.referenceDate)
+        .sheet(isPresented: $showMethod) { LiveMethod { showMethod = false } }
+        .sheet(isPresented: $showSources) {
+            MethodSheet(title: "Data sources", done: { showSources = false }) {
+                ForEach(Array(sourceErrors.enumerated()), id: \.offset) { _, error in
+                    ErrorNotice(message: error)
+                }
+                Text("Available readings remain visible. A source error does not turn missing usage into zero.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .sheet(isPresented: $showActivity) {
-            VStack(alignment: .trailing, spacing: 0) {
-                SheetDoneButton { showActivity = false }.padding(PageStyle.related)
-                RunningDetails(snapshot: meter.activity, unit: meter.unit)
-            }.frame(width: 560, height: 450).onExitCommand { showActivity = false }
+    }
+}
+
+struct LiveMethod: View {
+    var done: () -> Void
+    var body: some View {
+        MethodSheet(title: "How live readings work", done: done) {
+            Text("Output speed").font(.headline)
+            Text("Estimated from output-counter changes and elapsed time. Each tool has its own rate and units. Completed tasks stop contributing; missing or expired measurements show —.")
+            Text("Provider allowance").font(.headline)
+            Text(LiveTool.liveCoverage)
+            Text("Remaining is provider allowance, not a token balance. Projected exhaustion uses recent allowance burn, never output speed. Missing reset times stay unavailable. Claude readings remain current for 30 minutes and show their age after two minutes.")
+            Text("Activity and recorded usage").font(.headline)
+            Text("Task lifecycle and counter observations identify activity. Quiet work becomes unconfirmed after five minutes. Today's chart contains recorded tokens; account associations in history are inferred from stable local sign-in observations.")
         }
     }
-
 }
+
 struct RunningDetails: View {
     @Environment(\.presentationClock) private var clock
     @Environment(\.evaluationDate) private var evaluationDate

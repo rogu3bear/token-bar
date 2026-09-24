@@ -1252,3 +1252,17 @@ do {
     assert(paceMonitor.quota.paceHistory.isEmpty, "Another sign-in drops the previous account's pace history")
     print("PASS: Fable time left averages recent burn per limit, smooths bursts, relearns after resets, ignores jitter and other accounts, and renders small secondary copy")
 }
+
+// Live modules retain known identities across activity and unavailable readings.
+do {
+    let idle = Tachometer()
+    let empty = ToolQuotaState()
+    let known = LiveTool.modules(known: [.claude], codex: idle, claude: idle, grok: idle, quota: { _ in empty }, now: now)
+    assert(known == [.claude], "Known unavailable source retains its own module")
+    assert(LiveTool.modules(known: [], codex: idle, claude: idle, grok: idle, quota: { _ in empty }, now: now).isEmpty,
+           "Never-seen source does not invent a module")
+    let running = Tachometer(); running.hasRate = true
+    assert(LiveTool.modules(known: [.claude], codex: running, claude: idle, grok: idle, quota: { _ in empty }, now: now) == [.codex, .claude],
+           "Starting another tool preserves the known idle module")
+    print("PASS: live modules preserve tool identity through active, idle and unavailable states")
+}

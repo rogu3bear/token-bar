@@ -257,7 +257,8 @@ struct MenuBarSettingsView: View {
     var body: some View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Menu bar", subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
+                PageHeader("Settings", subtitle: "Changes apply and save automatically.")
+                Text("Menu bar").font(PageStyle.sectionTitle)
                 Group {
                     let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
                         monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota, riskText: quotaGuard?.menuText(selection: preferences.configuration.tool))
@@ -279,8 +280,7 @@ struct MenuBarSettingsView: View {
                         Text("Tokens / hour").tag("h")
                     }.pickerStyle(.segmented).labelsHidden()
                 }
-                Text("Follow selected tool uses its dashboard unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
-                if let quotaGuard { QuotaGuardSettingsView(coordinator: quotaGuard) }
+                Text("Follow selected tool uses its live module unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
                 Label("Appearance", systemImage: "paintpalette")
                     .font(PageStyle.sectionTitle)
                     .labelStyle(.titleAndIcon)
@@ -317,6 +317,14 @@ struct MenuBarSettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.top, 12)
                 }
+                Divider()
+                if let quotaGuard {
+                    DetailSheet("Allowance warnings") { QuotaGuardSettingsView(coordinator: quotaGuard) }
+                }
+                if let claudeConnection {
+                    DetailSheet("Connections") { ClaudeConnectionControl(model: claudeConnection) }
+                }
+                Text("General").font(PageStyle.sectionTitle)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .disabled(!allowsSystemSettings)
                     .onAppear { if allowsSystemSettings { launchAtLogin = SMAppService.mainApp.status == .enabled } }
@@ -331,9 +339,8 @@ struct MenuBarSettingsView: View {
                     }
                 if let loginError { ErrorNotice(message: loginError) }
                 if let updateCheck { UpdateCheckControl(check: updateCheck, allowsNetwork: allowsSystemSettings) }
-                if let claudeConnection { ClaudeConnectionControl(model: claudeConnection) }
                 DetailSheet("Local data and permissions") { LocalAccessExplanation().padding(.top, 8) }
-                Button("Restore defaults") { preferences.reset() }
+                Button("Restore menu bar defaults") { preferences.reset() }
             }
         }
     }

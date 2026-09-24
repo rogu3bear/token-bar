@@ -7,7 +7,7 @@ enum HistoryNavigationPreview {
         let delegate = AppDelegate()
         delegate.model = model
         delegate.configureNavigationActions()
-        defer { delegate.detailWindow?.close() }
+        defer { delegate.detailWindow?.close(); delegate.settingsWindow?.close() }
         var receipts: [String] = []
         func require(_ condition: Bool, _ message: String) throws {
             guard condition else { throw NSError(domain: "HistoryNavigationPreview", code: 1,
@@ -32,7 +32,17 @@ enum HistoryNavigationPreview {
             try require(!model.filtering, "Report publication settled")
             delegate.detailWindow?.contentView?.layoutSubtreeIfNeeded()
         }
-        // The exact callback used by the Today chart creates History first.
+        model.showDetails?()
+        try settle()
+        try require(delegate.dashboardSelection.destination == .history, "Reports defaults to History")
+        try require(delegate.detailWindow?.title == "Token Bar — Reports", "Reports entry and window title agree")
+        try require(!Destination.capsule.contains(.now), "Live is not a competing report destination")
+        model.showMenuBarSettings?()
+        let settingsWindow = delegate.settingsWindow
+        model.showMenuBarSettings?()
+        try require(delegate.settingsWindow === settingsWindow, "Settings reuses its existing window")
+        delegate.settingsWindow?.orderOut(nil)
+        // The exact callback used by the Today chart opens History.
         model.showHistory?()
         try settle()
         try require(delegate.dashboardSelection.destination == .history, "Today opens History on first window creation")
@@ -43,7 +53,7 @@ enum HistoryNavigationPreview {
         delegate.dashboardSelection.destination = .cost
         try settle()
         model.showDetails?()
-        try require(delegate.dashboardSelection.destination == .cost, "Dashboard preserves the selected Cost destination")
+        try require(delegate.dashboardSelection.destination == .cost, "Reports preserves the selected Cost destination")
         window?.orderOut(nil)
         model.showHistory?()
         try settle()
@@ -55,7 +65,7 @@ enum HistoryNavigationPreview {
         try settle()
         try require(!model.detailedReporting, "Returning to Now disables detailed reporting")
         model.showDetails?()
-        try require(delegate.dashboardSelection.destination == .now, "Dashboard preserves Now")
+        try require(delegate.dashboardSelection.destination == .now, "Reports preserves Now")
         if CommandLine.arguments.contains("--large-history") {
             let now = model.referenceDate ?? Date()
             let sample = model.snapshot.entries[0]
@@ -83,6 +93,6 @@ enum HistoryNavigationPreview {
         try require(model.reportPublicationCount == publications, "Warm page changes perform no report rebuild or publication")
         try JSONSerialization.data(withJSONObject: ["synthetic": true, "checks": receipts, "navigationMilliseconds": navigationMilliseconds], options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("receipt.json"))
-        print("PASS: Today/History routing, retained Dashboard selection, stable host and report state")
+        print("PASS: Today/History routing, retained Reports selection, stable host and report state")
     }
 }

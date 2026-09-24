@@ -32,6 +32,9 @@ enum ProductPreview {
             model.appearance.hex = CommandLine.arguments[index + 1].uppercased()
         }
         let now = PreviewFixture.date
+        let initiallyExpanded: LiveTool? = CommandLine.arguments.firstIndex(of: "--sample-expanded").flatMap {
+            CommandLine.arguments.indices.contains($0 + 1) ? LiveTool(rawValue: CommandLine.arguments[$0 + 1]) : nil
+        }
         var activity = ActivitySnapshot(readAt: now, referenceDate: now)
         for index in 0..<6 {
             let id = "sample-\(index)"
@@ -219,8 +222,8 @@ enum ProductPreview {
                     }.padding(8)
                 }
                 Group {
-                    if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
-                    else { DashboardRoot(model: model) }
+                    if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer, initiallyExpanded: initiallyExpanded) }
+                    else { DashboardRoot(model: model, initialDestination: .now) }
                 }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : previewHeight)
                     .background(Color(nsColor: .windowBackgroundColor))
             }

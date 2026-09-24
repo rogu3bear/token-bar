@@ -5,6 +5,7 @@ struct AccountsView: View {
     @Bindable var model: UsageModel
     @Bindable var monitor: LiveMonitor
     @Bindable var signIns: SignInTimeline
+    @State private var showMethod = false
     @Environment(\.appAccent) private var accent
     @Environment(\.evaluationDate) private var evaluationDate
     @Environment(\.presentationClock) private var clock
@@ -19,7 +20,7 @@ struct AccountsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 PageHeader(.accounts, subtitle: "Current remaining from installed Codex, Claude Code, and Grok.") {
-                    if monitor.busy { ProgressView().controlSize(.small) }
+                    MethodButton(title: "How allowances are read") { showMethod = true }
                 }
                 if let error = monitor.error { ErrorNotice(message: error) }
                 VStack(alignment: .leading, spacing: PageStyle.related) {
@@ -70,15 +71,21 @@ struct AccountsView: View {
                         }
                     }
                 }
-                DetailSheet("About account readings") {
-                Text("Quotas refresh every 30 seconds while the app runs. History is collected locally while this app runs. Quota samples are retained for 90 days, generally five minutes apart, with resets preserved. Gaps mean no readings; the app does not switch accounts or reconstruct missing quota history. A first sample has no trend line until a later reading arrives.")
-                    .font(.caption).foregroundStyle(.secondary)
-                }
                 if !model.snapshot.plans.isEmpty {
                     HistoricalPlanChart(plans: model.snapshot.plans)
                 }
                 if let error = signIns.error { ErrorNotice(message: error) }
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())
+        }
+        .sheet(isPresented: $showMethod) {
+            MethodSheet(title: "How allowances are read", done: { showMethod = false }) {
+                Text(LiveTool.liveCoverage)
+                Text("Saved account and plan observations are historical evidence. They do not establish subscription start or end dates. Gaps mean no readings; Token Bar does not switch accounts or reconstruct missing history.")
+                Text("Quota observations are retained for 90 days, generally five minutes apart with resets preserved. A first sample needs a later reading before it can form a trend. Forecasts use recent quota burn and never token speed.")
+            }
+        }
+        .sheet(item: Binding(get: { model.quotaGuard.selected }, set: { model.quotaGuard.selected = $0 })) { decision in
+            QuotaGuardDetail(coordinator: model.quotaGuard, decision: decision)
         }
     }
 }

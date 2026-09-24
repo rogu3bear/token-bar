@@ -138,8 +138,7 @@ struct CostView: View {
         }
     }
     private var method: some View {
-        VStack(alignment: .leading, spacing: PageStyle.related) {
-            Text("API-equivalent estimates and evidence").font(PageStyle.sectionTitle)
+        MethodSheet(title: "API-equivalent estimates and evidence", done: { showMethod = false }) {
             Text(model.costBasis == .historical
                  ? "Dated API rates where verified. Unknown historical tariffs and ambiguous price-change days remain unpriced. This is an API-equivalent estimate, not an amount paid."
                  : "Valued at the \(CostRateCard.reference.observedOn) reference rates. This is not a bill or subscription charge.")
@@ -148,7 +147,6 @@ struct CostView: View {
             Text("A single-request observation is needed to choose a long-context rate. For session-wide pricing, all observed usage in that task is considered even outside your filters. Missing evidence is never assumed to be short context.")
             Text("Recover details reads available local logs into temporary storage and enriches only groups whose token totals and record counts match existing history. Missing files, changed totals, or mixed account attribution leave the original group intact. A private rollback ledger is saved before enrichment.")
             Link(destination: CostRateCard.reference.source) { Text("OpenAI pricing source").foregroundStyle(accent) }
-            SheetDoneButton { showMethod = false }
-        }.padding(PageStyle.gutter).frame(width: 560).onExitCommand { showMethod = false }
+        }
     }
 }

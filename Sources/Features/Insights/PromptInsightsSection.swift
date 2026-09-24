@@ -8,7 +8,9 @@ struct PromptInsightsSection: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Codex prompt patterns").font(PageStyle.sectionTitle)
             Text("Last 30 days · up to 120 recently active human chats").font(.caption).foregroundStyle(.secondary)
-            readStatus
+            ReadStatusView(state: ReadPresentation(hasResult: state.result != nil, refreshing: state.loading,
+                failed: state.failed, partial: state.isPartial), date: state.result?.readAt)
+            if state.loading { readStatus }
             if state.failed { ErrorNotice(message: state.message) }
             else if state.isPartial || state.result?.prompts == 0 {
                 Text(state.message).foregroundStyle(.secondary)

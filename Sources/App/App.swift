@@ -420,66 +420,15 @@ import ServiceManagement
     }
 
 }
+/// The status item hosts the canonical live view at its compact width.
 struct QuickLiveView: View {
     @Bindable var model: UsageModel
     @Bindable var monitor: LiveMonitor
     @Bindable var meter: Tachometer
-    @Bindable var claude: Tachometer
-    @State private var expanded: LiveTool?
-    init(model: UsageModel, monitor: LiveMonitor, meter: Tachometer) {
-        self.model = model; self.monitor = monitor; self.meter = meter; self.claude = model.claudeMeter
-    }
-    @Environment(\.appAccent) private var accent
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var initiallyExpanded: LiveTool? = nil
     var body: some View {
-        Group {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack { 
-                    Label("Now", systemImage: "gauge.with.dots.needle.bottom.100percent")
-                        .font(.headline)
-                        .labelStyle(.titleAndIcon)
-                    Spacer()
-                    if monitor.busy { ProgressView().controlSize(.small) }
-                }
-                let now = model.referenceDate ?? model.clock.now
-                let tools = LiveTool.compact(codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter, remaining: { tool in
-                    AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
-                }, unconfirmed: { tool in
-                    AccountAllowancePresentation(quota: model.quota(for: tool), now: now).unconfirmedChair
-                })
-                ForEach(tools) { tool in
-                    Button {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                            expanded = expanded == tool ? nil : tool
-                        }
-                    } label: {
-                        CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: model.quota(for: tool), now: now, expanded: expanded == tool)
-                    }.buttonStyle(.plain)
-                }
-                if let empty = NowOccupancyCopy.line(sourcesKnown: !model.accountTools.isEmpty, occupied: !tools.isEmpty) {
-                    Text(empty).foregroundStyle(.secondary)
-                }
-                QuotaGuardSummary(coordinator: model.quotaGuard, compact: true)
-                ToolActivityErrors(model: model)
-                if let release = model.updateCheck.availableRelease {
-                    UpdateAvailableNotice(check: model.updateCheck, release: release)
-                }
-                CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: model.showHistory)
-                if let error = monitor.error { ErrorNotice(message: error) }
-                HStack {
-                    Button("Dashboard") { model.showDetails?() }.buttonStyle(.borderedProminent)
-                    Button("Settings") { model.showMenuBarSettings?() }
-                    Button("Quit") { NSApplication.shared.terminate(nil) }
-                    Spacer()
-                    Button {
-                        if !Feedback.open() { model.message = "Could not open feedback in your browser." }
-                    } label: {
-                        Text("Feedback").foregroundStyle(accent)
-                    }.buttonStyle(.plain).help("Send feedback")
-                }
-                ImportStatusView(model: model, inset: 0)
-            }.padding(16).frame(width: 440).fixedSize(horizontal: false, vertical: true)
-        }
+        LiveOverview(meter: meter, model: model, monitor: monitor, initiallyExpanded: initiallyExpanded)
+            .frame(width: 440).fixedSize(horizontal: false, vertical: true)
     }
 }
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -560,7 +509,8 @@ struct QuickLiveView: View {
         }
         if let providerTimer { RunLoop.main.add(providerTimer, forMode: .common) }
         if let timer { RunLoop.main.add(timer, forMode: .common) }
-        if firstRun || CommandLine.arguments.contains("--details") { model.period = 1; DispatchQueue.main.async { self.openDetails() } }
+        if firstRun { DispatchQueue.main.async { self.toggle() } }
+        else if CommandLine.arguments.contains("--details") { model.period = 1; DispatchQueue.main.async { self.openDetails() } }
         if CommandLine.arguments.contains("--show") { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.toggle() } }
     }
     private var watcherRevision = 0
@@ -632,7 +582,7 @@ struct QuickLiveView: View {
             if model.detailedReporting { model.rebuild() }
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 800),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            window.title = "Token Bar — Dashboard"
+            window.title = "Token Bar — Reports"
             window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model, dashboardSelection] in DashboardRoot(model: model, selection: dashboardSelection) })
             window.contentMinSize = NSSize(width: 900, height: 700)
             if model.allowsSystemSettings { window.setFrameAutosaveName("UsageDetails") }
@@ -648,7 +598,7 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Settings"
-            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, appearance: model.appearance, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
+            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in DestinationHost(destination: .menuBar, model: model) })
             host.sizingOptions = [.intrinsicContentSize]
             window.contentViewController = host
             window.isReleasedWhenClosed = false

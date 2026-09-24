@@ -23,11 +23,11 @@ let keptMint = AppearancePreferences(defaults: defaults)
 assert(keptMint.hex == "65E0BB" && !keptMint.followsSystemAccent, "a saved Mint hex is not migrated")
 print("PASS: appearance defaults follow macOS accent, website preset, custom persistence, invalid recovery and saved Mint")
 
-assert(Destination.capsule == [.now, .history, .cost, .accounts])
+assert(Destination.capsule == [.history, .cost, .accounts])
 assert(!Destination.capsule.contains(.insights) && !Destination.capsule.contains(.menuBar) && !Destination.capsule.contains(.appearance))
 assert(Destination.settings == [.menuBar, .appearance])
 assert(Destination.accounts.title == "Allowances")
-print("PASS: capsule membership is the four product destinations")
+print("PASS: report navigation contains History, Cost and Allowances only")
 assert(FirstRunAccess.needsExplanation(defaults))
 assert(FirstRunAccess.needsExplanation(defaults), "Viewing or dismissing does not accept local access")
 FirstRunAccess.accept(defaults)
@@ -214,9 +214,9 @@ for case let file as URL in enumerator where file.pathExtension == "swift" {
     }
 }
 let product = try String(contentsOf: sourceRoot.appendingPathComponent("App/ProductPreview.swift"), encoding: .utf8)
-assert(product.contains("else { DashboardRoot(model: model) }"), "Dashboard still must render shipping shell")
+assert(product.contains("else { DashboardRoot(model: model, initialDestination: .now) }"), "Live still must render the shipping host")
 let motion = try String(contentsOf: sourceRoot.appendingPathComponent("App/ProductMotionPreview.swift"), encoding: .utf8)
-assert(motion.contains("DashboardRoot(model: model)"))
+assert(motion.contains("DashboardRoot(model: model, initialDestination: .now)"))
 assert(motion.contains("MenuBarPresentation.combined("))
 assert(!motion.contains("MenuBarPresentation.attributed("))
 print("PASS: all hosting/capture routes retain the appearance boundary and marketing uses shipping composition")
@@ -235,7 +235,10 @@ assert(costPreview.contains("for page in Destination.capsule"), "Default page st
 assert(!costPreview.contains("for page in Destination.allCases"))
 assert(!costPreview.contains("CostView(model: model)"), "Cost product image must retain shipping navigation")
 let appSource = try String(contentsOf: sourceRoot.appendingPathComponent("App/App.swift"), encoding: .utf8)
-assert(appSource.contains("Button(\"Settings\") { model.showMenuBarSettings?() }"))
+let liveSource = try String(contentsOf: sourceRoot.appendingPathComponent("Features/Live/LiveOverview.swift"), encoding: .utf8)
+assert(liveSource.contains("Button(\"Settings\") { model.showMenuBarSettings?() }"))
+assert(liveSource.contains("Button(\"Reports\") { model.showDetails?() }"))
+assert(appSource.contains("window.title = \"Token Bar — Reports\""))
 assert(appSource.contains("window.title = \"Token Bar — Settings\""))
 assert(!appSource.contains("Button(\"Menu bar settings\")"))
 let menuSettings = try String(contentsOf: sourceRoot.appendingPathComponent("Features/Settings/MenuBarSettings.swift"), encoding: .utf8)
@@ -360,7 +363,7 @@ MainActor.assumeIsolated {
     print("PASS: shared headers, metric availability and contribution selection retain stable geometry and actual fractions")
 }
 
-// Render the actual allowance row and popover face, including disclosed evidence.
+// The module header stays stable while its disclosure opens below it.
 MainActor.assumeIsolated {
     let now = PreviewFixture.date
     let reading = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Sample", window: "primary", minutes: 300,
@@ -385,12 +388,12 @@ MainActor.assumeIsolated {
             CompactToolRate(tool: .codex, meter: idleMeter, quota: quota, now: now), width: 408)
         let expanded = capture("expanded-" + mode + hex,
             CompactToolRate(tool: .codex, meter: idleMeter, quota: quota, now: now, expanded: true), width: 408)
-        assert(expanded > collapsed, "Disclosed reset/read/account evidence must occupy visible native space")
+        assert(expanded == collapsed, "Expansion changes the chevron without moving the module's headline readings")
         let accounts = capture("accounts-" + mode + hex,
             AccountAllowanceSection(tools: [.codex, .claude], quota: { _ in quota }, now: now), width: 812)
         assert(accounts < 140, "Collapsed allowances must leave room for live gauges at the minimum window")
     }
-    print("PASS: shipping allowance rows and expanded popover evidence render with intrinsic sizing in dark/light/custom accent")
+    print("PASS: allowance rows and module headers retain intrinsic sizing in dark/light/custom accent")
 }
 
 assert(compact(999) == "999")
@@ -560,3 +563,14 @@ assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: false, occupied: false) ==
 assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: false) == NowOccupancyCopy.noneWorking)
 assert(NowOccupancyCopy.noneWorkingLine(sourcesKnown: true, occupied: true) == nil)
 print("PASS: Now empty occupancy copy distinguishes missing tools from idle-with-sources")
+
+let zeroRead = ReadPresentation(hasResult: true)
+assert(zeroRead.availability == .available && zeroRead.coverage == .complete && zeroRead.freshness == .current)
+let noRead = ReadPresentation(hasResult: false, failed: true)
+assert(noRead.availability == .unavailable && noRead.coverage == .unknown)
+let retainedRead = ReadPresentation(hasResult: true, failed: true, partial: true)
+assert(retainedRead.availability == .available && retainedRead.coverage == .partial && retainedRead.freshness == .stale)
+let updatingRead = ReadPresentation(hasResult: true, refreshing: true, partial: true)
+assert(updatingRead.freshness == .refreshing && updatingRead.coverage == .partial)
+assert(ReadPresentation(hasResult: false, refreshing: true).freshness == .loading)
+print("PASS: availability, coverage and freshness compose without converting absent data into zero")

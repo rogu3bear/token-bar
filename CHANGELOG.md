@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — Live, Reports and Settings
+
+- Make the menu-bar popover the canonical live surface, with stable expandable provider modules and explicit speed and remaining labels.
+- Open History, Cost and Allowances in a dedicated Reports window; retain selection and filters across navigation.
+- Share reading-state notices and Method presentation, preserving missing, zero, partial and stale distinctions.
+- Group Settings into menu bar, appearance, allowance warnings, connections and general controls; place source and update status below live readings.
+
+
 ## 0.1.14 — Released 2026-09-24
 
 - Menu-bar remaining is one line that spells out each provider and says remaining once, e.g. `Claude 45% Grok 80% Codex 12% remaining`. Only tools with dated activity in the last hour appear, most recent first; after an hour idle a tool drops off, and with none recent the status item returns to the clean idle face instead of stale remaining.

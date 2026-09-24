@@ -53,6 +53,7 @@ struct CompactToolRate: View {
     var quota: ToolQuotaState
     var now: Date
     var expanded = false
+    var warning: String? = nil
     @Environment(\.appAccent) private var accent
     var body: some View {
         let allowance = AccountAllowancePresentation(quota: quota, now: now)
@@ -61,12 +62,12 @@ struct CompactToolRate: View {
             ? min(1, max(0, (meter.rate - meter.minimum) / (meter.scale - meter.minimum))) : 0.5
         CompactToolFace(
             title: tool.label,
-            tint: accent,
+            tint: warning == nil ? accent : .orange,
             rate: CompactLiveCopy.rateHeadline(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             activity: activity,
             remaining: allowance.remaining,
             remainingAvailable: allowance.estimate != nil,
-            detail: expanded ? allowance.detail : allowance.estimate == nil ? allowance.qualifier : nil,
+            detail: warning ?? (allowance.estimate == nil ? allowance.qualifier : nil),
             accessibilityRate: CompactLiveCopy.spokenRate(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             dialValue: dialValue,
             dialAvailable: meter.hasRate,
@@ -106,7 +107,10 @@ private struct CompactToolFace: View {
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(.white.opacity(0.9))
             }
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                Text(activity).font(.caption).foregroundStyle(.secondary)
+            }
             Spacer(minLength: 8)
             if let rate {
                 VStack(alignment: .trailing, spacing: 2) {
@@ -116,15 +120,15 @@ private struct CompactToolFace: View {
                             .contentTransition(.numericText())
                             .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: rate)
                     }
-                    Text(activity + (rate == "—" ? " · rate unavailable" : "")).font(.caption).foregroundStyle(.secondary)
-                }
-                remainingNumber
-            } else {
-                VStack(alignment: .trailing, spacing: 2) {
-                    remainingNumber
-                    Text(activity).font(.caption).foregroundStyle(.secondary)
+                    Text(rate == "—" ? "Speed unavailable" : "Output speed").font(.caption).foregroundStyle(.secondary)
                 }
             }
+            VStack(alignment: .trailing, spacing: 2) {
+                remainingNumber
+                Text("remaining").font(.caption).foregroundStyle(.secondary)
+            }
+            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
         }
     }
     private func chrome<Content: View>(content: Content) -> some View {
@@ -138,7 +142,7 @@ private struct CompactToolFace: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title + ", " + accessibilityRate + ", " + (remainingAvailable ? remaining + " remaining" : "remaining unavailable") + (detail.map { ", " + $0 } ?? ""))
         .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-        .accessibilityHint(expanded ? "Hides remaining details" : "Shows remaining details")
+        .accessibilityHint(expanded ? "Hides provider details" : "Shows provider details")
         .accessibilityAddTraits(.isButton)
     }
 }

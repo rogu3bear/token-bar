@@ -26,6 +26,16 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
         return dated.enumerated().sorted { $0.element.1 != $1.element.1 ? $0.element.1 > $1.element.1 : $0.offset < $1.offset }
             .map(\.element.0)
     }
+    /// Stable live modules follow known sources, activity, or retained allowance evidence.
+    /// Missing readings are shown inside an existing module, never as invented zeros.
+    static func modules(known: [LiveTool], codex: Tachometer, claude: Tachometer, grok: Tachometer,
+                        quota: (LiveTool) -> ToolQuotaState, now: Date) -> [LiveTool] {
+        let working = Set(active(codex: codex, claude: claude, grok: grok))
+        return allCases.filter { tool in
+            let allowance = AccountAllowancePresentation(quota: quota(tool), now: now)
+            return known.contains(tool) || working.contains(tool) || allowance.estimate != nil || allowance.unconfirmedChair
+        }
+    }
     /// Occupancy alias of `active`. Idle no longer invents a Codex placeholder.
     static func visible(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         active(codex: codex, claude: claude, grok: grok)

@@ -38,8 +38,8 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
         self == .history || self == .cost
     }
 
-    /// Persistent dashboard tabs. Insights, Menu bar and Appearance stay hostable, not capsule members.
-    static var capsule: [Destination] { [.now, .history, .cost, .accounts] }
+    /// Reports navigation. Live, Insights and Settings stay hostable without extra destinations.
+    static var capsule: [Destination] { [.history, .cost, .accounts] }
     static var settings: [Destination] { [.menuBar, .appearance] }
 }
 
@@ -106,6 +106,6 @@ struct DashboardNavigation: View {
         .frame(maxWidth: 840)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selection)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Dashboard navigation")
+        .accessibilityLabel("Reports navigation")
     }
 }

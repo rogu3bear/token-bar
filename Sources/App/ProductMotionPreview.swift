@@ -42,7 +42,7 @@ enum ProductMotionPreview {
         model.claudeMeter.unit = .minute
 
         let dashboard = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
-            DashboardRoot(model: model)
+            DashboardRoot(model: model, initialDestination: .now)
                 .frame(width: 1064, height: 800, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
         }.environment(\.colorScheme, .dark))

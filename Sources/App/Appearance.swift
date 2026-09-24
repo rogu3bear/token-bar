@@ -199,6 +199,24 @@ struct DetailSheet<Content: View>: View {
     }
 }
 
+/// Shared geometry and dismissal for contextual measurement explanations.
+struct MethodSheet<Content: View>: View {
+    var title: String
+    var done: () -> Void
+    @ViewBuilder var content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: PageStyle.related) {
+            Text(title).font(PageStyle.sectionTitle)
+            ScrollView {
+                VStack(alignment: .leading, spacing: PageStyle.related) { content() }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            SheetDoneButton(action: done)
+        }.padding(PageStyle.gutter).frame(width: 560, height: 460)
+            .onExitCommand(perform: done)
+    }
+}
+
 enum NoticeSeverity: String {
     case error = "Error", warning = "Warning"
     var symbol: String { self == .error ? "exclamationmark.circle" : "exclamationmark.triangle" }

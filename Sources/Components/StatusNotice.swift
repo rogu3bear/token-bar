@@ -96,7 +96,7 @@ struct StatusNotice: View {
                             .buttonStyle(.plain).accessibilityLabel("Dismiss " + severity.rawValue.lowercased()).help("Dismiss this notice")
                     }
                 }.padding(12).background(severity.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity)
             }
         }.animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: appeared)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: dismissed)
@@ -108,4 +108,48 @@ struct StatusNotice: View {
 struct ErrorNotice: View {
     var message: String
     var body: some View { StatusNotice(message: message, severity: .error) }
+}
+
+/// Independent evidence axes. A value of zero never selects an availability state.
+struct ReadPresentation: Equatable {
+    enum Availability { case available, unavailable }
+    enum Coverage { case complete, partial, unknown }
+    enum Freshness { case current, loading, refreshing, stale, waiting }
+    let availability: Availability
+    let coverage: Coverage
+    let freshness: Freshness
+    let failed: Bool
+
+    init(hasResult: Bool, refreshing: Bool = false, failed: Bool = false, partial: Bool = false) {
+        availability = hasResult ? .available : .unavailable
+        coverage = hasResult ? (partial ? .partial : .complete) : .unknown
+        freshness = refreshing ? (hasResult ? .refreshing : .loading) : failed && hasResult ? .stale : hasResult ? .current : .waiting
+        self.failed = failed
+    }
+    var caption: String {
+        let base: String
+        switch freshness {
+        case .loading: base = "Loading…"
+        case .refreshing: base = "Updating · previous results remain visible"
+        case .stale: base = "Refresh failed · previous results may be stale"
+        case .current: base = "Current reading"
+        case .waiting: base = failed ? "Unavailable · no successful reading" : "Awaiting a reading"
+        }
+        return base + (coverage == .partial ? " · partial coverage" : "")
+    }
+    var needsAttention: Bool { failed || coverage == .partial }
+}
+
+/// One restrained status row for reports and sampled results; diagnostics stay intact below it.
+struct ReadStatusView: View {
+    var state: ReadPresentation
+    var date: Date? = nil
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(state.caption, systemImage: state.needsAttention ? "exclamationmark.triangle" : "clock")
+                .foregroundStyle(state.needsAttention ? Color.orange : .secondary)
+            if let date { ReadAgeCaption(date: date, prefix: "Last successful read") }
+        }.font(.caption).foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+    }
 }
