@@ -40,7 +40,7 @@ roles, not smaller copies of the dashboard.
 | Chart series and legend | One explicit resolved foreground scale; native symbols and line styles distinguish tools | Shipping minute History chart, including generated legend |
 | Actions and selection | Native buttons/pickers; primary emphasis only for an explicit primary action; method links remain links in native label ink, not the accent | Header actions, filter/pricing/detail sheets and settings |
 | Compact surface | Existing compact spacing, type and controls | Menu-bar readout and quick popover; not forced into full-page metrics |
-| Warnings and progress | Native warning color and explicit text; persistent integrity status survives closing details; native import progress retains measured fractions | Integrity, read failures, unavailable/unpriced data and import status |
+| Warnings and progress | Native warning color and explicit text; dismissible warnings retain an accessible integrity detail link; native import progress retains measured fractions | Integrity, read failures, unavailable/unpriced data and import status |
 
 Preserve content-driven control widths, native disabled/selected/focus behavior,
 Return/Escape sheet actions, stable navigation identity and reduced-motion gates.
@@ -512,11 +512,18 @@ coverage visible and directs the reader to all reported issues. Details preserve
 the complete original text in selectable 3,000-character sections, with
 Previous, Next, Done and Escape. No full diagnostic text layout occurs before
 details are requested. Small ordinary errors keep their original copy.
-Errors can be dismissed for the current presentation
-without clearing the underlying error; invalid date ranges and incomplete-data
-warnings remain visible while applicable. Compact integrity indicators retain
-their existing persistent, non-banner treatment. Notice entrance/removal motion
-is disabled under Reduce Motion. The feedback page uses the same severity
+Errors, coverage warnings and integrity notices can be dismissed for the current
+app session without changing the evidence. `NoticeDismissals`, owned by the
+appearance host, shares acknowledgements across native windows. Stable diagnostic
+identities ignore read timestamps; a changed issue set is shown again. Allowance
+acknowledgements are scoped to account/bucket/window, compare reset jitter to a
+fixed 60-second anchor, and return on escalation or a new reset period. They do
+not snooze notifications. Invalid date ranges remain inline validation until
+corrected. Read freshness and incomplete coverage stay in neutral metadata.
+Diagnostic and integrity detail links remain available; the live actions menu
+always opens Data sources. Show dismissed warnings in Settings or the live
+actions menu restores all session acknowledgements. Notice dismissal fades with
+no directional slide; Reduce Motion removes that animation. The feedback page uses the same severity
 meaning and clears obsolete severity styling when its state changes.
 
 The native status button and menu preview share one presentation animator.
@@ -602,30 +609,31 @@ Tests/MenuBar checks all tool selections and Auto with competing legacy colors.
 
 ### Native container hierarchy
 
-Reports share a continuous adaptive native window canvas. Spacing and headings
-group metrics; native Dividers separate account observations. Ordinary statistics,
-evidence text and contribution details have no decorative background or border.
-Live modules have a restrained rounded boundary because each whole header is an
-expandable control; a warning colors only the affected module.
-Selected report choices and navigation retain their selection fill and keyboard
-focus; unselected choices have no fill. Approximation badges remain status
-markers. Warning surfaces remain bounded to distinguish degraded evidence from
-ordinary data. The menu-bar sample keeps its boundary because it previews a
-separate native surface. Chart tracks/fills encode magnitude, not containers.
-Native buttons, pickers, sheets and popovers retain system chrome.
+`AppSurface` owns the live dropdown's treatment across Reports, Settings, welcome
+and detail sheets: charcoal `#111314` in Dark, an adaptive pale canvas in Light,
+and modules with 12-point corners and subtle raised fills and borders. Report
+metrics, charts, filter groups and account observations use the same module
+family. Settings groups follow the same spacing and shape. Increased Contrast
+strengthens boundaries; the canvas and data modules are opaque under every
+transparency setting. `AppearanceHost` owns the shared canvas and session notice
+state. Synthetic renderers use that same canvas instead of overriding it.
 
-### Persistent integrity, disclosed detail
+Glass remains on commands and navigation, with the existing native fallbacks.
+Native controls retain system behavior and focus. Current System/Light/Dark and
+saved accent choices remain intact. Orange identifies an affected tool or an
+undismissed warning; it is not a global accent. Dismissing an allowance notice
+removes its module warning chrome while the actual remaining reading, allowance
+details, notification policy and menu-bar assessment remain unchanged.
 
-Every affected History, Cost and Insights result keeps a compact Data integrity
-status above its figures, with exact excluded/repaired record counts and a native
-Details button. Orange marks the warning icon; ordinary text stays adaptive.
-No filled warning rectangle or dismiss/silence action is shown for this status.
-Details opens a native sheet with both exact counts (including zero), every
-violation explanation, exclusion and downward-repair semantics, and the statement
-that nothing was deleted. Done/Escape closes only the sheet; the status remains
-while the report is affected. Clean reports render no warning. Insights uses the
-same status once and does not duplicate it inside its counting-method sheet.
-The ledger gate, report counts, exclusion rules and repaired totals are unchanged.
+### Integrity evidence and acknowledgement
+
+Affected History, Cost and Insights results offer exact excluded/repaired record
+counts and Data integrity details. The close button hides the warning for this
+session; the detail link remains. Details includes every violation explanation,
+exclusion and downward-repair semantics, and the statement that nothing was
+deleted. Done/Escape closes the sheet. A changed report warning returns; clean
+reports render none. The ledger gate, exclusions and repaired totals do not
+change when a warning is acknowledged.
 
 ### Control cardinality audit — 2026-09-12
 

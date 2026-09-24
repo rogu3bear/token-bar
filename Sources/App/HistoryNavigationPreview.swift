@@ -39,6 +39,11 @@ enum HistoryNavigationPreview {
         try require(!Destination.capsule.contains(.now), "Live is not a competing report destination")
         delegate.commands.settings()
         let settingsWindow = delegate.settingsWindow
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        settingsWindow?.contentView?.layoutSubtreeIfNeeded()
+        let settingsSize = settingsWindow?.contentView?.bounds.size ?? .zero
+        try require(settingsSize.width >= 660 && settingsSize.height >= 640,
+                    "Settings keeps its explicit scrolling viewport instead of collapsing to zero")
         delegate.commands.settings()
         try require(delegate.settingsWindow === settingsWindow, "Settings reuses its existing window")
         delegate.settingsWindow?.orderOut(nil)

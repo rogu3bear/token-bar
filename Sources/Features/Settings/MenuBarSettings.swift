@@ -258,6 +258,7 @@ struct MenuBarSettingsView: View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 PageHeader("Settings", subtitle: "Changes apply and save automatically.")
+                VStack(alignment: .leading, spacing: PageStyle.related) {
                 Text("Menu bar").font(PageStyle.sectionTitle)
                 Group {
                     let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
@@ -265,7 +266,7 @@ struct MenuBarSettingsView: View {
                     MenuBarPreview(value: presentation)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .lineLimit(3).frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-                        .padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.vertical, 8)
                         .accessibilityLabel(presentation.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial"))
                 }
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
@@ -281,10 +282,13 @@ struct MenuBarSettingsView: View {
                     }.pickerStyle(.segmented).labelsHidden()
                 }
                 Text("Follow selected tool uses its live module unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
+                }.moduleSurface()
+                VStack(alignment: .leading, spacing: PageStyle.related) {
                 Label("Appearance", systemImage: "paintpalette")
                     .font(PageStyle.sectionTitle)
                     .labelStyle(.titleAndIcon)
                 AppearanceControls(preferences: appearance)
+                }.moduleSurface()
                 DetailSheet("Customize") {
                     VStack(alignment: .leading, spacing: 16) {
                         Toggle("Reorder fields", isOn: $reordering)
@@ -324,6 +328,7 @@ struct MenuBarSettingsView: View {
                 if let claudeConnection {
                     DetailSheet("Connections") { ClaudeConnectionControl(model: claudeConnection) }
                 }
+                VStack(alignment: .leading, spacing: PageStyle.related) {
                 Text("General").font(PageStyle.sectionTitle)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .disabled(!allowsSystemSettings)
@@ -341,6 +346,9 @@ struct MenuBarSettingsView: View {
                 if let updateCheck { UpdateCheckControl(check: updateCheck, allowsNetwork: allowsSystemSettings) }
                 DetailSheet("Local data and permissions") { LocalAccessExplanation().padding(.top, 8) }
                 Button("Restore menu bar defaults") { preferences.reset() }
+                Button("Show dismissed warnings") { appearance.notices.restore() }
+                    .disabled(!appearance.notices.hasDismissed)
+                }.moduleSurface()
             }
         }
     }

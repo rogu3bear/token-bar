@@ -9,6 +9,11 @@
 - Keep candidate notes out of the public release list and load the changelog script and styles through files allowed by the site's Content Security Policy.
 - Coordinate click feedback across the website and native app: quick presses, stable play/pause icons, reversible disclosures and a moving report selection. Keep hidden module details out of keyboard and accessibility navigation, and respect Reduce Motion.
 
+- Extend the live dropdown's charcoal canvas and rounded modules across native reports, Settings, and detail sheets, with adaptive Light and increased-contrast treatments.
+- Add session dismissal to source, continuity, integrity and allowance warnings; keep diagnostics reachable and resurface changed or escalated warnings.
+- Keep the native Settings window at its explicit size instead of collapsing its scrolling content to a zero-size window.
+- Brand the macOS installer with the app's glass gauge icon and bind its welcome artwork and distribution metadata into release verification.
+
 ## 0.2.1 — Read health and native architecture qualification
 
 - Distinguish a completed usage read with incomplete coverage from a failed refresh; retain accepted totals, diagnostic scope and the last successful read across restart.

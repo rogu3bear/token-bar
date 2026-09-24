@@ -61,7 +61,7 @@ struct NoticeDetails: View {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
-        }.padding(20).frame(width: 580, height: 440)
+        }.padding(20).frame(width: 580, height: 440).appCanvas()
             .onExitCommand { dismiss() }
     }
 }
@@ -72,14 +72,15 @@ struct StatusNotice: View {
     var message: String
     var severity: NoticeSeverity
     var dismissible = true
-    @State private var dismissed: String?
+    @Environment(\.noticeDismissals) private var notices
     @State private var appeared = false
     @State private var showsDetails = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let content = NoticeContent(message)
+        let key = NoticeDismissals.key([severity.rawValue, message])
         VStack(spacing: 0) {
-            if appeared && !message.isEmpty && dismissed != message {
+            if appeared && !message.isEmpty && !notices.contains(key) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: severity.symbol).foregroundStyle(severity.color).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 8) {
@@ -91,15 +92,14 @@ struct StatusNotice: View {
                             Button("View diagnostic details") { showsDetails = true }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                    if dismissible && content.continuityCount == 0 {
-                        Button { dismissed = message } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.plain).accessibilityLabel("Dismiss " + severity.rawValue.lowercased()).help("Dismiss this notice")
+                    if dismissible {
+                        DismissNoticeButton(label: "Dismiss " + severity.rawValue.lowercased()) { notices.dismiss(key) }
                     }
-                }.padding(12).background(severity.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                }.moduleSurface(padding: 12, warning: true)
                     .transition(.opacity)
             }
         }.animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: appeared)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: dismissed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: notices.contains(key))
             .onAppear { appeared = true }
             .sheet(isPresented: $showsDetails) { NoticeDetails(content: content).id(message) }
     }
@@ -152,7 +152,7 @@ struct ReadStatusView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(state.caption, systemImage: state.needsAttention ? "exclamationmark.triangle" : "clock")
-                .foregroundStyle(state.needsAttention ? Color.orange : .secondary)
+                .foregroundStyle(.secondary)
             if let date { ReadAgeCaption(date: date, prefix: "Last successful read") }
         }.font(.caption).foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)

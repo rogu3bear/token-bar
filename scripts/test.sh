@@ -16,7 +16,7 @@ RAN=0
 # The ledger, cost and provider surfaces that every logic group links.
 CORE="ProviderUsage.swift UsageComparison.swift CostRateHistory.swift CostCoverage.swift RequestExport.swift
       CoverageAudit.swift UsageMetadata.swift RequestArchive.swift LiveStateStore.swift CostPricing.swift
-      CostReport.swift CostRecovery.swift UsageInsights.swift Appearance.swift GlassControls.swift StatusNotice.swift PageStyle.swift
+      CostReport.swift CostRecovery.swift UsageInsights.swift Appearance.swift AppSurface.swift NoticeDismissals.swift GlassControls.swift StatusNotice.swift PageStyle.swift
       Usage.swift UsageReadHealth.swift UsageMetric.swift TokenFormatting.swift UsageStore.swift ImportProgress.swift GrokUsage.swift Activity.swift LiveTool.swift ClaudeActivityReader.swift ActivityFeed.swift EventIndex.swift
       PlanHistory.swift TaskCatalog.swift Reports.swift ReportEngine.swift ReportScheduler.swift ReportIndexStorage.swift PrivateCache.swift UsageTimeline.swift LiveMonitor.swift ClaudeQuotaMonitor.swift FableQuota.swift ClaudeUsageRefresh.swift ClaudeStatuslineConnection.swift
       Project.swift DimensionReport.swift TokenConvention.swift Integrity.swift EventIdentity.swift EventTime.swift

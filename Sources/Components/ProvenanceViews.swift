@@ -25,7 +25,7 @@ struct ProvenanceBadge: View {
                     Text(provenance.title).font(.headline)
                     Text(provenance.explanation).font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(PageStyle.related).frame(width: 320)
+                .padding(PageStyle.related).frame(width: 320).appCanvas()
                 .textSelection(.enabled)
             }
         }
@@ -97,20 +97,29 @@ struct IntegrityPresentation {
     static let retention = "Nothing was deleted. Source records remain unchanged."
 }
 
-/// Always present while the report is affected. Only its details can close.
+/// Acknowledgement hides the warning; the exact evidence remains reachable.
 struct IntegrityBanner: View {
     var report: IntegrityReport
     @State private var showingDetails = false
+    @Environment(\.noticeDismissals) private var notices
     var body: some View {
         if let status = IntegrityPresentation(report: report).status {
+            let key = NoticeDismissals.key([status] + report.explanations)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).accessibilityHidden(true)
-                Text(status).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
-                Button("Details") { showingDetails = true }
+                if !notices.contains(key) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange).accessibilityHidden(true)
+                    Text(status).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Data integrity details") { showingDetails = true }
                     .accessibilityLabel("Data integrity details")
                     .accessibilityHint("Shows exact excluded and repaired record counts and their explanations")
+                Spacer(minLength: 8)
+                if !notices.contains(key) {
+                    DismissNoticeButton(label: "Dismiss data integrity warning") { notices.dismiss(key) }
+                }
             }.font(.callout)
+                .moduleSurface(padding: 12, warning: !notices.contains(key))
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(status)
                 .sheet(isPresented: $showingDetails) {
@@ -121,7 +130,7 @@ struct IntegrityBanner: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         SheetDoneButton { showingDetails = false }
-                    }.padding(PageStyle.section).frame(width: 560, height: 440)
+                    }.padding(PageStyle.section).frame(width: 560, height: 440).appCanvas()
                         .onExitCommand { showingDetails = false }
                 }
         }

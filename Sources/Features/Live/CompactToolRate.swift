@@ -54,6 +54,7 @@ struct CompactToolRate: View {
     var now: Date
     var expanded = false
     var warning: String? = nil
+    var showsWarningDetail = true
     @Environment(\.appAccent) private var accent
     var body: some View {
         let allowance = AccountAllowancePresentation(quota: quota, now: now)
@@ -67,7 +68,7 @@ struct CompactToolRate: View {
             activity: activity,
             remaining: allowance.remaining,
             remainingAvailable: allowance.estimate != nil,
-            detail: warning ?? (allowance.estimate == nil ? allowance.qualifier : nil),
+            detail: (showsWarningDetail ? warning : nil) ?? (allowance.estimate == nil ? allowance.qualifier : nil),
             accessibilityRate: CompactLiveCopy.spokenRate(activity: activity, available: meter.hasRate, amount: meter.displayedRate, unit: meter.unit),
             dialValue: dialValue,
             dialAvailable: meter.hasRate,

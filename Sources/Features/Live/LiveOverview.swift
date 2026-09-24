@@ -7,6 +7,7 @@ struct LiveOverview: View {
     @Bindable var monitor: LiveMonitor
     var initiallyExpanded: LiveTool? = nil
     @Environment(\.nativeCommands) private var commands
+    @Environment(\.noticeDismissals) private var notices
     @State private var showMethod = false
     @State private var showSources = false
 
@@ -15,6 +16,7 @@ struct LiveOverview: View {
          LiveTool.allCases.map { model.meter(for: $0).activity.error }).compactMap { $0 }
     }
     var body: some View {
+        let sourceKey = NoticeDismissals.key(sourceErrors + model.snapshot.readHealth.diagnostics.map(\.id))
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Now").font(.headline)
@@ -24,11 +26,15 @@ struct LiveOverview: View {
             }
             LiveToolPanels(model: model, codex: meter, claude: model.claudeMeter, initiallyExpanded: initiallyExpanded)
             CompactUsageBar(packed: model.usageStore.compactUsage, now: model.referenceDate ?? model.clock.now, action: { commands.reports(.history) })
-            if !sourceErrors.isEmpty || !model.snapshot.readHealth.diagnostics.isEmpty {
-                Button { showSources = true } label: {
-                    Label("Sources need attention", systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.orange)
-                }.buttonStyle(.plain)
+            if (!sourceErrors.isEmpty || !model.snapshot.readHealth.diagnostics.isEmpty) && !notices.contains(sourceKey) {
+                HStack {
+                    Button { showSources = true } label: {
+                        Label("Sources need attention", systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }.buttonStyle(.plain)
+                    Spacer()
+                    DismissNoticeButton(label: "Dismiss source warnings") { notices.dismiss(sourceKey) }
+                }.transition(.opacity)
             }
             ImportStatusView(model: model, inset: 0)
             if let release = model.updateCheck.availableRelease {
@@ -42,6 +48,10 @@ struct LiveOverview: View {
                     Button("Settings") { commands.settings() }.keyboardShortcut(",", modifiers: .command)
                     Spacer()
                     Menu {
+                        Button("Data sources") { showSources = true }
+                        if notices.hasDismissed {
+                            Button("Show dismissed warnings") { notices.restore() }
+                        }
                         Button("Feedback") {
                             if !Feedback.open() { model.message = "Could not open feedback in your browser." }
                         }

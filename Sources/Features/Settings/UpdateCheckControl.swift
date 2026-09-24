@@ -36,7 +36,7 @@ struct UpdateAvailableNotice: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Download") { _ = check.openDownload() }.controlSize(.small)
         }
-        .padding(12).background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .moduleSurface(padding: 12)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Update available: Token Bar \(release.version)")
     }

@@ -58,7 +58,7 @@ enum HistoryPreview {
         precondition(model.report.timeline.points.count == 5, "The new minute must extend the line")
         let host = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
             DashboardRoot(model: model, initialDestination: .history).frame(width: 1064, height: 1200)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .appCanvas()
         }.previewStill())
         host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1200)
         let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)

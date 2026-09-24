@@ -25,5 +25,6 @@ struct CostSummary: View {
     }
     private func metric(_ title: String, _ value: String, _ detail: String) -> some View {
         SummaryMetric(title: title, value: value, detail: detail)
+            .moduleSurface()
     }
 }

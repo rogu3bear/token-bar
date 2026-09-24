@@ -47,7 +47,7 @@ struct FirstRunWelcome: View {
                 Button("Start local monitoring", action: start).keyboardShortcut(.defaultAction)
             }
         }.padding(PageStyle.gutter).frame(width: 600)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .appCanvas()
     }
     @MainActor static func present() -> Bool {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 350), styleMask: [.titled], backing: .buffered, defer: false)

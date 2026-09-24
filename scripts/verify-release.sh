@@ -87,7 +87,7 @@ fi
 pkgutil --expand-full "$package" "$work/shipped" || fail "package could not be expanded"
 bundle=$(python3 scripts/bundle_layout.py bundle-name)
 exe=$(python3 scripts/bundle_layout.py executable-name)
-shipped="$work/shipped/Payload/$bundle"
+shipped=$(python3 scripts/bundle_layout.py payload-app "$work/shipped") || fail "unexpected shipped archive layout"
 [ -f "$shipped/Contents/MacOS/$exe" ] || fail "expected Token Bar executable is missing"
 codesign --verify --deep --strict "$shipped" || fail "shipped app signature is invalid"
 
@@ -99,7 +99,7 @@ git archive "$resolved" | (mkdir -p "$work/src" && tar -x -C "$work/src") \
 version=$(tr -d '\n' < "$work/src/VERSION")
 rebuilt_package="$work/src/dist/TokenBar-$version-arm64.pkg"
 pkgutil --expand-full "$rebuilt_package" "$work/rebuilt" || fail "rebuilt installer could not be expanded"
-rebuilt="$work/rebuilt/Payload/$bundle"
+rebuilt=$(python3 scripts/bundle_layout.py payload-app "$work/rebuilt") || fail "unexpected rebuilt archive layout"
 
 # 5. Remove signatures only from these disposable copies, then compare complete
 # payload files and installer semantics. A toolchain difference fails closed.

@@ -28,7 +28,7 @@ struct ToolSpeedHeader: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     SheetDoneButton { showActivity = false }.padding(PageStyle.related)
                     RunningDetails(snapshot: meter.activity, unit: meter.unit)
-                }.frame(width: 560, height: 450).onExitCommand { showActivity = false }
+                }.frame(width: 560, height: 450).appCanvas().onExitCommand { showActivity = false }
             }
     }
     private var activityButton: some View {

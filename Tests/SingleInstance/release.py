@@ -66,7 +66,34 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-release-test-') as temporary:
         rejected(lambda: binary.write_bytes(changed), lambda: binary.write_bytes(macho(0x8000)))
     truncated = macho(0x8000)[:40]
     rejected(lambda: binary.write_bytes(truncated), lambda: binary.write_bytes(macho(0x8000)))
+    product_left, product_right = root / 'product-left', root / 'product-right'
+    for product, component in ((product_left, left), (product_right, right)):
+        product.mkdir()
+        shutil.copytree(component, product / 'TokenBar-component.pkg')
+        (product / 'Resources').mkdir()
+        (product / 'Resources/TokenBar.png').write_bytes(b'synthetic icon')
+        (product / 'Distribution').write_text('<installer-gui-script><title>Token Bar</title></installer-gui-script>')
+    module.compare(product_left, product_right)
+    for relative in ('Resources/TokenBar.png', 'Distribution'):
+        resource = product_right / relative
+        original = resource.read_bytes()
+        resource.write_bytes(b'<changed/>')
+        try:
+            module.compare(product_left, product_right)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('Changed installer branding or distribution was accepted')
+        resource.write_bytes(original)
+    (product_right / 'unexpected.pkg').mkdir()
+    try:
+        module.compare(product_left, product_right)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Unexpected product component was accepted')
 print('PASS: release comparison rejects changed executable, resource, script, mode, payload and metadata; installed-size and signature-residue normalization is narrow')
+print('PASS: product archives bind welcome resources, icon, distribution and exact component inventory')
 
 # Exercise the real shell entry points without compiling or contacting Apple.
 with tempfile.TemporaryDirectory(prefix='tokenbar-output-test-') as temporary:
@@ -171,6 +198,8 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-sidecar-test-') as tem
     shutil.copy2(owner.parent / 'package.sh', root / 'scripts/package.sh')
     shutil.copy2(checksum, root / 'scripts/checksum.sh')
     shutil.copytree(owner.parent / 'pkg', root / 'scripts/pkg')
+    shutil.copytree(owner.parent.parent / 'Assets/Installer', root / 'Assets/Installer', dirs_exist_ok=True)
+    shutil.copy2(owner.parent.parent / 'Assets/TokenBar.png', root / 'Assets/TokenBar.png')
     app = root / 'build/Token Bar.app/Contents'
     app.mkdir(parents=True)
     (app / 'Info.plist').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
@@ -192,6 +221,15 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-sidecar-test-') as tem
     import xml.etree.ElementTree as ET
     expanded = root / 'expanded'
     subprocess.run(['pkgutil', '--expand-full', str(dist / 'TokenBar-9.8.7-arm64.pkg'), str(expanded)], check=True, capture_output=True)
+    expected_icon = root / 'expected-icon.png'
+    subprocess.run(['sips', '-z', '112', '112', str(root / 'Assets/TokenBar.png'), '--out', str(expected_icon)], check=True, capture_output=True)
+    assert (expanded / 'Resources/TokenBar.png').read_bytes() == expected_icon.read_bytes()
+    assert (expanded / 'Resources/welcome.rtf').read_bytes() == (root / 'Assets/Installer/welcome.rtf').read_bytes()
+    distribution = ET.parse(expanded / 'Distribution').getroot()
+    assert distribution.find('welcome').get('file') == 'welcome.rtf'
+    for background in ('background', 'background-darkAqua'):
+        assert distribution.find(background).get('file') == 'TokenBar.png'
+    expanded = expanded / 'TokenBar-component.pkg'
     info = ET.parse(expanded / 'PackageInfo').getroot()
     assert len(list(info.find('bundle-version'))) == 0, 'bundle version checking must be off'
     assert [b.get('id') for b in info.find('upgrade-bundle')] == ['local.star.CodexTokenBar']
@@ -329,9 +367,14 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-identifier-test-') as 
     shutil.copy2(owner.parent / 'package.sh', root / 'scripts/package.sh')
     shutil.copy2(owner.parent / 'checksum.sh', root / 'scripts/checksum.sh')
     shutil.copytree(owner.parent / 'pkg', root / 'scripts/pkg')
+    shutil.copytree(owner.parent.parent / 'Assets/Installer', root / 'Assets/Installer', dirs_exist_ok=True)
+    shutil.copy2(owner.parent.parent / 'Assets/TokenBar.png', root / 'Assets/TokenBar.png')
     pkgbuild = root / 'bin/pkgbuild'
     pkgbuild.write_text('#!/bin/bash\nprintf \'%s\\n\' "$@" > "$TMPDIR/pkgbuild-args"\ntouch "${!#}"\n')
     pkgbuild.chmod(0o700)
+    productbuild = root / 'bin/productbuild'
+    productbuild.write_text('#!/bin/bash\ntouch "${!#}"\n')
+    productbuild.chmod(0o700)
     result = subprocess.run(['bash', str(root / 'scripts/package.sh')], cwd=root, env=env, capture_output=True)
     assert result.returncode == 0, result.stderr
     args = (root / 'pkgbuild-args').read_text().splitlines()
@@ -339,7 +382,7 @@ with tempfile.TemporaryDirectory(prefix='tokenbar-package-identifier-test-') as 
         ['/usr/libexec/PlistBuddy', '-c', 'Print :CFBundleIdentifier',
          str(root / 'build/Token Bar.app/Contents/Info.plist')], text=True).strip()
     assert identifier and args[args.index('--identifier') + 1] == identifier, args
-    assert Path(args[-1]).name == 'TokenBar-9.8.7-arm64.pkg', args
+    assert Path(args[-1]).name == 'TokenBar-component.pkg', args
     from bundle_layout import built_app, built_executable
     assert built_app(root).name == 'Token Bar.app'
     assert built_executable(root).is_file()

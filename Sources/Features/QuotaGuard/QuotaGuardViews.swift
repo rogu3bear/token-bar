@@ -13,9 +13,12 @@ struct QuotaGuardSummary: View {
     @Bindable var coordinator: QuotaGuardCoordinator
     var compact = false
     @State private var expanded = false
-    private var warnings: [QuotaGuardDecision] { coordinator.decisions.filter { $0.risk != .none } }
+    @Environment(\.noticeDismissals) private var notices
+    private var warnings: [QuotaGuardDecision] {
+        coordinator.decisions.filter { $0.risk != .none && !notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level) }
+    }
     var body: some View {
-        let warning = QuotaGuardChrome.hasWarning(coordinator.decisions)
+        let warning = !warnings.isEmpty
         VStack(alignment: .leading, spacing: 8) {
             if warning {
                 HStack {
@@ -74,6 +77,9 @@ struct QuotaGuardSummary: View {
             Button(coordinator.isSnoozed(decision) ? "Snoozed 30 min" : QuotaGuardAction.snoozeTitle) { coordinator.snooze(decision) }
                 .disabled(coordinator.isSnoozed(decision))
                 .accessibilityLabel("Snooze notifications for " + decision.title + " for 30 minutes")
+            DismissNoticeButton(label: "Dismiss " + decision.tool.label + " allowance warning") {
+                notices.dismissAllowance(decision.id, reset: decision.reading?.reset, level: decision.level)
+            }
         }.font(.caption)
     }
     private func row(_ decision: QuotaGuardDecision) -> some View {
@@ -110,7 +116,7 @@ struct QuotaGuardDetail: View {
             if let forecast = evidence.forecast { Text("Projected exhaustion " + Runway.clockLabel(forecast, now: evidence.evaluated)) }
             Text("This is one account allowance, not a whole-tool stop. Forecasts assume recent quota burn continues; they are not a guarantee or token-speed measurement.").font(.caption).foregroundStyle(.secondary)
             Button("Done") { coordinator.selected = nil }.keyboardShortcut(.defaultAction)
-        }.padding(PageStyle.section).frame(width: 460).onExitCommand { coordinator.selected = nil }
+        }.padding(PageStyle.section).frame(width: 460).appCanvas().onExitCommand { coordinator.selected = nil }
     }
 }
 struct QuotaGuardSettingsView: View {

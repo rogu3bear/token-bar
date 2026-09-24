@@ -25,7 +25,16 @@ def built_executable(root=None):
 
 
 def payload_app(root):
-    return root / "Payload" / BUNDLE_NAME
+    return component_root(root) / "Payload" / BUNDLE_NAME
+
+
+def component_root(root):
+    """One exact component, with backward support for published component archives."""
+    if (root / "Distribution").is_file():
+        if {p.name for p in root.iterdir()} != {"Distribution", "Resources", "TokenBar-component.pkg"}:
+            raise ValueError("Unexpected product archive component")
+        return root / "TokenBar-component.pkg"
+    return root
 
 
 def payload_executable(root):
@@ -40,6 +49,9 @@ if __name__ == "__main__":
         "app": str(built_app()),
         "executable": str(built_executable()),
     }
+    if kind == "payload-app" and len(sys.argv) == 3:
+        print(payload_app(Path(sys.argv[2])))
+        sys.exit(0)
     if kind not in mapping:
         sys.exit("usage: bundle_layout.py bundle-name|executable-name|app|executable")
     print(mapping[kind])

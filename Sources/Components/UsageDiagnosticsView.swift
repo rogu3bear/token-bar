@@ -5,16 +5,25 @@ import SwiftUI
 struct UsageDiagnosticsView: View {
     var health: UsageReadHealth
     @State private var showingDetails = false
+    @Environment(\.noticeDismissals) private var notices
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        let key = NoticeDismissals.key(health.diagnostics.map(\.id))
         if !health.diagnostics.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Label(health.summary, systemImage: health.failed ? "exclamationmark.circle" : "exclamationmark.triangle")
-                    .foregroundStyle(health.failed ? Color.red : .orange)
-                    .textSelection(.enabled)
+                if !notices.contains(key) {
+                    HStack(alignment: .top) {
+                        Label(health.summary, systemImage: health.failed ? "exclamationmark.circle" : "exclamationmark.triangle")
+                            .foregroundStyle(health.failed ? Color.red : .orange)
+                            .textSelection(.enabled)
+                        Spacer(minLength: 8)
+                        DismissNoticeButton(label: "Dismiss source warnings") { notices.dismiss(key) }
+                    }.transition(.opacity)
+                }
                 Button("View diagnostic details") { showingDetails = true }
-            }.font(.callout).padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background((health.failed ? Color.red : .orange).opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }.font(.callout).frame(maxWidth: .infinity, alignment: .leading)
+                .moduleSurface(padding: 12, warning: !notices.contains(key))
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: notices.contains(key))
                 .sheet(isPresented: $showingDetails) { UsageDiagnosticDetails(health: health) }
         }
     }
@@ -61,7 +70,7 @@ struct UsageDiagnosticDetails: View {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
-        }.padding(20).frame(width: 660, height: 480).onExitCommand { dismiss() }
+        }.padding(20).frame(width: 660, height: 480).appCanvas().onExitCommand { dismiss() }
     }
     private func recovery(_ value: UsageDiagnostic.Recovery) -> String {
         switch value {

@@ -7,6 +7,7 @@ struct LiveToolPanels: View {
     @Bindable var claude: Tachometer
     @Environment(\.presentationClock) private var clock
     @Environment(\.appAccent) private var accent
+    @Environment(\.noticeDismissals) private var notices
     @State private var expanded: LiveTool?
     @State private var activityTool: LiveTool?
 
@@ -27,20 +28,32 @@ struct LiveToolPanels: View {
             ForEach(tools) { tool in
                 let quota = model.quota(for: tool)
                 let allowance = AccountAllowancePresentation(quota: quota, now: now)
-                let warning = model.quotaGuard.decisions.first { $0.tool == tool && $0.risk != .none }
+                let decision = model.quotaGuard.decisions.first { $0.tool == tool && $0.risk != .none }
+                let warning = decision.flatMap {
+                    notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level) ? nil : $0
+                }
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
                         expanded = expanded == tool ? nil : tool
                     } label: {
                         CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: quota, now: now,
-                                        expanded: expanded == tool, warning: warning.map { warningCopy($0, now: now) })
+                                        expanded: expanded == tool, warning: warning.map { warningCopy($0, now: now) }, showsWarningDetail: false)
                     }.buttonStyle(PressFeedbackStyle())
+                    if let warning {
+                        HStack {
+                            Text(warningCopy(warning, now: now)).font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            DismissNoticeButton(label: "Dismiss " + tool.label + " allowance warning") {
+                                notices.dismissAllowance(warning.id, reset: warning.reading?.reset, level: warning.level)
+                            }
+                        }.padding(.horizontal, 12).padding(.bottom, 8).transition(.opacity)
+                    }
                     DisclosureReveal(expanded: expanded == tool) {
                         VStack(alignment: .leading, spacing: 0) {
                             Divider().padding(.horizontal, 12)
                             VStack(alignment: .leading, spacing: 12) {
                                 providerDetails(tool, allowance: allowance, now: now)
-                                if let warning {
+                                if let warning = decision {
                                     HStack {
                                         Button("View allowance") { model.quotaGuard.view(warning) }
                                         Button(model.quotaGuard.isSnoozed(warning) ? "Snoozed" : "Snooze 30 min") { model.quotaGuard.snooze(warning) }
@@ -51,15 +64,14 @@ struct LiveToolPanels: View {
                         }
                     }
                 }
-                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(warning == nil ? Color.primary.opacity(0.08) : .orange.opacity(0.5), lineWidth: 1))
+                .moduleSurface(padding: 0, warning: warning != nil)
             }
         }
         .sheet(item: $activityTool) { tool in
             VStack(alignment: .trailing, spacing: 0) {
                 SheetDoneButton { activityTool = nil }.padding(PageStyle.related)
                 RunningDetails(snapshot: model.meter(for: tool).activity, unit: model.meter(for: tool).unit)
-            }.frame(width: 560, height: 450).onExitCommand { activityTool = nil }
+            }.frame(width: 560, height: 450).appCanvas().onExitCommand { activityTool = nil }
         }
     }
 

@@ -17,7 +17,7 @@ struct PromptInsightsSection: View {
             }
             if let result = state.result {
                 if let warning = result.cacheWarning {
-                    StatusNotice(message: warning, severity: .warning, dismissible: false)
+                    StatusNotice(message: warning, severity: .warning)
                 }
                 HStack(alignment: .top, spacing: PageStyle.related) {
                     stat("PROMPTS", result.prompts.formatted())
@@ -49,7 +49,7 @@ struct PromptInsightsSection: View {
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 if result.skipped > 0 {
-                    StatusNotice(message: "\(result.skipped) logs were unavailable or incomplete.", severity: .warning, dismissible: false)
+                    StatusNotice(message: "\(result.skipped) logs were unavailable or incomplete.", severity: .warning)
                 }
 
             }

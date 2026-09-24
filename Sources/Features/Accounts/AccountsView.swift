@@ -26,6 +26,7 @@ struct AccountsView: View {
                 VStack(alignment: .leading, spacing: PageStyle.related) {
                     ForEach(LiveTool.allCases) { tool in
                         AccountAllowanceDisclosure(tool: tool, quota: model.quota(for: tool), now: now)
+                            .moduleSurface()
                     }
                 }
                 if accounts.isEmpty {
@@ -34,7 +35,6 @@ struct AccountsView: View {
                 }
                 ForEach(accounts) { account in
                     let quotas = AccountQuotaPresentation.visible(account.quotas)
-                    if account.id != accounts.first?.id { Divider() }
                     VStack(alignment: .leading, spacing: 18) {
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
@@ -69,10 +69,10 @@ struct AccountsView: View {
                             }
                             Text("First and last observed dates, not subscription start or end dates.").font(.caption).foregroundStyle(.secondary)
                         }
-                    }
+                    }.moduleSurface()
                 }
                 if !model.snapshot.plans.isEmpty {
-                    HistoricalPlanChart(plans: model.snapshot.plans)
+                    HistoricalPlanChart(plans: model.snapshot.plans).moduleSurface()
                 }
                 if let error = signIns.error { ErrorNotice(message: error) }
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())

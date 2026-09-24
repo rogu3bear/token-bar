@@ -560,9 +560,15 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Settings"
-            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in DestinationHost(destination: .menuBar, model: model) }.environment(\.nativeCommands, commands))
-            host.sizingOptions = [.intrinsicContentSize]
+            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in
+                DestinationHost(destination: .menuBar, model: model).frame(width: 660, height: 640)
+            }.environment(\.nativeCommands, commands))
+            // Settings is a scrolling viewport. Its unconstrained ideal size is
+            // zero, so the explicit window geometry owns sizing (not the host).
+            host.sizingOptions = []
             window.contentViewController = host
+            window.contentMinSize = NSSize(width: 660, height: 640)
+            window.setContentSize(NSSize(width: 660, height: 640))
             window.isReleasedWhenClosed = false
             window.center(); settingsWindow = window
         }

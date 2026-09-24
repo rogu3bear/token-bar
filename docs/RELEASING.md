@@ -25,6 +25,12 @@ The working successor is **0.2.2**, build **30202**: shared expandable live
 modules, a three-destination Reports window, one Settings destination and common
 measurement-state language, structured read health and explicit report scheduling,
 with Frost branding, a glass gauge icon and native glass controls on macOS 26+.
+The successor installer is a product archive with one `TokenBar-component.pkg`.
+Its native RTF welcome screen and Light/Dark background use a size conversion
+of `Assets/TokenBar.png`, the same artwork as the app icon; the installer keeps
+no separately maintained icon. Source verification
+compares the welcome resource, Distribution, exact component inventory, payload,
+scripts and metadata. Published older component archives remain verifiable.
 Signing and source binding are separate from publication.
 For each successor, bump `VERSION`, prepare changelog notes, and advance the build number. Leave public download links and
 `site/public/release.json` on 0.1.14 until the next release is verified.

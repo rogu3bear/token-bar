@@ -225,7 +225,7 @@ enum ProductPreview {
                     if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer, initiallyExpanded: initiallyExpanded) }
                     else { DashboardRoot(model: model, initialDestination: .now) }
                 }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : previewHeight)
-                    .background(Color(nsColor: .windowBackgroundColor))
+                    .appCanvas()
             }
         }.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } }
         let host = NSHostingView(rootView: view)

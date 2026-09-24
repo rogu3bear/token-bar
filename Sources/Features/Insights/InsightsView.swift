@@ -21,11 +21,12 @@ struct InsightsView: View {
                 if trends.hasResult {
                     UsageInsightsView(summary: trends.summary, monitor: usage.live,
                                       notices: usage.provenanceNotices, integrity: usage.snapshot.integrity)
+                        .moduleSurface()
                 } else if !trends.sourceUnavailable {
                     Text("Usage patterns will appear when local history is ready.").foregroundStyle(.secondary)
                 }
                 Divider().padding(.vertical, 8)
-                PromptInsightsSection(state: model.state)
+                PromptInsightsSection(state: model.state).moduleSurface()
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())
         }.task {
             guard usage.referenceDate == nil else { return } // Isolated fixtures publish explicitly.

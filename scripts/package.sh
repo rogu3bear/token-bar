@@ -42,7 +42,28 @@ fi
 # the installed bundle afterwards, so the system resolves this identifier to
 # /Applications rather than to a stale copy elsewhere.
 args=(--root "$stage/root" --component-plist "$stage/components.plist" --install-location /Applications --identifier "$identifier" --version "$version" --ownership recommended --scripts "$stage/scripts")
-if [[ -n "${INSTALLER_SIGNING_IDENTITY:-}" ]]; then args+=(--sign "$INSTALLER_SIGNING_IDENTITY" --timestamp); fi
-pkgbuild "${args[@]}" "$pkg"
+pkgbuild "${args[@]}" "$stage/TokenBar-component.pkg"
+# Installer branding travels inside the signed archive, including after download.
+# The app and welcome screen derive their icon from the same canonical artwork.
+mkdir -p "$stage/resources"
+cp Assets/Installer/welcome.rtf "$stage/resources/welcome.rtf"
+sips -z 112 112 Assets/TokenBar.png --out "$stage/resources/TokenBar.png" >/dev/null
+cat > "$stage/Distribution" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+  <title>Token Bar</title>
+  <welcome file="welcome.rtf" mime-type="text/rtf"/>
+  <background file="TokenBar.png" mime-type="image/png" scaling="none" alignment="bottomleft"/>
+  <background-darkAqua file="TokenBar.png" mime-type="image/png" scaling="none" alignment="bottomleft"/>
+  <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+  <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+  <choices-outline><line choice="tokenbar"/></choices-outline>
+  <choice id="tokenbar" visible="false"><pkg-ref id="$identifier"/></choice>
+  <pkg-ref id="$identifier" version="$version" onConclusion="none">TokenBar-component.pkg</pkg-ref>
+</installer-gui-script>
+XML
+product_args=(--distribution "$stage/Distribution" --package-path "$stage" --resources "$stage/resources")
+if [[ -n "${INSTALLER_SIGNING_IDENTITY:-}" ]]; then product_args+=(--sign "$INSTALLER_SIGNING_IDENTITY" --timestamp); fi
+productbuild "${product_args[@]}" "$pkg"
 ./scripts/checksum.sh "$pkg"
 printf '%s\n' "Installer assembled. Public distribution still requires Developer ID signing and notarization."

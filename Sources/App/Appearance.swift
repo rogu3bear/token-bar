@@ -19,6 +19,7 @@ extension EnvironmentValues {
     var appAccent: Color { get { self[AppAccentKey.self] } set { self[AppAccentKey.self] = newValue } }
 }
 @Observable final class AppearancePreferences {
+    let notices = NoticeDismissals()
     static let marketingAccent = "A9C9EC"
     static let systemAccent = "SYSTEM"
     static let presets = [("Frost", marketingAccent), ("Mint", "65E0BB"), ("Blue", "67B9FF"), ("Coral", "FFAB91")]
@@ -72,7 +73,8 @@ struct AppearanceHost<Content: View>: View {
     var clock: PresentationClock? = nil
     @ViewBuilder var content: () -> Content
     var body: some View {
-        content().environment(\.presentationClock, clock ?? PresentationClockKey.defaultValue).environment(\.toolPalette, preferences.toolPalette).environment(\.appAccent, preferences.foreground).tint(preferences.foreground).accentColor(preferences.foreground).preferredColorScheme(preferences.scheme)
+        content().appCanvas().environment(\.noticeDismissals, preferences.notices)
+            .environment(\.presentationClock, clock ?? PresentationClockKey.defaultValue).environment(\.toolPalette, preferences.toolPalette).environment(\.appAccent, preferences.foreground).tint(preferences.foreground).accentColor(preferences.foreground).preferredColorScheme(preferences.scheme)
     }
 }
 struct AppearanceControls: View {
@@ -115,7 +117,7 @@ struct AppearanceSettingsView: View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 PageHeader("Appearance", subtitle: "Choose your appearance and colors. Changes apply everywhere and save automatically.")
-                AppearanceControls(preferences: preferences)
+                AppearanceControls(preferences: preferences).moduleSurface()
             }
         }
     }
@@ -193,7 +195,7 @@ struct DetailSheet<Content: View>: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     SheetDoneButton { presented = false }
-                }.padding(PageStyle.gutter).frame(width: 700, height: 520)
+                }.padding(PageStyle.gutter).frame(width: 700, height: 520).appCanvas()
                     .onExitCommand { presented = false }
             }
     }
@@ -212,7 +214,7 @@ struct MethodSheet<Content: View>: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             SheetDoneButton(action: done)
-        }.padding(PageStyle.gutter).frame(width: 560, height: 460)
+        }.padding(PageStyle.gutter).frame(width: 560, height: 460).appCanvas()
             .onExitCommand(perform: done)
     }
 }

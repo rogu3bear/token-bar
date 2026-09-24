@@ -56,7 +56,7 @@ enum DataStatePreview {
                     }
                     Spacer(minLength: 0)
                 }.padding(PageStyle.gutter).frame(width: 1064, height: 1250, alignment: .topLeading)
-                    .background(Color(nsColor: .windowBackgroundColor))
+                    .appCanvas()
             }.previewStill())
             host.frame = NSRect(x: 0, y: 0, width: 1064, height: 1250)
             let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)

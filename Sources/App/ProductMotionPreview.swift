@@ -58,7 +58,7 @@ enum ProductMotionPreview {
         let dashboard = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
             QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)
                 .frame(width: 440, height: 400, alignment: .top)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .appCanvas()
         }.environment(\.colorScheme, .dark))
         dashboard.frame = NSRect(x: 0, y: 0, width: 440, height: 400)
         let window = NSWindow(contentRect: dashboard.frame, styleMask: [.borderless], backing: .buffered, defer: false)
@@ -75,7 +75,7 @@ enum ProductMotionPreview {
                     palette: model.appearance.toolPalette, claudeQuota: model.claudeQuota.quota,
                     grokQuota: model.grokQuota.quota))
                     .padding(.horizontal, 16).frame(width: 560, height: 40)
-                    .background(Color(nsColor: .windowBackgroundColor))
+                    .appCanvas()
             }
         }
         let menuHost = NSHostingView(rootView: menuView(now: now))

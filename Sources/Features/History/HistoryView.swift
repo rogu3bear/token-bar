@@ -14,8 +14,11 @@ struct HistoryView: View {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 header
                 if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
-                periodFilter
-                filters
+                HStack(alignment: .top, spacing: PageStyle.related) {
+                    periodFilter
+                    Spacer()
+                    filters
+                }.moduleSurface()
                 ReadStatusView(state: ReadPresentation(snapshot: model.snapshot,
                     refreshing: model.busy || model.filtering), date: model.lastSuccessfulUsageRead)
                 UsageDiagnosticsView(health: model.snapshot.readHealth)
@@ -33,7 +36,7 @@ struct HistoryView: View {
                     }
                 }
                 if model.report.entries.contains(where: { $0.tokens.cached > $0.tokens.input || $0.tokens.reasoning > $0.tokens.output }) {
-                    StatusNotice(message: "Some source counters have inconsistent cached-input or reasoning subsets. The total still uses input + output; subset comparisons may be unreliable.", severity: .warning, dismissible: false)
+                    StatusNotice(message: "Some source counters have inconsistent cached-input or reasoning subsets. The total still uses input + output; subset comparisons may be unreliable.", severity: .warning)
                 }
                 ChoiceRow(title: "Measure", selection: $reporting.historyMetric, choices: UsageMetric.allCases.map { ($0, $0.rawValue) }, segmented: true)
                 VStack(alignment: .leading, spacing: 18) {
@@ -41,7 +44,7 @@ struct HistoryView: View {
                     ChoiceRow(title: "Compare", selection: $reporting.historyBreakdown, choices: [(0, "Tasks"), (1, "Models"), (2, "Accounts"), (3, "Days"), (4, "Tools"), (5, "Projects")])
                     ContributionChart(rows: rows, metric: metric)
                     if breakdown == 2 { Text("Account associations are inferred from local sign-in observations. Unattributed history stays separate.").font(.caption).foregroundStyle(.secondary) }
-                }
+                }.moduleSurface()
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Usage over time").font(PageStyle.sectionTitle)
@@ -49,7 +52,7 @@ struct HistoryView: View {
                         Text("\(model.report.tasks.count.formatted()) tasks · Local time").font(.caption).foregroundStyle(.secondary)
                     }
                     UsageTimelineChart(timeline: model.report.timeline, metric: metric, tools: model.report.toolTimelines)
-                }
+                }.moduleSurface()
                 if let message = model.message { Text(message).font(.callout).foregroundStyle(.secondary) }
             }.padding(PageStyle.gutter).background(ScrollIndicatorSuppression())
         }
@@ -83,10 +86,12 @@ struct HistoryView: View {
     }
     private func card(_ metric: UsageMetric, _ tokens: Tokens) -> some View {
         SummaryMetric(title: metric.rawValue.uppercased(), value: hasResult ? metric.formatted(tokens) : "—")
+            .moduleSurface()
             .help(hasResult ? metric.amount(tokens).formatted() + " tokens" : "Reading unavailable")
     }
     private func card(_ label: String, _ value: Int) -> some View {
         SummaryMetric(title: label, value: hasResult ? compact(value) : "—")
+            .moduleSurface()
             .help(hasResult ? value.formatted() + " tokens" : "Reading unavailable")
     }
 }

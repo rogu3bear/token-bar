@@ -15,9 +15,11 @@ struct CostView: View {
             VStack(alignment: .leading, spacing: PageStyle.section) {
                 header
                 if let integrity = model.snapshot.integrity, !integrity.isClean { IntegrityBanner(report: integrity) }
-                periodFilter
-                ReportFilters(model: model, includesCost: true)
-                pricingAssumptions
+                VStack(alignment: .leading, spacing: PageStyle.related) {
+                    periodFilter
+                    ReportFilters(model: model, includesCost: true)
+                    pricingAssumptions
+                }.moduleSurface()
                 CostSummary(report: report, refreshing: model.busy || model.filtering,
                             sourceDate: model.lastSuccessfulUsageRead, sourceAvailable: model.costSourceAvailable,
                             sourceHealth: model.snapshot.readHealth)
@@ -27,16 +29,16 @@ struct CostView: View {
                         ForEach(Array((showAll ? rows : Array(rows.prefix(8))))) { row in costRow(row) }
                         if rows.count > 8 { Button { showAll.toggle() } label: { Text(showAll ? "Show fewer" : "Show all \(rows.count)").foregroundStyle(accent) }.buttonStyle(.link) }
                         if rows.isEmpty { Text("No usage matches these filters.").foregroundStyle(.secondary) }
-                    }
-                    dailyChart
-                    contributions
+                    }.moduleSurface()
+                    dailyChart.moduleSurface()
+                    contributions.moduleSurface()
                     if !report.issues.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Usage still awaiting a price").font(.headline)
                             ForEach(report.issues.keys.sorted(), id: \.self) { reason in
                                 HStack { Text(reason); Spacer(); Text(compact(report.issues[reason] ?? 0) + " tokens").monospacedDigit() }
                             }
-                        }.font(.callout).padding(PageStyle.related).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }.font(.callout).moduleSurface()
                     }
                 }
                 DetailSheet("Report details and exports") {

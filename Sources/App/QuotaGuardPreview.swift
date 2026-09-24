@@ -101,7 +101,7 @@ enum QuotaGuardPreview {
                 if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
                 else { DashboardRoot(model: model, initialDestination: settings ? .menuBar : .now) }
             }.frame(width: compact ? 440 : width, height: compact ? nil : height)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .appCanvas()
         }.previewStill()
         let host = NSHostingView(rootView: view)
         host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : width, height: compact ? host.fittingSize.height : height)

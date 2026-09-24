@@ -16,7 +16,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bundle_layout import BUNDLE_NAME, payload_executable
+from bundle_layout import BUNDLE_NAME, payload_executable, component_root
 
 PAGE = 0x4000
 # A signature is kilobytes; anything beyond this is not signing residue.
@@ -86,6 +86,16 @@ def package_info(path):
 
 
 def compare(left, right):
+    product = (left / 'Distribution').is_file()
+    if product != (right / 'Distribution').is_file():
+        raise ValueError('Installer archive formats differ')
+    if product:
+        # No branding resource or distribution behavior is excluded from proof.
+        if inventory(left / 'Resources') != inventory(right / 'Resources'):
+            raise ValueError('Installer branding resources differ')
+        if package_info(left / 'Distribution') != package_info(right / 'Distribution'):
+            raise ValueError('Installer distribution differs')
+        left, right = component_root(left), component_root(right)
     allowed = {'Payload', 'Scripts', 'PackageInfo', 'Bom'}
     for root in (left, right):
         if {p.name for p in root.iterdir()} - allowed:
