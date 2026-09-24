@@ -153,14 +153,20 @@ activity. Remaining you still have is the instrument.
 
 1. Auto is quiet about speed unless a tool is working (fresh rate or currently
    observed running task). Idle Auto does not mint a speed line.
-2. Idle Auto names every tool with a measured remaining, including a measured
-   zero. Unavailable readings do not mint a name. Two named remainings
-   concatenate each tool’s single-tool remaining face. Idle Auto does not use
-   Total or the working mixed quota labels.
-3. When Auto has working tools, occupancy follows activity and measured rate
-   only. Exhausted remaining may still appear in the popover; it does not join a
-   working Auto line as a second occupant. Idle remaining does not sit beside a
-   working neighbor.
+2. Auto's remaining line names only tools with dated activity (a lifecycle
+   event or counter sample) in the last 60 minutes, most recent first, each by
+   its full name, with “remaining” once at the end:
+   `Claude 45% Grok 80% Codex 12% remaining`. A measured zero is named;
+   unavailable readings do not mint a name. A tool idle for an hour drops off.
+   When no tool was used within the hour, idle Auto is the clean idle face
+   (icon, plus any Quota Guard warning), never stale remaining. Idle Auto does
+   not use Total.
+3. When Auto has working tools, speed occupancy follows activity and measured
+   rate only. A lone working tool's title already names it, so its remaining
+   stays unlabeled unless another tool used within the hour joins; then the
+   remaining field is the named line from rule 2. Remaining of a tool unused
+   for an hour never sits beside a working neighbor. Exhausted remaining may
+   still appear in the popover.
 4. Total adds available output rates in one displayed unit and labels partial
    reporting. It never adds remaining percents or a combined exhaustion time.
 5. Fable quota and Fable time left remain opt-in fields, off by default. They
@@ -175,7 +181,8 @@ activity. Remaining you still have is the instrument.
    preferences survive.
 
 `MenuBarPresentation.combined` is the single occupancy owner for the status item
-and the settings preview. `LiveTool.idleNamed` owns idle remaining names.
+and the settings preview. `LiveTool.recent` owns the one-hour remaining-line occupancy;
+`CompactLiveCopy.remainingLine` owns its wording.
 `LiveTool.compact` owns popover rows.
 `LiveTool.nowOccupied` owns Now columns. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
 any CLI's idle name. Changing idle remaining occupancy requires changing this section

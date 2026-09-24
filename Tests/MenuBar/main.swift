@@ -4,6 +4,13 @@ let suite = "local.codex-token-bar.tests." + UUID().uuidString
 let defaults = UserDefaults(suiteName: suite)!
 defer { defaults.removePersistentDomain(forName: suite) }
 let settings = MenuBarPreferences(defaults: defaults)
+/// A completed turn `ago` seconds before `now`: dated lifecycle evidence of recent use, not a running task.
+@discardableResult func used(_ meter: Tachometer, _ tool: LiveTool, ago: TimeInterval, now: Date) -> Tachometer {
+    let date = now.addingTimeInterval(-ago), key = "used-\(tool.rawValue)-\(Int(ago))"
+    meter.activity.turns[key] = TaskActivity(turn: key, started: date, observed: date, running: false, kind: .chat,
+                                             session: key, eventDate: date, tool: tool)
+    return meter
+}
 assert(settings.configuration.enabled == [.quota, .rate, .dial])
 settings.configuration.enabled = [.quota, .rate]
 settings.configuration.compact = true
@@ -165,7 +172,7 @@ let remainingWithoutClockQuota = ToolQuotaState(readings: remainingWithoutClock,
 assert(AccountAllowancePresentation(quota: remainingWithoutClockQuota, now: cacheNow).estimate?.remaining == 60)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow, tool: .claude, claudeQuota: remainingWithoutClockQuota)[.quota] == "Claude 60% remaining")
 var remainingWithoutClockBar = MenuBarConfiguration(); remainingWithoutClockBar.enabled = [.quota]
-let remainingWithoutClockLine = MenuBarPresentation.combined(remainingWithoutClockBar, codex: Tachometer(), claude: Tachometer(), grok: Tachometer(),
+let remainingWithoutClockLine = MenuBarPresentation.combined(remainingWithoutClockBar, codex: Tachometer(), claude: used(Tachometer(), .claude, ago: 60, now: cacheNow), grok: Tachometer(),
     monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: remainingWithoutClockQuota)
 assert(remainingWithoutClockLine.string.contains("Claude") && remainingWithoutClockLine.string.contains("60% remaining"),
        remainingWithoutClockLine.string)
@@ -455,10 +462,14 @@ assert(grokMeasured.string.hasPrefix("Grok") && grokMeasured.string.contains("51
 assert(!grokMeasured.string.contains("Codex 40% remaining"))
 print("PASS: Auto menu bar follows Grok activity without a rate and without falling back to Codex")
 print("PASS: Auto does not borrow unused Codex remaining beside Grok speed; explicit Grok does not inherit Codex quota")
+// Used within the hour, most recent first: Claude 5m, Codex 20m, Grok 40m. None is working now.
+let usedCodex = used(Tachometer(), .codex, ago: 20 * 60, now: now)
+let usedClaude = used(Tachometer(), .claude, ago: 5 * 60, now: now)
+let usedGrok = used(Tachometer(), .grok, ago: 40 * 60, now: now)
 let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
 let claudeSpentState = ToolQuotaState(readings: [claudeSpent], samples: [claudeSpent], horizon: ClaudeQuotaSource.horizon)
 var spentBar = MenuBarConfiguration(); spentBar.enabled = [.dial, .rate, .quota, .fable]
-let spent = MenuBarPresentation.combined(spentBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let spent = MenuBarPresentation.combined(spentBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudeSpentState)
 assert(spent.string.contains("Claude") && spent.string.contains("0% remaining"), spent.string)
 assert(spent.string.contains("Codex") && spent.string.contains("40% remaining"), spent.string)
@@ -470,7 +481,7 @@ let spentCodex = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", wi
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [spentCodex])
 let grokSpent = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premium+", window: "weekly", minutes: 10080, used: 100, reset: now.addingTimeInterval(86400), date: now)
 var unusedZeroBar = MenuBarConfiguration(); unusedZeroBar.enabled = [.dial, .rate, .quota]
-let unusedZeros = MenuBarPresentation.combined(unusedZeroBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let unusedZeros = MenuBarPresentation.combined(unusedZeroBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: ToolQuotaState(readings: [grokSpent], samples: [grokSpent]))
 assert(unusedZeros.string.contains("Codex") && unusedZeros.string.contains("0% remaining"),
        "Idle Auto names a measured Codex zero: \(unusedZeros.string)")
@@ -480,13 +491,13 @@ assert(!unusedZeros.string.contains("Claude") && !unusedZeros.string.contains("t
        unusedZeros.string)
 monitor.state.accounts["a"] = previousAccount
 var unusedRemainingBar = MenuBarConfiguration(); unusedRemainingBar.enabled = [.dial, .rate, .quota]
-let unusedRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let unusedRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
 assert(unusedRemaining.string.hasPrefix("Codex") && unusedRemaining.string.contains("40% remaining"),
        "Idle Auto names Codex remaining you still have: \(unusedRemaining.string)")
 assert(!unusedRemaining.string.contains("tok/") && !unusedRemaining.string.contains("Speed dial"),
        "Idle remaining is not a speed line: \(unusedRemaining.string)")
-let idleGrokRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let idleGrokRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: grokState)
 assert(idleGrokRemaining.string.contains("Grok") && idleGrokRemaining.string.contains("51% remaining"),
        "Idle Auto names measured Grok remaining: \(idleGrokRemaining.string)")
@@ -506,13 +517,11 @@ assert(workingWithClaudeZero.string.hasPrefix("Codex") && !workingWithClaudeZero
        "Claude-at-zero occupies idle Auto only, not a second working-line occupant: \(workingWithClaudeZero.string)")
 assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : ($0 == .codex ? 40 : nil) }) == [.codex, .claude])
 assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : ($0 == .codex ? 40 : nil) }) == [.codex])
-let idleClaudeRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let idleClaudeRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
-assert(idleClaudeRemaining.string.contains("Codex") && idleClaudeRemaining.string.contains("40% remaining"), idleClaudeRemaining.string)
-assert(idleClaudeRemaining.string.contains("Claude") && idleClaudeRemaining.string.contains("60% remaining"), idleClaudeRemaining.string)
+assert(idleClaudeRemaining.string == "Claude 60% Codex 40% remaining",
+       "Idle Auto names each recent tool once, most recent first, and says remaining once: \(idleClaudeRemaining.string)")
 assert(!idleClaudeRemaining.string.contains("Total") && !idleClaudeRemaining.string.contains("tok/"), idleClaudeRemaining.string)
-assert(idleClaudeRemaining.string.hasPrefix(unusedRemaining.string),
-       "Mixed idle remaining reuses the single-tool status-item face: \(idleClaudeRemaining.string)")
 func remainingFaceSize(_ text: NSAttributedString, matching: String) -> CGFloat? {
     let range = (text.string as NSString).range(of: matching)
     guard range.location != NSNotFound else { return nil }
@@ -521,14 +530,14 @@ func remainingFaceSize(_ text: NSAttributedString, matching: String) -> CGFloat?
 assert(remainingFaceSize(unusedRemaining, matching: "40% remaining") == 13)
 assert(remainingFaceSize(idleClaudeRemaining, matching: "40% remaining") == 13,
        "Idle remaining on the status item is the 13pt remaining face, not mixed quota labels")
-assert(remainingFaceSize(idleClaudeRemaining, matching: "60% remaining") == 13)
+assert(remainingFaceSize(idleClaudeRemaining, matching: "60%") == 13)
 let savedIdleAccount = monitor.state.accounts["a"]
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
-let idleClaudeOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let idleClaudeOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
 assert(idleClaudeOnly.string.hasPrefix("Claude") && idleClaudeOnly.string.contains("60% remaining") && !idleClaudeOnly.string.contains("Codex"),
        idleClaudeOnly.string)
-let idleIconOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let idleIconOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
 assert(idleIconOnly.string == "◈", "Idle Auto without a measured remaining is the app icon: \(idleIconOnly.string)")
 monitor.state.accounts["a"] = savedIdleAccount
@@ -540,7 +549,7 @@ do {
         let savedOrder = ordered.order, savedEnabled = ordered.enabled
         func line(twoAccounts: Bool) -> String {
             monitor.state.accounts["a"] = twoAccounts ? savedAccount : LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
-            return MenuBarPresentation.combined(ordered, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+            return MenuBarPresentation.combined(ordered, codex: usedCodex, claude: usedClaude, grok: usedGrok,
                 monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState, riskText: "Quota warning").string
         }
         let one = line(twoAccounts: false), two = line(twoAccounts: true), oneAgain = line(twoAccounts: false)
@@ -558,6 +567,60 @@ do {
 }
 print("PASS: idle Auto names measured Codex, Claude, and Grok remaining, including measured zeros")
 print("PASS: unavailable remaining stays off Auto; remaining you still have is named; Claude-at-zero does not join a working line")
+// Menu-bar remaining line: full names, "remaining" once, only tools used within the last hour.
+do {
+    assert(CompactLiveCopy.remainingLine([("Claude", 45), ("Grok", 80), ("Codex", 12)]) == "Claude 45% Grok 80% Codex 12% remaining")
+    assert(CompactLiveCopy.remainingLine([("Claude", 0)]) == "Claude 0% remaining", "A measured zero is named, not dropped")
+    let codexReading = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 88, reset: now.addingTimeInterval(3600), date: now)
+    let claudeReading = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude", window: "five_hour", minutes: 300, used: 55, reset: now.addingTimeInterval(3600), date: now)
+    let grokReading = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premium+", window: "weekly", minutes: 10080, used: 20, reset: now.addingTimeInterval(86400), date: now)
+    let claudeState = ToolQuotaState(readings: [claudeReading], samples: [claudeReading], horizon: ClaudeQuotaSource.horizon)
+    let grokState = ToolQuotaState(readings: [grokReading], samples: [grokReading])
+    let savedAccount = monitor.state.accounts["a"]
+    defer { monitor.state.accounts["a"] = savedAccount }
+    monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [codexReading])
+    var bar = MenuBarConfiguration(); bar.enabled = [.dial, .rate, .quota]
+    func line(codex: Tachometer, claude: Tachometer, grok: Tachometer, at date: Date = now) -> String {
+        MenuBarPresentation.combined(bar, codex: codex, claude: claude, grok: grok, monitor: monitor, now: date,
+                                     palette: ToolPalette(), claudeQuota: claudeState, grokQuota: grokState).string
+    }
+    // Several tools within the hour share one line, most recent first.
+    let multi = line(codex: used(Tachometer(), .codex, ago: 50 * 60, now: now), claude: used(Tachometer(), .claude, ago: 2 * 60, now: now),
+                     grok: used(Tachometer(), .grok, ago: 10 * 60, now: now))
+    assert(multi == "Claude 45% Grok 80% Codex 12% remaining", multi)
+    assert(multi.components(separatedBy: "remaining").count == 2, "remaining appears once: \(multi)")
+    for code in [" C ", " G ", " X ", "C:", "G:", "X:"] { assert(!multi.contains(code), "No single-letter provider codes: \(multi)") }
+    // A tool idle for more than an hour drops off; the others stay.
+    let partial = line(codex: used(Tachometer(), .codex, ago: 61 * 60, now: now), claude: used(Tachometer(), .claude, ago: 2 * 60, now: now),
+                       grok: used(Tachometer(), .grok, ago: 3 * 3600, now: now))
+    assert(partial == "Claude 45% remaining", partial)
+    // Exactly one hour is outside the window.
+    assert(line(codex: used(Tachometer(), .codex, ago: 3600, now: now), claude: Tachometer(), grok: Tachometer()) == "◈")
+    // Every tool stale: the clean idle face, no leftover remaining clutter.
+    let stale = line(codex: used(Tachometer(), .codex, ago: 2 * 3600, now: now), claude: used(Tachometer(), .claude, ago: 90 * 60, now: now),
+                     grok: used(Tachometer(), .grok, ago: 5 * 3600, now: now))
+    assert(stale == "◈", "All stale is the clean idle face: \(stale)")
+    // The same meters age out as the clock moves; nothing is retained past the window.
+    let codexUsed = used(Tachometer(), .codex, ago: 30 * 60, now: now)
+    assert(line(codex: codexUsed, claude: Tachometer(), grok: Tachometer()) == "Codex 12% remaining")
+    assert(line(codex: codexUsed, claude: Tachometer(), grok: Tachometer(), at: now.addingTimeInterval(31 * 60)) == "◈")
+    // Evidence is dated lifecycle or counter data; an undated turn is not recent use.
+    let undated = Tachometer()
+    undated.activity.turns["u"] = TaskActivity(turn: "u", started: now, observed: now, running: false, kind: .chat, session: "u", tool: .claude)
+    assert(undated.activity.lastEvidence(at: now) == nil)
+    assert(LiveTool.recent(codex: Tachometer(), claude: undated, grok: Tachometer(), now: now).isEmpty)
+    // A working tool keeps its speed face; others used within the hour join the remaining line by name.
+    let working = Tachometer(); working.hasRate = true; working.rawRate = 12; working.rate = 12
+    let joined = line(codex: working, claude: used(Tachometer(), .claude, ago: 15 * 60, now: now), grok: used(Tachometer(), .grok, ago: 2 * 3600, now: now))
+    assert(joined.hasPrefix("Codex") && joined.hasSuffix("Codex 12% Claude 45% remaining") && !joined.contains("Grok"), joined)
+    let alone = line(codex: working, claude: used(Tachometer(), .claude, ago: 2 * 3600, now: now), grok: Tachometer())
+    assert(alone.hasPrefix("Codex") && alone.hasSuffix("12% remaining") && alone.components(separatedBy: "Codex").count == 2,
+           "A lone working tool is named once: \(alone)")
+    // Explicit selection stays on its own tool's remaining.
+    bar.tool = .claude
+    assert(line(codex: used(Tachometer(), .codex, ago: 60, now: now), claude: Tachometer(), grok: Tachometer()).hasSuffix("45% remaining"))
+    print("PASS: menu-bar remaining line names recent tools in full, says remaining once, drops tools idle over an hour, and all-stale is the clean idle face")
+}
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex],
        "Working Now does not give idle Claude a column")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .codex ? 64 : nil }) == [.codex],
@@ -680,15 +743,13 @@ for selection in [MenuBarTool.codex, .claude, .grok, .auto] {
                 choice.order = reverse ? Array(MenuBarPart.allCases.reversed()) : MenuBarPart.allCases
                 choice.enabled = Set(MenuBarPart.allCases.enumerated().filter { mask & (1 << $0.offset) != 0 }.map { $0.element })
                 for date in [now, now.addingTimeInterval(121)] {
-                    let composed = MenuBarPresentation.combined(choice, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+                    let composed = MenuBarPresentation.combined(choice, codex: usedCodex, claude: idleClaude, grok: usedGrok,
                         monitor: monitor, now: date, palette: combinedPalette, claudeQuota: ToolQuotaState(), grokQuota: grokState)
                     if selection == .auto {
                         let namesRemaining = choice.enabled.contains(.quota) && date == now
                         if namesRemaining {
-                            assert(composed.string.contains("Codex") && composed.string.contains("40% remaining"),
-                                   "Idle Auto names Codex remaining you still have: \(composed.string)")
-                            assert(composed.string.contains("Grok") && composed.string.contains("51% remaining"),
-                                   "Idle Auto names measured Grok remaining: \(composed.string)")
+                            assert(composed.string.contains("Codex 40% Grok 51% remaining"),
+                                   "Idle Auto names recent Codex and Grok remaining on one line: \(composed.string)")
                             assert(!composed.string.contains("Claude"),
                                    "Idle Auto does not invent Claude: \(composed.string)")
                         } else {
@@ -978,7 +1039,7 @@ do {
         monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
     assert(totalWithFable.string.hasPrefix("Total") && totalWithFable.string.components(separatedBy: "Fable 68% · 5h").count == 2, totalWithFable.string)
     fableMenu.enabled = [.rate, .quota, .fable, .fablePace]
-    let idleWithFable = MenuBarPresentation.combined(fableMenu, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+    let idleWithFable = MenuBarPresentation.combined(fableMenu, codex: idleCodex, claude: used(Tachometer(), .claude, ago: 600, now: cacheNow), grok: staleGrok,
         monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
     assert(!idleWithFable.string.contains("Fable") && !idleWithFable.string.contains("tok/"),
            "Idle Auto omits unused Fable remaining: \(idleWithFable.string)")

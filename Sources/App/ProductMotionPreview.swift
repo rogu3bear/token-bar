@@ -79,6 +79,12 @@ enum ProductMotionPreview {
                 meter.activity = ActivitySnapshot(readAt: now, referenceDate: now)
                 meter.tick(now: now)
             }
+            // The idle remaining line names only tools used within the hour: completed turns, not running ones.
+            for (meter, tool, ago) in [(model.claudeMeter, LiveTool.claude, 300.0), (model.tachometer, .codex, 1200)] {
+                let date = now.addingTimeInterval(-ago), key = "sample-idle-" + tool.rawValue
+                meter.activity.turns[key] = TaskActivity(turn: key, started: date, observed: date, running: false,
+                                                         kind: .chat, session: key, eventDate: date, tool: tool)
+            }
             model.claudeQuota.quota.samples = [claudeFirst]
             model.claudeQuota.quota.readings = [claudeQuota]
             RunLoop.main.run(until: Date().addingTimeInterval(0.3))

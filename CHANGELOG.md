@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Menu-bar remaining is one line that spells out each provider and says remaining once, e.g. `Claude 45% Grok 80% Codex 12% remaining`. Only tools with dated activity in the last hour appear, most recent first; after an hour idle a tool drops off, and with none recent the status item returns to the clean idle face instead of stale remaining.
+- Native test groups compile again: two settings headers depended on dashboard navigation, which the logic groups do not link.
+
 ## 0.1.13 — Released 2026-09-23
 
 - Quiet first-view chrome on Now, Cost, Quota Guard, and Menu bar settings. Guard no longer prints a no-warning disclaimer; Cost leads with estimate and coverage; the working column puts rate above remaining; method links use native label ink, not the accent; occupancy rules stay in Glance grammar rather than a settings essay.

@@ -270,9 +270,9 @@ boundaries. A first snapshot is still only a baseline; decreases and long gaps
 do not create an estimated rate. `MenuBarPresentation.combined` owns automatic
 multi-tool presentation for both the status item and settings preview. It sums
 available output rates, never provider allowances, and keeps idle Auto quiet
-about speed while naming every measured remaining, including Grok. Mixed idle remaining
-concatenates each tool’s single-tool remaining face rather than Total or working
-quota labels. Unavailable remaining stays off. Opt-in Fable fields cannot restore
+about speed. Its remaining line names each tool with dated activity in the last
+hour (`LiveTool.recent`), full names, “remaining” once; with none recent, idle
+Auto is the clean idle face. Unavailable remaining stays off. Opt-in Fable fields cannot restore
 an idle Codex speed line. An enabled Quota Guard warning is risk text, not
 occupancy. `LiveTool.nowOccupied` owns Now columns: working tools while any
 are working, measured remainings when idle. Remaining sits in the same column as
