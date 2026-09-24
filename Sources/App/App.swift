@@ -606,8 +606,10 @@ struct QuickLiveView: View {
         statusAnimator.update(presentation, in: button, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak button] in
             button?.attributedTitle = $0
         }
-        button.setAccessibilityLabel(presentation.string)
-        button.toolTip = presentation.string
+        // Break accessibility recursion: plain text only, no attachment characters.
+        let plainLabel = presentation.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial")
+        button.setAccessibilityLabel(plainLabel)
+        button.toolTip = plainLabel
     }
     func applicationWillTerminate(_ notification: Notification) {
         statusAnimator.cancel()

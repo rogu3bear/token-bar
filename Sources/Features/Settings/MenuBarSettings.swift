@@ -265,7 +265,7 @@ struct MenuBarSettingsView: View {
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .lineLimit(3).frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
                         .padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-                        .accessibilityLabel(presentation.string)
+                        .accessibilityLabel(presentation.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial"))
                 }
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }

@@ -27,10 +27,13 @@ struct CompactSpeedDial: View {
                              endAngle: .degrees(Self.degrees(at: value)), clockwise: false)
                 context.stroke(active, with: .color(tint), style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 let angle = Self.degrees(at: value)
-                let tip = point(value, radius - 5)
-                let left = point(value, radius).applying(CGAffineTransform(rotationAngle: (angle + 90) * .pi / 180).translatedBy(x: 2, y: 0))
-                let right = point(value, radius).applying(CGAffineTransform(rotationAngle: (angle - 90) * .pi / 180).translatedBy(x: 2, y: 0))
-                let tail = point(value, radius * 0.4)
+                func polar(_ degrees: Double, _ distance: Double) -> CGPoint {
+                    let a = degrees * .pi / 180
+                    return CGPoint(x: center.x + cos(a) * distance, y: center.y + sin(a) * distance)
+                }
+                let tip = polar(angle, radius - 5)
+                let left = polar(angle + 90, 1.5), right = polar(angle - 90, 1.5)
+                let tail = polar(angle + 180, radius * 0.35)
                 var needle = Path()
                 needle.move(to: tip); needle.addLine(to: left); needle.addLine(to: tail)
                 needle.addLine(to: right); needle.closeSubpath()
