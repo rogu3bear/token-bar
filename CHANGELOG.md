@@ -4,6 +4,7 @@
 
 - Quiet first-view chrome on Now, Cost, Quota Guard, and Menu bar settings. Guard no longer prints a no-warning disclaimer; Cost leads with estimate and coverage; the working column puts rate above remaining; method links use native label ink, not the accent; occupancy rules stay in Glance grammar rather than a settings essay.
 - Keep configuration in the settings window. Menu bar and Appearance leave the capsule; the popover Settings control opens the existing window, not a SwiftUI Settings scene.
+- Name measured Grok remaining on idle Auto and the popover the same way as Codex and Claude, including a measured zero. Unavailable remaining still does not mint a name; working Auto still omits idle neighbors.
 
 ## 0.1.12 — Released 2026-09-19
 

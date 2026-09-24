@@ -153,13 +153,12 @@ activity. Remaining you still have is the instrument.
 
 1. Auto is quiet about speed unless a tool is working (fresh rate or currently
    observed running task). Idle Auto does not mint a speed line.
-2. Idle Auto names measured Codex and Claude remaining, including Claude at a
-   measured zero. Unused Codex or Grok zeros stay off Auto and the popover.
-   Idle Grok remaining stays off Auto. Unavailable readings do not mint a name.
-   Two named remainings concatenate each tool’s single-tool remaining face.
-   Idle Auto does not use Total or the working mixed quota labels.
+2. Idle Auto names every tool with a measured remaining, including a measured
+   zero. Unavailable readings do not mint a name. Two named remainings
+   concatenate each tool’s single-tool remaining face. Idle Auto does not use
+   Total or the working mixed quota labels.
 3. When Auto has working tools, occupancy follows activity and measured rate
-   only. Exhausted Claude may still appear in the popover; it does not join a
+   only. Exhausted remaining may still appear in the popover; it does not join a
    working Auto line as a second occupant. Idle remaining does not sit beside a
    working neighbor.
 4. Total adds available output rates in one displayed unit and labels partial
@@ -179,7 +178,7 @@ activity. Remaining you still have is the instrument.
 and the settings preview. `LiveTool.idleNamed` owns idle remaining names.
 `LiveTool.compact` owns popover rows.
 `LiveTool.nowOccupied` owns Now columns. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
-Claude's idle name. Changing idle remaining occupancy requires changing this section
+any CLI's idle name. Changing idle remaining occupancy requires changing this section
 and a MenuBar test that names the tool.
 
 `AccountAllowancePresentation` owns current allowance qualification: matching
@@ -200,14 +199,13 @@ claim. A working row with no speed reading still says rate unavailable.
 Auto occupancy follows Glance grammar. Right now shows tools with a fresh rate or currently observed running task.
 Inactive quota readings and stale unconfirmed tasks do not reserve speed panels. Unused remaining does not occupy a working Now column.
 Tools join with stable identity and a restrained transition; when nothing is active,
-the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unused idle Grok rows and unused Codex or Grok zeros are not listed. Idle Auto names measured Codex and Claude remaining without a speed line. Unused Codex or Grok zeros stay off Auto. Codex speed appears in Auto only while it is running or has a measured rate. Each tool owns its units,
+the dashboard says that no tools are working. Working popover rows distinguish Idle from Unconfirmed; unavailable remaining stays off. Idle Auto names every measured remaining without a speed line. Unavailable remaining stays off Auto. Codex speed appears in Auto only while it is running or has a measured rate. Each tool owns its units,
 range, activity, and estimated output rate. Rate units use directly visible buttons.
-Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools with explicit `tok/s`, `tok/m`, or `tok/h` units, idle named Codex and Claude remaining, and unused Claude whose remaining is a measured zero. No tool's
+Every tool follows the one saved application accent. Appearance retains System, Dark and Light modes, presets, and a custom accent. Legacy per-tool color values remain stored but do not override the rendered accent. Grok joins the same tool-panel layout when active. The quick popover lists working tools with explicit `tok/s`, `tok/m`, or `tok/h` units, idle named remainings for every CLI with a reading, and exhausted remaining at a measured zero. No tool's
 speed is labeled as another tool or silently pooled into it.
 
 Menu bar settings offer Codex, Claude, Grok, and Auto. Auto shows a named
-single tool or Total when several tools are active, and names measured Codex and
-Claude remaining when none are running. Total adds available output
+single tool or Total when several tools are active, and names every measured remaining when none are running. Total adds available output
 rates in one displayed unit and labels partial reporting; it never adds quota
 percentages or projects a combined exhaustion time. Each remaining allowance
 keeps its tool identity and the shared accent. A single-tool menu-bar readout
@@ -232,7 +230,7 @@ Dividers separate tools without adding card surfaces. The compact gauge leaves t
 900 × 700 minimum dashboard size; expanded evidence can scroll. The popover
 fits its content rather than reserving a fixed height, follows the saved
 appearance, and uses the same saved application accent as Now. The quick
-popover shows each working tool, idle named Codex and Claude remaining, and unused Claude whose remaining is a measured zero. Working rows keep name, rate, and remaining percent. Idle remaining rows keep remaining as the only large figure; Idle is caption, not a rate-sized word. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. When the optional launch-time update check finds a newer notarized release, one accent-tinted row names that version with a Download button; it is a notice, not occupancy, never joins the status item, and appears in previews only through the explicit `--sample-update` seed. Menu bar quota remains separately labeled for each selected tool. Unused Codex or Grok zeros stay off Auto and the popover. Idle Grok remaining stays off Auto. Grok remaining, when present on a working or explicit Grok line, comes from the installed Grok agent and stays labeled Grok. Claude reads
+popover shows each working tool, idle named remainings for every CLI with a reading, and exhausted remaining at a measured zero. Working rows keep name, rate, and remaining percent. Idle remaining rows keep remaining as the only large figure; Idle is caption, not a rate-sized word. Click a row for reset, read freshness, account and projected-zero evidence. Idle is labeled separately from unavailable speed; stale or failed allowance is unconfirmed. Disclosure state survives activity transitions. A today token bar uses recorded usage only. When the optional launch-time update check finds a newer notarized release, one accent-tinted row names that version with a Download button; it is a notice, not occupancy, never joins the status item, and appears in previews only through the explicit `--sample-update` seed. Menu bar quota remains separately labeled for each selected tool. Unavailable remaining stays off Auto and the popover. Grok remaining, when present on a working, idle, or explicit Grok line, comes from the installed Grok agent and stays labeled Grok. Claude reads
 its account-bound local usage cache, which the installed Claude Code refreshes every 15 minutes at Token Bar's request; missing or stale readings stay unavailable. A missing reset stays unavailable; remaining can still be measured. `QuotaReading.windowLabel` owns the allowance-window name used by Now, Accounts, and Quota Guard. Exact day or hour multiples keep those units; other durations stay in minutes. `resetWhen` owns the reset clock; callers add Reset/resets grammar. The optional Fable quota field, off by default, names the binding limit among Claude's current 5-hour, weekly and Fable weekly readings; it compares those percentages and never adds them. A measured Fable zero or missing budget is omitted from the status item rather than shown as “Fable 0%” or unavailable copy. An optional time-left field follows it in smaller secondary text (“≈2h 40m left”). Each limit's burn is a time-weighted average of up to four hours of readings with a one-hour half-life, restarting at a reset, so bursts and uneven refresh timing do not swing the projection. Until 30 minutes of readings exist, or when no limit would run out before its reset, it says learning pace, no recent use or resets first rather than a guessed time. Completion removes a task's rate; stale or insufficient counter
 reports show an em dash, never a guessed zero.
 

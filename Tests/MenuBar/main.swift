@@ -356,11 +356,12 @@ assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { _ 
 assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .codex ? 40 : nil }) == [.codex],
        "Idle popover names Codex remaining you still have")
 assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .claude ? 60 : nil }) == [.claude])
-assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .grok ? 51 : nil }).isEmpty,
-       "Idle Grok remaining does not occupy Auto or the popover")
-assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .claude ? 0 : 40 }) == [.codex, .claude])
-assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { _ in 0 }) == [.claude],
-       "Unused Codex remaining 0 does not earn a popover row")
+assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, grok: Tachometer(),
+                        remaining: { $0 == .grok ? 51 : nil }) == [.grok],
+       "Idle Grok remaining is named when measured")
+assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .claude ? 0 : ($0 == .codex ? 40 : nil) }) == [.codex, .claude])
+assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { _ in 0 }) == [.codex, .claude, .grok],
+       "Measured zero remaining names each CLI")
 soloCodex.hasRate = true
 assert(LiveTool.visible(codex: soloCodex, claude: joiningClaude) == [.codex])
 assert(LiveTool.compact(codex: soloCodex, claude: joiningClaude, remaining: { $0 == .claude ? 0 : 40 }) == [.codex, .claude])
@@ -463,7 +464,7 @@ assert(spent.string.contains("Claude") && spent.string.contains("0% remaining"),
 assert(spent.string.contains("Codex") && spent.string.contains("40% remaining"), spent.string)
 assert(!spent.string.contains("Fable") && !spent.string.contains("tok/"), spent.string)
 assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : nil }) == [.claude])
-assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in 0 }) == [.claude])
+assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in 0 }) == [.codex, .claude, .grok])
 let previousAccount = monitor.state.accounts["a"]
 let spentCodex = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 100, reset: now.addingTimeInterval(3600), date: now)
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [spentCodex])
@@ -471,8 +472,12 @@ let grokSpent = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premi
 var unusedZeroBar = MenuBarConfiguration(); unusedZeroBar.enabled = [.dial, .rate, .quota]
 let unusedZeros = MenuBarPresentation.combined(unusedZeroBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: ToolQuotaState(readings: [grokSpent], samples: [grokSpent]))
-assert(!unusedZeros.string.contains("Codex") && !unusedZeros.string.contains("Grok") && !unusedZeros.string.contains("Claude"),
-       "Idle unused zeros stay off Auto: \(unusedZeros.string)")
+assert(unusedZeros.string.contains("Codex") && unusedZeros.string.contains("0% remaining"),
+       "Idle Auto names a measured Codex zero: \(unusedZeros.string)")
+assert(unusedZeros.string.contains("Grok") && unusedZeros.string.contains("0% remaining"),
+       "Idle Auto names a measured Grok zero: \(unusedZeros.string)")
+assert(!unusedZeros.string.contains("Claude") && !unusedZeros.string.contains("tok/"),
+       unusedZeros.string)
 monitor.state.accounts["a"] = previousAccount
 var unusedRemainingBar = MenuBarConfiguration(); unusedRemainingBar.enabled = [.dial, .rate, .quota]
 let unusedRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
@@ -481,6 +486,11 @@ assert(unusedRemaining.string.hasPrefix("Codex") && unusedRemaining.string.conta
        "Idle Auto names Codex remaining you still have: \(unusedRemaining.string)")
 assert(!unusedRemaining.string.contains("tok/") && !unusedRemaining.string.contains("Speed dial"),
        "Idle remaining is not a speed line: \(unusedRemaining.string)")
+let idleGrokRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: grokState)
+assert(idleGrokRemaining.string.contains("Grok") && idleGrokRemaining.string.contains("51% remaining"),
+       "Idle Auto names measured Grok remaining: \(idleGrokRemaining.string)")
+assert(!idleGrokRemaining.string.contains("tok/"), idleGrokRemaining.string)
 let workingCodex = Tachometer()
 workingCodex.hasRate = true; workingCodex.rawRate = 12; workingCodex.rate = 12
 let claudePlenty = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude",
@@ -494,8 +504,8 @@ let workingWithClaudeZero = MenuBarPresentation.combined(unusedRemainingBar, cod
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudeSpentState)
 assert(workingWithClaudeZero.string.hasPrefix("Codex") && !workingWithClaudeZero.string.contains("Claude"),
        "Claude-at-zero occupies idle Auto only, not a second working-line occupant: \(workingWithClaudeZero.string)")
-assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : 40 }) == [.codex, .claude])
-assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 40 }) == [.codex])
+assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : ($0 == .codex ? 40 : nil) }) == [.codex, .claude])
+assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : ($0 == .codex ? 40 : nil) }) == [.codex])
 let idleClaudeRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
 assert(idleClaudeRemaining.string.contains("Codex") && idleClaudeRemaining.string.contains("40% remaining"), idleClaudeRemaining.string)
@@ -546,8 +556,8 @@ do {
     }
     print("PASS: reordered icon, grouped remaining and warning retain saved order across one-to-two-to-one idle accounts")
 }
-print("PASS: idle Auto names measured Codex and Claude remaining and keeps unused zeros off the bar")
-print("PASS: unused zeros stay off Auto; remaining you still have is named; Claude-at-zero does not join a working line")
+print("PASS: idle Auto names measured Codex, Claude, and Grok remaining, including measured zeros")
+print("PASS: unavailable remaining stays off Auto; remaining you still have is named; Claude-at-zero does not join a working line")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex],
        "Working Now does not give idle Claude a column")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .codex ? 64 : nil }) == [.codex],
@@ -668,8 +678,10 @@ for selection in [MenuBarTool.codex, .claude, .grok, .auto] {
                         if namesRemaining {
                             assert(composed.string.contains("Codex") && composed.string.contains("40% remaining"),
                                    "Idle Auto names Codex remaining you still have: \(composed.string)")
-                            assert(!composed.string.contains("Claude") && !composed.string.contains("Grok"),
-                                   "Idle Auto does not invent Claude or Grok: \(composed.string)")
+                            assert(composed.string.contains("Grok") && composed.string.contains("51% remaining"),
+                                   "Idle Auto names measured Grok remaining: \(composed.string)")
+                            assert(!composed.string.contains("Claude"),
+                                   "Idle Auto does not invent Claude: \(composed.string)")
                         } else {
                             assert(!composed.string.contains("Codex") && !composed.string.contains("Claude") && !composed.string.contains("Grok"),
                                    "Idle Auto does not invent a tool: \(composed.string)")
