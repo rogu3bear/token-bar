@@ -13,7 +13,7 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
         case .now: return "Now"
         case .history: return "History"
         case .cost: return "Cost"
-        case .accounts: return "Accounts & plans"
+        case .accounts: return "Allowances"
         case .insights: return "Insights"
         case .menuBar: return "Menu bar"
         case .appearance: return "Appearance"
@@ -26,8 +26,8 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
         self == .history || self == .cost
     }
 
-    /// Persistent dashboard tabs. Menu bar and Appearance stay hostable, not capsule members.
-    static var capsule: [Destination] { [.now, .history, .cost, .accounts, .insights] }
+    /// Persistent dashboard tabs. Insights, Menu bar and Appearance stay hostable, not capsule members.
+    static var capsule: [Destination] { [.now, .history, .cost, .accounts] }
     static var settings: [Destination] { [.menuBar, .appearance] }
 }
 
