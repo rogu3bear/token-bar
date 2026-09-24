@@ -3,7 +3,6 @@ import SwiftUI
 /// The same report availability is used for headline and detailed coverage.
 struct CostSummary: View {
     var report: CostReport
-    var basis: CostPriceBasis
     var refreshing = false
     var sourceDate: Date?
     var sourceError: String?
@@ -28,8 +27,6 @@ struct CostSummary: View {
                 metric("PRICING COVERAGE", report.coverageText,
                        report.calculatedAt == nil ? "Awaiting calculation" : report.lines.isEmpty ? "No selected usage" : "\(compact(report.unpricedTokens)) tokens unpriced")
             }
-            Text(basis == .historical ? "Dated API rates where verified. Unknown historical tariffs and ambiguous price-change days remain unpriced. This is an API-equivalent estimate, not an amount paid." : "Valued at the \(CostRateCard.reference.observedOn) reference rates. This is not a bill or subscription charge.")
-                .font(.callout).foregroundStyle(.secondary)
         }
     }
     private func metric(_ title: String, _ value: String, _ detail: String) -> some View {

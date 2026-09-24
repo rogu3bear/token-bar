@@ -6,6 +6,7 @@
 - Keep configuration in the settings window. Menu bar and Appearance leave the capsule; the popover Settings control opens the existing window, not a SwiftUI Settings scene.
 - Name measured Grok remaining on idle Auto and the popover the same way as Codex and Claude, including a measured zero. Unavailable remaining still does not mint a name; working Auto still omits idle neighbors.
 - Capsule is Now, History, Cost, and Allowances. Allowances leads with the three CLI remainings; Insights stays in tree without a tab.
+- After an end-to-end stills pass: Guard chrome only when a warning exists; View quota opens Allowances; idle Now and the popover keep unconfirmed chairs for stale or failed remaining; Allowances does not reprint Codex remaining under the disclosures; Settings Rate units stays a readable label; welcome and empty Allowances name all three CLIs.
 
 ## 0.1.12 — Released 2026-09-19
 

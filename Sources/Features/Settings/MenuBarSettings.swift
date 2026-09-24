@@ -276,13 +276,17 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
-                Picker("Rate units", selection: $preferences.configuration.unit) {
-                    Text("Follow selected tool").tag("dashboard")
-                    Text("Tokens / second").tag("s")
-                    Text("Tokens / minute").tag("m")
-                    Text("Tokens / hour").tag("h")
-                }.pickerStyle(.segmented)
+                VStack(alignment: .leading, spacing: PageStyle.labelGap) {
+                    Text("Rate units").font(.callout)
+                    Picker("Rate units", selection: $preferences.configuration.unit) {
+                        Text("Follow selected tool").tag("dashboard")
+                        Text("Tokens / second").tag("s")
+                        Text("Tokens / minute").tag("m")
+                        Text("Tokens / hour").tag("h")
+                    }.pickerStyle(.segmented).labelsHidden()
+                }
                 Text("Follow selected tool uses its dashboard unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
+                if let quotaGuard { QuotaGuardSettingsView(coordinator: quotaGuard) }
                 Text("Appearance").font(PageStyle.sectionTitle)
                 AppearanceControls(preferences: appearance)
                 DetailSheet("Customize") {
@@ -317,7 +321,6 @@ struct MenuBarSettingsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.top, 12)
                 }
-                if let quotaGuard { QuotaGuardSettingsView(coordinator: quotaGuard) }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .disabled(!allowsSystemSettings)
                     .onAppear { if allowsSystemSettings { launchAtLogin = SMAppService.mainApp.status == .enabled } }

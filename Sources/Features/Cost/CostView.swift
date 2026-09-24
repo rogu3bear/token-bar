@@ -17,7 +17,7 @@ struct CostView: View {
                 periodFilter
                 ReportFilters(model: model, includesCost: true)
                 pricingAssumptions
-                CostSummary(report: report, basis: model.costBasis, refreshing: model.busy || model.filtering,
+                CostSummary(report: report, refreshing: model.busy || model.filtering,
                             sourceDate: model.lastSuccessfulUsageRead, sourceError: model.snapshot.error, sourceAvailable: model.costSourceAvailable)
                 if report.calculatedAt != nil && model.costSourceAvailable {
                     VStack(alignment: .leading, spacing: 14) {
@@ -140,6 +140,9 @@ struct CostView: View {
     private var method: some View {
         VStack(alignment: .leading, spacing: PageStyle.related) {
             Text("API-equivalent estimates and evidence").font(PageStyle.sectionTitle)
+            Text(model.costBasis == .historical
+                 ? "Dated API rates where verified. Unknown historical tariffs and ambiguous price-change days remain unpriced. This is an API-equivalent estimate, not an amount paid."
+                 : "Valued at the \(CostRateCard.reference.observedOn) reference rates. This is not a bill or subscription charge.")
             Text("Historical rates use dated, sourced versions and leave unsupported intervals unpriced. Reference rates apply the \(CostRateCard.reference.observedOn) card to any period for comparison. Recorded tier uses only a tier present in usage metadata; Standard and Fast are explicit scenarios. Neither establishes a charge. Subscriptions, credits, taxes, regional uplifts, and tool fees are excluded.")
             Text("Effort is the setting recorded for a turn. It is not inferred from reasoning-token counts and does not multiply prices. Missing effort stays Unknown; models with no verified price stay unpriced.")
             Text("A single-request observation is needed to choose a long-context rate. For session-wide pricing, all observed usage in that task is considered even outside your filters. Missing evidence is never assumed to be short context.")

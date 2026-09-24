@@ -14,8 +14,11 @@ struct LiveToolPanels: View {
             let remaining: (LiveTool) -> Double? = { tool in
                 AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
             }
+            let unconfirmed: (LiveTool) -> Bool = { tool in
+                AccountAllowancePresentation(quota: model.quota(for: tool), now: now).unconfirmedChair
+            }
             let tools = LiveTool.active(codex: codex, claude: claude, grok: model.grokMeter)
-            let seats = LiveTool.nowOccupied(codex: codex, claude: claude, grok: model.grokMeter, remaining: remaining)
+            let seats = LiveTool.nowOccupied(codex: codex, claude: claude, grok: model.grokMeter, remaining: remaining, unconfirmed: unconfirmed)
             VStack(alignment: .leading, spacing: PageStyle.related) {
             if tools.isEmpty {
                 AccountAllowanceSection(tools: seats, quota: { model.quota(for: $0) },

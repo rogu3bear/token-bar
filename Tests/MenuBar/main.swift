@@ -571,7 +571,16 @@ assert(LiveTool.nowOccupied(codex: idleCodex, claude: idleClaude, grok: staleGro
        "Idle Now keeps measured remainings, including Claude at zero")
 assert(LiveTool.nowOccupied(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in nil }).isEmpty,
        "Idle Now does not mint seats from connection without a reading")
-print("PASS: Now seats are working tools, or idle measured remainings, never an empty chair")
+assert(LiveTool.nowOccupied(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in nil },
+                            unconfirmed: { $0 == .codex }) == [.codex],
+       "Idle Now keeps a chair for a stale or failed reading")
+assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in nil },
+                        unconfirmed: { $0 == .codex }) == [.codex])
+assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .codex ? 64 : nil },
+                            unconfirmed: { $0 == .claude }) == [.codex],
+       "Unconfirmed idle neighbor is not a working Now column")
+assert(LiveTool.idleNamed(remaining: { _ in nil }).isEmpty, "Auto still omits unconfirmed remaining")
+print("PASS: Now seats are working tools, idle measured remainings, or unconfirmed chairs, never a never-seen unavailable")
 assert(unusedRemaining.string.hasPrefix("Codex") && unusedRemaining.string.contains("40% remaining"), unusedRemaining.string)
 assert(AccountAllowancePresentation(quota: claudeSpentState, now: now).measuredZero)
 assert(!AccountAllowancePresentation(quota: claudePlentyState, now: now).measuredZero)
@@ -852,16 +861,21 @@ do {
     var stale = current; stale.readings[0].date = now.addingTimeInterval(-Runway.defaultHorizon)
     assert(AccountAllowancePresentation(quota: stale, now: now).remaining == "—")
     assert(AccountAllowancePresentation(quota: stale, now: now).detail.contains("Stale"))
+    assert(AccountAllowancePresentation(quota: stale, now: now).unconfirmedChair)
     var expired = current; expired.readings[0].reset = now
     assert(AccountAllowancePresentation(quota: expired, now: now).remaining == "—")
     assert(AccountAllowancePresentation(quota: expired, now: now).qualifier.contains("Reset passed"))
+    assert(AccountAllowancePresentation(quota: expired, now: now).unconfirmedChair)
     var failed = current; failed.guardFailed = true
     assert(AccountAllowancePresentation(quota: failed, now: now).remaining == "—")
     assert(AccountAllowancePresentation(quota: failed, now: now).detail.contains("Read failed"))
+    assert(AccountAllowancePresentation(quota: failed, now: now).unconfirmedChair)
+    assert(!shown.unconfirmedChair)
     var switched = current; switched.guardAccountID = "synthetic-b"; switched.accountLabel = "Second synthetic account"
     let switchedFace = AccountAllowancePresentation(quota: switched, now: now)
     assert(switchedFace.reading == nil && switchedFace.remaining == "—")
     assert(!switchedFace.detail.contains("64%"), "Old account allowance cannot be labeled as the new account")
+    assert(!switchedFace.unconfirmedChair, "A new account without a reading is unavailable, not an unconfirmed chair")
     var invalid = current; invalid.readings[0].used = -1
     assert(AccountAllowancePresentation(quota: invalid, now: now).remaining == "—")
     print("PASS: account relevance survives idle/failure with stable order; allowance preserves reset/freshness/identity/zero boundaries")
