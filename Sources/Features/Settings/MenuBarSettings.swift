@@ -263,7 +263,7 @@ struct MenuBarSettingsView: View {
     var body: some View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Menu bar", subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
+                PageHeader(.menuBar, subtitle: "Choose what appears at the top of your screen. Changes apply and save automatically.")
                 Group {
                     let presentation = MenuBarPresentation.combined(preferences.configuration, codex: meter, claude: claudeMeter, grok: grokMeter,
                         monitor: monitor, now: evaluationDate ?? clock.now, palette: palette, claudeQuota: claudeQuota.quota, grokQuota: grokQuota.quota, riskText: quotaGuard?.menuText(selection: preferences.configuration.tool))
@@ -287,7 +287,9 @@ struct MenuBarSettingsView: View {
                 }
                 Text("Follow selected tool uses its dashboard unit. Explicit units apply only to the menu bar.").font(.caption).foregroundStyle(.secondary)
                 if let quotaGuard { QuotaGuardSettingsView(coordinator: quotaGuard) }
-                Text("Appearance").font(PageStyle.sectionTitle)
+                Label("Appearance", systemImage: "paintpalette")
+                    .font(PageStyle.sectionTitle)
+                    .labelStyle(.titleAndIcon)
                 AppearanceControls(preferences: appearance)
                 DetailSheet("Customize") {
                     VStack(alignment: .leading, spacing: 16) {

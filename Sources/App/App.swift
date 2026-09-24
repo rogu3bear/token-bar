@@ -434,7 +434,13 @@ struct QuickLiveView: View {
     var body: some View {
         Group {
             VStack(alignment: .leading, spacing: 10) {
-                HStack { Text("Now").font(.headline); Spacer(); if monitor.busy { ProgressView().controlSize(.small) } }
+                HStack { 
+                    Label("Now", systemImage: "gauge.with.dots.needle.bottom.100percent")
+                        .font(.headline)
+                        .labelStyle(.titleAndIcon)
+                    Spacer()
+                    if monitor.busy { ProgressView().controlSize(.small) }
+                }
                 let now = model.referenceDate ?? model.clock.now
                 let tools = LiveTool.compact(codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter, remaining: { tool in
                     AccountAllowancePresentation(quota: model.quota(for: tool), now: now).estimate.map(\.remaining)
@@ -640,7 +646,9 @@ struct QuickLiveView: View {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Token Bar — Settings"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, appearance: model.appearance, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
+            let host = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, appearance: model.appearance, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
+            host.sizingOptions = [.intrinsicContentSize]
+            window.contentViewController = host
             window.isReleasedWhenClosed = false
             window.center(); settingsWindow = window
         }

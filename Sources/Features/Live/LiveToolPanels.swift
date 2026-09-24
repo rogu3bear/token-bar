@@ -39,7 +39,7 @@ struct LiveToolPanels: View {
                     RPMGauge(value: meter.rate, minimum: meter.minimum, maximum: meter.scale,
                              measured: meter.rawRate, hasRate: meter.hasRate, unit: Binding(get: { meter.unit }, set: { meter.unit = $0 }),
                              compactLayout: true, showsReadout: false)
-                        .frame(height: 210)
+                        .frame(height: 180)
                 }, footer: { tool in
                     VStack(alignment: .leading) {
                         Text(model.meter(for: tool).models.joined(separator: ", "))
