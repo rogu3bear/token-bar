@@ -460,7 +460,7 @@ struct QuickLiveView: View {
                 if let error = monitor.error { ErrorNotice(message: error) }
                 HStack {
                     Button("Dashboard") { model.showDetails?() }.buttonStyle(.borderedProminent)
-                    Button("Menu bar settings") { model.showMenuBarSettings?() }
+                    Button("Settings") { model.showMenuBarSettings?() }
                     Button("Quit") { NSApplication.shared.terminate(nil) }
                     Spacer()
                     Button {
@@ -637,8 +637,8 @@ struct QuickLiveView: View {
         popover.performClose(nil)
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Token Bar — Menu bar settings"
-            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
+            window.title = "Token Bar — Settings"
+            window.contentViewController = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) { [model] in MenuBarSettingsView(allowsSystemSettings: model.allowsSystemSettings, preferences: model.menuBarPreferences, appearance: model.appearance, meter: model.tachometer, claudeMeter: model.claudeMeter, grokMeter: model.grokMeter, monitor: model.live, claudeQuota: model.claudeQuota, grokQuota: model.grokQuota, claudeConnection: model.claudeConnection, quotaGuard: model.quotaGuard, updateCheck: model.updateCheck) })
             window.isReleasedWhenClosed = false
             window.center(); settingsWindow = window
         }

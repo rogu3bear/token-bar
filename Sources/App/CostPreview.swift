@@ -172,7 +172,7 @@ enum CostPreview {
             NSApp.appearance = NSAppearance(named: mode == "Light" ? .aqua : .darkAqua)
             for size in sizes {
                 for reduced in [NSWorkspace.shared.accessibilityDisplayShouldReduceMotion] {
-                    for page in Destination.allCases {
+                    for page in Destination.capsule {
                         let host = NSHostingView(rootView: AppearanceHost(preferences: model.appearance) {
                             DashboardRoot(model: model, initialDestination: page).frame(width: size.width, height: size.height)
                                 .background(Color(nsColor: .windowBackgroundColor))
