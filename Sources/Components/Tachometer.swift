@@ -98,15 +98,15 @@ struct RPMGauge: View {
             let center = CGPoint(x: width / 2, y: height * 0.59)
             let radius = min(width * 0.44, height * 0.52)
             let fraction = min(1, max(0, (value - minimum) / max(1, maximum - minimum)))
-            AnimatedRateDial(fraction: fraction, width: width, height: height, minimum: minimum, maximum: maximum, unit: unit, showsLabels: !compactLayout)
+            AnimatedRateDial(fraction: fraction, width: width, height: height, minimum: minimum, maximum: maximum, unit: unit, showsLabels: !compactLayout, arcWidth: compactLayout ? 6 : 14)
                 .animation(reduceMotion ? nil : .smooth(duration: 1.2, extraBounce: 0), value: fraction)
                 .animation(reduceMotion ? nil : .smooth(duration: 1.2, extraBounce: 0), value: minimum)
                 .animation(reduceMotion ? nil : .smooth(duration: 1.2, extraBounce: 0), value: maximum)
             if showsReadout {
-                RateReadout(measured: measured, hasRate: hasRate, unit: $unit, size: compactLayout ? 34 : 46)
+                RateReadout(measured: measured, hasRate: hasRate, unit: $unit, size: compactLayout ? 29 : 46)
                     .position(x: center.x, y: center.y + radius * 0.48)
             }
-        }.frame(minHeight: 180)
+        }.frame(minHeight: 160)
     }
 }
 
@@ -145,6 +145,7 @@ struct AnimatedRateDial: View, Animatable {
     var maximum: Double
     var unit: RateUnit
     var showsLabels = true
+    var arcWidth: Double = 14
     /// SwiftUI degrees: counterclockwise from 8 o'clock through 12 to 4 o'clock.
     static let startDegrees = 150.0
     static let sweepDegrees = 240.0
@@ -170,10 +171,10 @@ struct AnimatedRateDial: View, Animatable {
                 }
                 var rail = Path()
                 rail.addArc(center: center, radius: radius, startAngle: .degrees(Self.startDegrees), endAngle: .degrees(Self.endDegrees), clockwise: false)
-                context.stroke(rail, with: .color(.primary.opacity(0.09)), style: StrokeStyle(lineWidth: showsLabels ? 14 : 6, lineCap: .round))
+                context.stroke(rail, with: .color(.primary.opacity(0.09)), style: StrokeStyle(lineWidth: arcWidth, lineCap: .round))
                 var active = Path()
                 active.addArc(center: center, radius: radius, startAngle: .degrees(Self.startDegrees), endAngle: .degrees(Self.degrees(at: fraction)), clockwise: false)
-                context.stroke(active, with: .color(accent), style: StrokeStyle(lineWidth: showsLabels ? 14 : 6, lineCap: .round))
+                context.stroke(active, with: .color(accent), style: StrokeStyle(lineWidth: arcWidth, lineCap: .round))
                 for tick in stride(from: 0, through: Self.tickDivisions, by: showsLabels ? 2 : 10) {
                     let angle = Self.tickDegrees(tick)
                     let major = tick % 10 == 0
@@ -187,8 +188,10 @@ struct AnimatedRateDial: View, Animatable {
                     }
                 }
                 let angle = Self.degrees(at: fraction)
-                let tip = point(angle, radius - 41)
-                let left = point(angle + 90, 4), right = point(angle - 90, 4), tail = point(angle + 180, 18)
+                let needleReach = showsLabels ? 41 : 30
+                let tip = point(angle, radius - Double(needleReach))
+                let width = showsLabels ? 4.0 : 3.0
+                let left = point(angle + 90, width), right = point(angle - 90, width), tail = point(angle + 180, 18)
                 var needle = Path(); needle.move(to: tip); needle.addLine(to: left); needle.addLine(to: tail); needle.addLine(to: right); needle.closeSubpath()
                 context.fill(needle, with: .color(accent))
                 context.fill(Path(ellipseIn: CGRect(x: center.x - 9, y: center.y - 9, width: 18, height: 18)), with: .color(Color(nsColor: .windowBackgroundColor)))

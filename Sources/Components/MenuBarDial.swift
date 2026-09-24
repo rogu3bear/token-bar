@@ -123,7 +123,8 @@ final class MenuBarValueAnimator {
         cancel()
         target = value
         // Core Animation files every CATransition under kCATransition, whatever key it is added with.
-        guard let from, !reduceMotion, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        // Trust the reduceMotion parameter; do not re-check NSWorkspace mid-animation
+        guard let from, !reduceMotion else {
             view.layer?.removeAnimation(forKey: kCATransition)
             displayed = value; apply(value); return
         }
@@ -145,7 +146,8 @@ final class MenuBarValueAnimator {
             guard let self else { timer.invalidate(); return }
             guard let view else { self.cancel(); return }
             let progress = min(1, (ProcessInfo.processInfo.systemUptime - start) / 0.35)
-            let finished = progress >= 1 || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            // Do not re-check NSWorkspace during animation; motion decision was already made
+            let finished = progress >= 1
             let eased = progress * progress * (3 - 2 * progress)
             let frame = finished ? value : Self.frame(from: from, to: value, progress: eased)
             self.displayed = frame; apply(frame)
@@ -172,7 +174,9 @@ struct MenuBarPreview: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         field.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         context.coordinator.update(value, in: field, reduceMotion: reduceMotion) { [weak field] in field?.attributedStringValue = $0 }
-        field.setAccessibilityLabel(value.string)
+        // Break accessibility recursion: plain text only, no attachment characters
+        let plainLabel = value.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial")
+        field.setAccessibilityLabel(plainLabel)
     }
     static func dismantleNSView(_ view: NSTextField, coordinator: MenuBarValueAnimator) { coordinator.cancel() }
 }
