@@ -97,7 +97,12 @@ private struct CompactToolFace: View {
     }
     private var numbers: some View {
         HStack(spacing: 10) {
-            Circle().fill(tint).frame(width: 8, height: 8)
+            ZStack {
+                Circle().fill(tint).frame(width: 14, height: 14)
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(tint)
             Spacer(minLength: 8)
             if let rate {

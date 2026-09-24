@@ -33,7 +33,8 @@ struct ToolSpeedHeader: View {
     }
     private var activityButton: some View {
         Button { showActivity = true } label: {
-            Label(meter.activity.error == nil ? meter.status : "Inspect activity read failure", systemImage: meter.runningCount > 0 ? "waveform" : "pause.circle")
+            Label(meter.activity.error == nil ? meter.status : "Inspect activity read failure", 
+                  systemImage: meter.runningCount > 0 ? "waveform" : meter.activity.error != nil ? "exclamationmark.triangle" : "pause.circle")
                 .font(.callout).foregroundStyle(.primary)
         }.buttonStyle(.plain).help("Inspect observed chats and agents")
     }

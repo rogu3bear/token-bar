@@ -114,7 +114,7 @@ struct AppearanceSettingsView: View {
     var body: some View {
         SettingsPage {
             VStack(alignment: .leading, spacing: PageStyle.section) {
-                PageHeader("Appearance", subtitle: "Choose your appearance and colors. Changes apply everywhere and save automatically.")
+                PageHeader(.appearance, subtitle: "Choose your appearance and colors. Changes apply everywhere and save automatically.")
                 AppearanceControls(preferences: preferences)
             }
         }

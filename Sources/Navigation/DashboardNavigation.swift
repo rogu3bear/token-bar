@@ -19,6 +19,18 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
         case .appearance: return "Appearance"
         }
     }
+    
+    var icon: String {
+        switch self {
+        case .now: return "gauge.with.dots.needle.bottom.100percent"
+        case .history: return "chart.line.uptrend.xyaxis"
+        case .cost: return "dollarsign.circle"
+        case .accounts: return "person.crop.circle"
+        case .insights: return "lightbulb"
+        case .menuBar: return "menubar.rectangle"
+        case .appearance: return "paintpalette"
+        }
+    }
 
     /// Destinations that render filtered reports and therefore need the
     /// expensive detailed rebuild while they are visible.
@@ -65,11 +77,15 @@ struct DashboardNavigation: View {
                     selection = destination
                     focused = destination
                 } label: {
-                    Text(destination.title)
-                        .font(.system(size: 12, weight: selection == destination ? .semibold : .medium))
-                        .foregroundStyle(selection == destination ? .primary : .secondary)
-                        .frame(maxWidth: .infinity, minHeight: 30)
-                        .contentShape(Capsule())
+                    HStack(spacing: 4) {
+                        Image(systemName: destination.icon)
+                            .font(.system(size: 11, weight: selection == destination ? .semibold : .medium))
+                        Text(destination.title)
+                            .font(.system(size: 12, weight: selection == destination ? .semibold : .medium))
+                    }
+                    .foregroundStyle(selection == destination ? .primary : .secondary)
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .focused($focused, equals: destination)
