@@ -87,7 +87,7 @@ struct DashboardNavigation: View {
                     .frame(maxWidth: .infinity, minHeight: 30)
                     .contentShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressFeedbackStyle(cornerRadius: 15))
                 .focused($focused, equals: destination)
                 .overlay(Capsule().stroke(focused == destination ? Color.primary.opacity(0.6) : .clear, lineWidth: 2))
                 .help("Open " + destination.title)
@@ -105,7 +105,7 @@ struct DashboardNavigation: View {
         .padding(3)
         .frame(maxWidth: 840)
         .modifier(ReportNavigationMaterial())
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selection)
+        .animation(InteractionMotion.selection(reduceMotion), value: selection)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Reports navigation")
     }

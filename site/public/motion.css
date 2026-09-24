@@ -1,0 +1,52 @@
+/* Interaction motion: press 90 ms, state 160 ms, disclosure 240 ms.
+   Animate the control that changes; never delay its action. */
+:root {
+  --motion-press: 90ms;
+  --motion-state: 160ms;
+  --motion-disclosure: 240ms;
+  --motion-ease: cubic-bezier(.2, .8, .2, 1);
+}
+.button, .source-link, .recording-controls button {
+  transition: transform var(--motion-state) var(--motion-ease),
+    color var(--motion-state) ease, background-color var(--motion-state) ease,
+    border-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
+}
+nav a, .text-link, summary, .field input, .field textarea {
+  transition: color var(--motion-state) ease, border-color var(--motion-state) ease,
+    background-color var(--motion-state) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .button:not(:disabled):hover, .source-link:hover {
+    transform: translateY(-1px);
+  }
+}
+.button:not(:disabled):active, .source-link:active, .recording-controls button:not(:disabled):active {
+  transform: translateY(0) scale(.98);
+  transition-duration: var(--motion-press);
+}
+.button:disabled, .recording-controls button:disabled { transform: none; }
+.playback-icon { display: grid; place-items: center; width: 16px; height: 16px; }
+.playback-icon svg {
+  grid-area: 1 / 1;
+  width: 16px; height: 16px; fill: currentColor;
+  transition: opacity var(--motion-state) ease, transform var(--motion-state) var(--motion-ease);
+}
+.playback-pause, [data-playing="true"] .playback-play { opacity: 0; transform: scale(.8); }
+[data-playing="true"] .playback-pause { opacity: 1; transform: scale(1); }
+[data-disclosure] > summary { display: flex; align-items: center; gap: 10px; list-style: none; }
+[data-disclosure] > summary::-webkit-details-marker { display: none; }
+[data-disclosure] > summary::before {
+  content: ""; width: 7px; height: 7px; flex: 0 0 7px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--motion-disclosure) var(--motion-ease);
+}
+[data-disclosure][open] > summary::before { transform: rotate(45deg); }
+[data-disclosure][data-expanded="false"] > summary::before { transform: rotate(-45deg); }
+[data-disclosure].is-animating { overflow: clip; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .button:not(:disabled):hover, .button:not(:disabled):active,
+  .source-link:hover, .source-link:active, .recording-controls button:not(:disabled):active { transform: none; }
+}

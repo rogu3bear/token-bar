@@ -244,7 +244,7 @@ enum ProductPreview {
             // AppDelegate as NSApp.delegate or start its monitoring lifecycle.
             let delegate = AppDelegate()
             delegate.model = model; delegate.configureNavigationActions()
-            let controller = NSHostingController(rootView: view)
+            let controller = NSHostingController(rootView: view.environment(\.nativeCommands, delegate.commands))
             controller.sizingOptions = [.preferredContentSize]
             window.contentViewController = controller
             defer { PreviewModelScope.close(delegate.detailWindow); PreviewModelScope.close(delegate.settingsWindow) }

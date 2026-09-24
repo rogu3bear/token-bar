@@ -555,6 +555,25 @@ preview version. Playback uses a small icon button with an accessible action
 name and tooltip; routine playback status is screen-reader-only. Reduced-motion,
 visibility pause and explicit user-pause behavior remain unchanged.
 
+### Click and disclosure motion
+
+`InteractionMotion` owns custom native click timing; `site/public/motion.css`
+owns the same hierarchy on the website: 90 ms press feedback, 160 ms selection
+or icon changes, and 240 ms expansion, with a gentle ease-out and no bounce.
+Actions run immediately. System glass buttons and sheets retain macOS behavior.
+Report motion stays inside the navigation control; it does not animate the
+report page or trigger measurement transitions.
+
+Live module details keep their identity and full content width while a clipped
+layout reveals their height. The header chevron rotates on the same expansion
+clock. Repeated clicks reverse from the current presentation; there is no queue
+of delayed state changes. Collapsed content is unavailable to focus and hit tests.
+Website disclosures likewise measure content height and cancel obsolete motion;
+clipboard/error fallbacks settle open before focusing the copyable text.
+Resizing settles the requested state. Reduce Motion removes movement and applies
+the final state immediately, including when enabled during a website transition.
+Playback uses fixed-size, overlapping icons so play/pause does not shift layout.
+
 ### Visible website previews
 
 Native still images remain visible until a recording actually starts playing,

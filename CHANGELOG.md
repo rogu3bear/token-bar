@@ -7,6 +7,7 @@
 - Preserve saved accents and System defaults; Frost replaces Lime in the preset list.
 - Refresh the website and native sample captures; public downloads remain on the last published, notarized package.
 - Keep candidate notes out of the public release list and load the changelog script and styles through files allowed by the site's Content Security Policy.
+- Coordinate click feedback across the website and native app: quick presses, stable play/pause icons, reversible disclosures and a moving report selection. Keep hidden module details out of keyboard and accessibility navigation, and respect Reduce Motion.
 
 ## 0.2.1 — Read health and native architecture qualification
 

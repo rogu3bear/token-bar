@@ -541,15 +541,6 @@ footer nav {
     font-size: 40px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
 
 .native-preview {
   background: #1e1e1e;
@@ -563,9 +554,6 @@ footer nav {
   height: auto;
 }
 /* Shared controls and distinct native recording surfaces. */
-.button, .source-link, nav a, summary {
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
-}
 .source-link, nav a {
   min-height: var(--control-height);
   display: inline-flex;
@@ -609,10 +597,6 @@ footer nav {
   background: rgb(255 165 0 / 8%);
 }
 .recording-controls button:disabled { opacity: 0.6; cursor: default; }
-@media (prefers-reduced-motion: no-preference) {
-  .button:not(:disabled):hover { transform: translateY(-1px); }
-  .button { transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease; }
-}
 @media (max-width: 600px) {
   .actions .button { flex: 1 1 140px; }
   .navigation { flex-wrap: wrap; gap: 8px 16px; }

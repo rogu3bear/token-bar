@@ -584,3 +584,47 @@ assert(ReadPresentation(snapshot: retainedGaps).caption == "Read completed · co
 let mixedFailure = Snapshot(updated: PreviewFixture.date, error: PreviewFixture.sourceDiagnostics + " Account service unavailable.")
 assert(mixedFailure.readHealth.failed)
 print("PASS: full legacy diagnostic payload retains source counts and coverage while mixed unknown failures stay failures")
+
+// Real SwiftUI layout measurement: content keeps its full measure and identity
+// through expansion, reversal and a width change; only its reveal height changes.
+private final class DisclosureProbeState: ObservableObject {
+    @Published var progress: CGFloat = 0
+    @Published var width: CGFloat = 408
+}
+private struct DisclosureProbeFixture: View {
+    @ObservedObject var state: DisclosureProbeState
+    let probes: ProviderLayoutProbes
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: 44)
+            DisclosureLayout(progress: state.progress) {
+                Color.clear.frame(height: 180)
+                    .background(ProviderLayoutProbe(key: "details", probes: probes))
+            }.clipped()
+            Color.clear.frame(height: 32)
+        }.frame(width: state.width).fixedSize(horizontal: false, vertical: true)
+    }
+}
+MainActor.assumeIsolated {
+    let state = DisclosureProbeState(), probes = ProviderLayoutProbes()
+    let host = NSHostingView(rootView: DisclosureProbeFixture(state: state, probes: probes))
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false; window.contentView = host
+    defer { window.contentView = nil; window.close() }
+    var retained: NSView?
+    for width: CGFloat in [408, 320] {
+        state.width = width
+        for progress: CGFloat in [0, 0.35, 0.8, 0.45, 1, 0] {
+            state.progress = progress
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            assert(abs(host.fittingSize.height - (76 + 180 * progress)) < 1, "disclosure height tracks the current reveal without reserving a collapsed gap")
+            let frame = probes.frame("details")
+            assert(abs(frame.width - width) < 1 && abs(frame.height - 180) < 1, "details keep their intrinsic size while their parent clips the reveal")
+            if let retained { assert(retained === probes.views["details"], "reversal must retain the detail subtree") }
+            retained = probes.views["details"]
+        }
+    }
+    print("PASS: disclosure expansion/reversal retains content identity and full measure, with exact intermediate heights at two widths")
+}

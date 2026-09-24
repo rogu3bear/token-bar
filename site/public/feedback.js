@@ -1,4 +1,5 @@
 import { DRAFT_KEY, FIELDS, VERSION_QUERY_MAX, draftFields, issueURL, copyText } from './feedback-draft.js';
+import { enhanceDisclosure, setDisclosureOpen } from './disclosure.js';
 
 export function initFeedback({ document, location, history, storage, writeClipboard, openReview }) {
   const form = document.querySelector('#feedback-form');
@@ -42,13 +43,13 @@ export function initFeedback({ document, location, history, storage, writeClipbo
     if (!form.reportValidity()) return;
     const { draft, retained } = retain();
     if (!retained) {
-      fallback.open = true; text.focus(); text.select();
+      setDisclosureOpen(fallback, true); text.focus(); text.select();
       show('Your draft could not be saved in this browser. Copy or save the complete draft below before leaving, then use Open GitHub directly and paste it into the issue form.', true);
       return;
     }
     const url = issueURL(draft);
     if (!url) {
-      fallback.open = true; text.focus(); text.select();
+      setDisclosureOpen(fallback, true); text.focus(); text.select();
       show('This draft is too long for a GitHub link. Copy it below, open GitHub directly, and paste it into the issue form. Your draft is retained.', true);
       return;
     }
@@ -56,7 +57,7 @@ export function initFeedback({ document, location, history, storage, writeClipbo
       openReview(url);
       show('Opening GitHub in this tab. Your draft is saved; use Back to return. If GitHub does not open, copy the draft and use Open GitHub directly below.');
     } catch {
-      fallback.open = true;
+      setDisclosureOpen(fallback, true);
       show('GitHub could not be opened. Your draft is retained. Copy it and use Open GitHub directly below.', true);
     }
   });
@@ -65,19 +66,25 @@ export function initFeedback({ document, location, history, storage, writeClipbo
     try { await writeClipboard(value); show('Draft copied. Review it before submitting on GitHub.'); }
     catch {
       // Use the current draft even if it changed while permission was pending.
-      text.value = copyText(fields()); fallback.open = true; text.focus(); text.select();
+      text.value = copyText(fields()); setDisclosureOpen(fallback, true); text.focus(); text.select();
       show('Clipboard access is unavailable. Select and copy the draft below with your keyboard or touch controls.', true);
     }
   });
   document.querySelector('#clear-draft').addEventListener('click', () => {
     try { storage().removeItem(DRAFT_KEY); }
     catch { show('Saved draft could not be cleared. Clear this site’s browser data to remove it; the visible draft is retained.', true); return; }
-    form.reset(); text.value = ''; fallback.open = false;
+    form.reset(); text.value = ''; setDisclosureOpen(fallback, false);
     saved.textContent = 'Local draft cleared.'; show(''); form.elements.title.focus();
   });
 }
-if (typeof document !== 'undefined') initFeedback({
-  document, location, history, storage: () => window.localStorage,
-  writeClipboard: text => navigator.clipboard.writeText(text),
-  openReview: url => location.assign(url),
-});
+if (typeof document !== 'undefined') {
+  enhanceDisclosure(document.querySelector('#copy-fallback'), {
+    media: matchMedia('(prefers-reduced-motion: reduce)'), resizeTarget: window,
+    style: getComputedStyle(document.documentElement),
+  });
+  initFeedback({
+    document, location, history, storage: () => window.localStorage,
+    writeClipboard: text => navigator.clipboard.writeText(text),
+    openReview: url => location.assign(url),
+  });
+}

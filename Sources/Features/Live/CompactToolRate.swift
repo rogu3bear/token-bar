@@ -127,8 +127,10 @@ private struct CompactToolFace: View {
                 remainingNumber
                 Text("remaining").font(.caption).foregroundStyle(.secondary)
             }
-            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+            Image(systemName: "chevron.down")
                 .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                .rotationEffect(.degrees(expanded ? 180 : 0))
+                .animation(InteractionMotion.disclosure(reduceMotion), value: expanded)
         }
     }
     private func chrome<Content: View>(content: Content) -> some View {

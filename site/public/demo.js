@@ -32,7 +32,7 @@ const mayPlay = () => inView && pageActive && !document.hidden && !reducedMotion
 function controls() {
   play.ariaLabel = playing ? "Pause preview" : "Play preview";
   play.title = play.ariaLabel;
-  document.querySelector("#demo-icon").textContent = playing ? "Ⅱ" : "▶";
+  play.dataset.playing = String(playing);
   play.disabled = failed || reducedMotion.matches;
   if (failed) {
     status.textContent = "Warning: Recording unavailable. The still previews show the native app.";

@@ -5,7 +5,6 @@ struct LiveToolPanels: View {
     var model: UsageModel
     @Bindable var codex: Tachometer
     @Bindable var claude: Tachometer
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.presentationClock) private var clock
     @Environment(\.appAccent) private var accent
     @State private var expanded: LiveTool?
@@ -31,25 +30,25 @@ struct LiveToolPanels: View {
                 let warning = model.quotaGuard.decisions.first { $0.tool == tool && $0.risk != .none }
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                            expanded = expanded == tool ? nil : tool
-                        }
+                        expanded = expanded == tool ? nil : tool
                     } label: {
                         CompactToolRate(tool: tool, meter: model.meter(for: tool), quota: quota, now: now,
                                         expanded: expanded == tool, warning: warning.map { warningCopy($0, now: now) })
-                    }.buttonStyle(.plain)
-                    if expanded == tool {
-                        Divider().padding(.horizontal, 12)
-                        VStack(alignment: .leading, spacing: 12) {
-                            providerDetails(tool, allowance: allowance, now: now)
-                            if let warning {
-                                HStack {
-                                    Button("View allowance") { model.quotaGuard.view(warning) }
-                                    Button(model.quotaGuard.isSnoozed(warning) ? "Snoozed" : "Snooze 30 min") { model.quotaGuard.snooze(warning) }
-                                        .disabled(model.quotaGuard.isSnoozed(warning))
-                                }.controlSize(.small)
-                            }
-                        }.padding(12)
+                    }.buttonStyle(PressFeedbackStyle())
+                    DisclosureReveal(expanded: expanded == tool) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Divider().padding(.horizontal, 12)
+                            VStack(alignment: .leading, spacing: 12) {
+                                providerDetails(tool, allowance: allowance, now: now)
+                                if let warning {
+                                    HStack {
+                                        Button("View allowance") { model.quotaGuard.view(warning) }
+                                        Button(model.quotaGuard.isSnoozed(warning) ? "Snoozed" : "Snooze 30 min") { model.quotaGuard.snooze(warning) }
+                                            .disabled(model.quotaGuard.isSnoozed(warning))
+                                    }.controlSize(.small)
+                                }
+                            }.padding(12)
+                        }
                     }
                 }
                 .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
