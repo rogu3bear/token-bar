@@ -27,10 +27,10 @@ struct NowOccupancyStack<Remaining: View, Header: View, Gauge: View, Footer: Vie
     var body: some View {
         ProviderColumnsLayout(nowColumns: working.count) {
             ForEach(working) { tool in
-                remaining(tool)
+                header(tool)
             }
             ForEach(working) { tool in
-                header(tool)
+                remaining(tool)
             }
             ForEach(working) { tool in
                 gauge(tool)

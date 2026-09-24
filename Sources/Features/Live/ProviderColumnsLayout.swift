@@ -6,7 +6,7 @@ struct ProviderColumnsLayout: Layout {
     var columns: Int
     var horizontalSpacing: CGFloat = 48
     var verticalSpacing: CGFloat = 12
-    /// Identity rows stacked above the gauge (remaining, then speed header).
+    /// Identity rows stacked above the gauge (speed header, then remaining).
     var leadingIntrinsicRows: Int = 1
     /// Model/error detail under the gauge uses the speed header's measure.
     var trailingIntrinsicRows: Int = 1
@@ -68,10 +68,10 @@ struct ProviderColumnsLayout: Layout {
 }
 
 extension ProviderColumnsLayout {
-    /// Remaining row plus the speed header that owns column width.
+    /// Speed header plus remaining, both intrinsic, stacked above the gauge.
     static let nowLeadingIntrinsicRows = 2
-    /// Speed header row; remaining copies its measure so remaining.midX == gauge.midX.
-    static let nowHeaderRow = 1
+    /// Speed header is row 0; remaining copies its measure so remaining.midX == gauge.midX.
+    static let nowHeaderRow = 0
 
     init(nowColumns columns: Int) {
         self.init(columns: columns, leadingIntrinsicRows: Self.nowLeadingIntrinsicRows, headerRow: Self.nowHeaderRow)

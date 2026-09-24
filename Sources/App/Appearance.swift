@@ -148,12 +148,13 @@ struct ScrollIndicatorSuppression: NSViewRepresentable {
 }
 
 struct MethodButton: View {
-    @Environment(\.appAccent) private var accent
     var title: String
     var action: () -> Void
     var body: some View {
-        Button(action: action) { Label(title, systemImage: "info.circle").foregroundStyle(accent) }
-            .buttonStyle(.link).help(title)
+        Button(action: action) { Label(title, systemImage: "info.circle").foregroundStyle(AccentContrast.label) }
+            .buttonStyle(.link)
+            .tint(AccentContrast.label)
+            .help(title)
     }
 }
 
@@ -240,6 +241,16 @@ enum AccentContrast {
                 if backgrounds.allSatisfy({ ratio(source, on: $0) >= 7 }) { result = source }
                 else { result = .labelColor }
                 result = result.usingColorSpace(.sRGB) ?? result
+            }
+            return result
+        })
+    }
+    /// Adaptive label ink that does not follow the application accent, even when that hue is 7:1.
+    static var label: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            var result = NSColor.labelColor
+            appearance.performAsCurrentDrawingAppearance {
+                result = NSColor.labelColor.usingColorSpace(.sRGB) ?? .labelColor
             }
             return result
         })

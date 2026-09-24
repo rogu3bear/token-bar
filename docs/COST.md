@@ -102,9 +102,9 @@ The report details panel reports model, reasoning level, cache reads, cache writ
 
 **What this usage covers** explains that reports use records available on this
 Mac; origin-host identity is not retained. Copied logs do not establish where
-work ran, and absent remote/cloud records remain unseen. The directly accessible
-**Compare with Codex account totals** sheet provides account context without a
-transfer or sync feature. Account-minus-local differences cannot distinguish
+work ran, and absent remote/cloud records remain unseen. The
+**Compare with Codex account totals** sheet, opened from Report details, provides
+account context without a transfer or sync feature. Account-minus-local differences cannot distinguish
 other hosts from attribution gaps, unavailable logs or reporting differences.
 
 **Refresh account usage** reads `account/usage/read` through the installed app-server, bracketed by account-bound quota/identity reads on the serialized provider queue. Account changes reject the read. Private per-account snapshots persist alongside existing quota observations, with source and observation time. The panel reports lifetime tokens and available daily buckets, then compares only complete UTC days returned by the provider inside the selected local-time period. Missing days stay unknown. Tool, model, effort, task or different-account filters disable the comparison; provider daily totals have no such breakdown. Local inferred-account tokens and unattributed tokens remain separate. Unknown UTC dates are excluded and counted. A difference is arithmetic, not a finding of missing usage or a billing error: the provider's counter rules and delay are not established by this endpoint. Today may have no complete eligible day.

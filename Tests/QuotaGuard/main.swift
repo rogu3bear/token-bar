@@ -256,4 +256,11 @@ do {
     f.guardModel.snooze(target)
     check(changed.wait(timeout: .now()) == .success && f.guardModel.isSnoozed(target), "snooze invalidates rendered controls without a clock or source update")
 }
+check(!QuotaGuardChrome.hasWarning([QuotaRisk]()), "No decisions is not a warning")
+check(!QuotaGuardChrome.hasWarning([QuotaRisk.none]), "Risk none is not warning chrome")
+check(QuotaGuardChrome.hasWarning([.none, .low]), "Any non-none risk is warning chrome")
+check(QuotaGuardChrome.hasWarning([.observedExhaustion]), "Observed exhaustion is warning chrome")
+check(!QuotaGuardChrome.hasWarning([low].filter { $0.risk == .none }), "none-only decisions are not warning chrome")
+check(QuotaGuardChrome.hasWarning([low]), "Evaluator low-risk decision is warning chrome")
+print("PASS: idle Guard chrome follows warning risk, not an empty disclaimer")
 print("PASS: \(checks) Quota Guard checks; all data, clock, persistence and notification adapters synthetic")

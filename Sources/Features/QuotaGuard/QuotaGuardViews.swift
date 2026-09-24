@@ -1,30 +1,48 @@
 import SwiftUI
 
+enum QuotaGuardChrome {
+    static func hasWarning(_ risks: [QuotaRisk]) -> Bool {
+        risks.contains { $0 != .none }
+    }
+    static func hasWarning(_ decisions: [QuotaGuardDecision]) -> Bool {
+        hasWarning(decisions.map(\.risk))
+    }
+}
+
 struct QuotaGuardSummary: View {
     @Bindable var coordinator: QuotaGuardCoordinator
     var compact = false
     @State private var expanded = false
     private var warnings: [QuotaGuardDecision] { coordinator.decisions.filter { $0.risk != .none } }
     var body: some View {
+        let warning = QuotaGuardChrome.hasWarning(coordinator.decisions)
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Quota Guard", systemImage: warnings.isEmpty ? "gauge.with.dots.needle.33percent" : "exclamationmark.triangle")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(warnings.isEmpty ? Color.primary : Color.orange)
-                if warnings.count > 1 { Text("\(warnings.count) allowance warnings").font(.caption).foregroundStyle(.secondary) }
-                Spacer()
-                Button(expanded ? "Less" : "All allowances") { expanded.toggle() }.font(.caption)
-            }
-            if let first = warnings.first {
-                if expanded { row(first) } else { summary(first) }
-            }
-            else { Text("No current quota warning. Missing evidence does not mean capacity is available.").font(.caption).foregroundStyle(.secondary) }
-            if expanded {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(coordinator.decisions.filter { $0.id != warnings.first?.id }) { row($0) }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(maxHeight: compact ? 180 : 260)
+            if warning || expanded {
+                HStack {
+                    if warning {
+                        Label("Quota Guard", systemImage: "exclamationmark.triangle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.orange)
+                        if warnings.count > 1 { Text("\(warnings.count) allowance warnings").font(.caption).foregroundStyle(.secondary) }
+                    }
+                    Spacer()
+                    Button(expanded ? "Less" : "All allowances") { expanded.toggle() }.font(.caption)
+                }
+                if let first = warnings.first {
+                    if expanded { row(first) } else { summary(first) }
+                }
+                if expanded {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(coordinator.decisions.filter { $0.id != warnings.first?.id }) { row($0) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(maxHeight: compact ? 180 : 260)
+                }
+            } else {
+                HStack {
+                    Spacer()
+                    Button("All allowances") { expanded.toggle() }.font(.caption)
+                }
             }
             if let error = coordinator.persistenceError { Text(error).font(.caption).foregroundStyle(.orange) }
             if coordinator.submissionState.hasPrefix("That allowance") { Text(coordinator.submissionState).font(.caption).foregroundStyle(.orange) }
