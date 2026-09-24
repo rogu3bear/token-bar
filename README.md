@@ -18,26 +18,25 @@ See your AI usage from the macOS menu bar.
 
 ![Token Bar popover while idle: provider remaining and recorded Today output](site/public/popover-idle.png)
 
-*Upcoming 0.2.2 design, captured from the native app with synthetic sample data. The public download remains v0.1.14.*
+*Token Bar 0.2.2, captured from the native app with synthetic sample data.*
 
 Token Bar brings together local activity, estimated output speed, account
 allowance and usage history for Codex, Claude Code, Grok and OpenCode. It keeps
 saved measurements on your Mac and updates them as new records arrive.
 
-**v0.1.14 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
+**v0.2.2 · Apple silicon · macOS 14+ · Swift/SwiftUI · MIT**
 
 [Website](https://token-bar-9v8.pages.dev) · [Releases](https://github.com/rogu3bear/token-bar/releases) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ## At a glance
 
-- **See what is working.** Active tools appear in the menu bar and dashboard,
+- **See what is working.** Active tools appear in the menu bar and live modules,
   with estimated output rates labeled in tok/s, tok/m or tok/h. When nothing is
   running, Auto stays quiet about speed: unused zeros stay off the menu bar and
   popover.
-- **Keep account allowance in view.** Supported Codex and Claude remaining stays
-  on the menu bar and on Now, with reset times and an estimated time to
-  exhaustion when enough observations exist. Unused Codex zeros and idle Grok
-  remaining stay off Auto.
+- **Keep account allowance in view.** Supported Codex, Claude and Grok allowances
+  remain available in the live modules, including while idle. Expand a tool for
+  its reading age, reset time and estimated exhaustion when supported.
 - **Explore saved history.** Filter by tool, task, model, project, account or day;
   export the matching records to CSV.
 - **Pick up where you left off.** Collected data persists between launches.
@@ -46,25 +45,24 @@ saved measurements on your Mac and updates them as new records arrive.
 - **Make it yours.** Choose menu-bar fields, their order, rate units, appearance
   and accent color.
 
-Quota Guard adds one allowance warning in Now and the
-popover, even when no tool is active. Its optional menu-bar warning field and
-notifications are off by default. Menu bar settings controls the low threshold,
-forecast lead and sound. Warnings identify one account allowance; they do not
-mean an entire tool has stopped.
+Quota Guard marks the affected live module and its active menu-bar instrument.
+Settings controls the threshold, forecast lead and optional notifications.
+Warnings identify one account allowance. Dismiss a notice for the session while
+keeping its details available; changed or escalated warnings return.
 
 ## Get started
 
-[Download Token Bar 0.1.14 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.1.14/TokenBar-0.1.14-arm64.pkg)
+[Download Token Bar 0.2.2 for Mac (.pkg)](https://github.com/rogu3bear/token-bar/releases/download/v0.2.2/TokenBar-0.2.2-arm64.pkg)
 
 The installer is signed with Developer ID and notarized by Apple. Open the
 `.pkg` and follow the macOS installer; it installs **Token Bar.app** in
 `/Applications`. Then open Token Bar from Applications. No build tools or reboot
 are required. Requires Apple silicon and macOS 14 or later.
 
-[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.1.14)
+[Release notes and checksum](https://github.com/rogu3bear/token-bar/releases/tag/v0.2.2)
 
 GitHub Releases hosts the macOS installer. The current download is the
-notarized v0.1.14 package above. [Distribution and verification details](docs/RELEASING.md).
+notarized v0.2.2 package above. [Distribution and verification details](docs/RELEASING.md).
 
 On first launch, review the local-data explanation and choose **Start local
 monitoring**. Token Bar discovers supported tools in their standard locations.

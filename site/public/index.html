@@ -6,12 +6,12 @@
     <title>Token Bar — Your AI usage, at a glance.</title>
     <meta
       name="description"
-      content="See active AI tools, estimated output speed and saved usage history from your Mac’s menu bar. Open source. Local data. Token Bar v0.1.14."
+      content="See active AI tools, estimated output speed and saved usage history from your Mac’s menu bar. Open source. Local data. Token Bar v0.2.2."
     />
     <meta name="theme-color" content="#0d1016" />
-    <link rel="icon" href="/favicon.svg?v=frost-20260924" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg?v=release-022-58ed505" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css?v=motion-20260924" />
-    <link rel="stylesheet" href="/brand.css?v=frost-20260924" />
+    <link rel="stylesheet" href="/brand.css?v=release-022-58ed505" />
     <link rel="stylesheet" href="/motion.css?v=motion-20260924" />
     <script src="/demo.js?v=motion-20260924" type="module"></script>
   </head>
@@ -19,7 +19,7 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="navigation wrap">
       <a class="brand" href="/" aria-label="Token Bar home"
-        ><img src="/token-bar-icon.png?v=frost-20260924" width="27" height="27" alt="" />Token Bar</a
+        ><img src="/token-bar-icon.png?v=release-022-58ed505" width="27" height="27" alt="" />Token Bar</a
       >
       <nav aria-label="Main navigation">
         <a href="#how">How it works</a><a href="/feedback/">Feedback</a
@@ -45,8 +45,8 @@
           <a
             class="button primary"
             id="download"
-            href="https://github.com/rogu3bear/token-bar/releases/download/v0.1.14/TokenBar-0.1.14-arm64.pkg"
-            >Download v0.1.14 .pkg <span aria-hidden="true">↓</span></a
+            href="https://github.com/rogu3bear/token-bar/releases/download/v0.2.2/TokenBar-0.2.2-arm64.pkg"
+            >Download v0.2.2 .pkg <span aria-hidden="true">↓</span></a
           ><a class="button secondary" href="#try"
             >See the app <span aria-hidden="true">↓</span></a
           >
@@ -59,13 +59,13 @@
         </div>
         <div class="hero-visual">
           <div class="icon-halo" aria-hidden="true"></div>
-          <img class="hero-icon" src="/token-bar-icon.png?v=frost-20260924" width="320" height="320" alt="Token Bar’s new smoked-glass speedometer icon" />
+          <img class="hero-icon" src="/token-bar-icon.png?v=release-022-58ed505" width="320" height="320" alt="Token Bar’s new smoked-glass speedometer icon" />
           <div class="hero-label"><span class="status-dot" aria-hidden="true"></span>Local by default. Ready at a glance.</div>
         </div>
       </section>
       <section class="instrument wrap" id="try" aria-labelledby="demo-heading">
         <div class="demo-topline">
-          <div><span class="preview-label">NEXT RELEASE PREVIEW</span><h2 id="demo-heading">One place for what’s happening now.</h2></div>
+          <div><span class="preview-label">NATIVE APP PREVIEW</span><h2 id="demo-heading">One place for what’s happening now.</h2></div>
         </div>
         <div class="menu-preview">
           <div class="surface-heading">
@@ -74,9 +74,9 @@
           </div>
           <div class="menu-viewport" tabindex="0" role="region" aria-label="Enlarged menu-bar preview">
             <div class="recording-frame native-menu">
-              <img src="/menu-bar-demo.png?v=frost-20260924" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
+              <img src="/menu-bar-demo.png?v=release-022-58ed505" width="560" height="40" alt="Token Bar menu bar showing a sample Codex output rate and quota remaining" />
               <video id="menu-recording" controls muted playsinline preload="metadata"
-                poster="/menu-bar-demo.png?v=frost-20260924" src="/menu-bar-demo.mp4?v=frost-20260924"
+                poster="/menu-bar-demo.png?v=release-022-58ed505" src="/menu-bar-demo.mp4?v=release-022-58ed505"
                 aria-label="Native menu-bar recording with synthetic token measurements">
                 Your browser cannot play this recording.
               </video>
@@ -88,15 +88,15 @@
           <p>A consistent place for each tool’s activity, output speed and allowance.</p>
         </div>
         <div class="native-preview recording-frame">
-          <img src="/dashboard-demo.png?v=frost-20260924" width="440" height="400" alt="Current Token Bar live popover showing sample Codex activity before Claude joins" />
+          <img src="/dashboard-demo.png?v=release-022-58ed505" width="440" height="400" alt="Current Token Bar live popover showing sample Codex activity before Claude joins" />
           <video id="dashboard-recording" data-start="3.5" data-loop-start="45.3" controls muted playsinline preload="metadata"
-            poster="/dashboard-demo.png?v=frost-20260924" src="/dashboard-demo.mp4?v=frost-20260924"
+            poster="/dashboard-demo.png?v=release-022-58ed505" src="/dashboard-demo.mp4?v=release-022-58ed505"
             aria-label="Current Token Bar live modules recording with synthetic token measurements">
             Your browser cannot play this recording.
           </video>
         </div>
         <div class="demo-footer">
-          <p class="demo-caption">Upcoming 0.2.2 design · native captures with synthetic sample data. Public download: v0.1.14.</p>
+          <p class="demo-caption">Token Bar 0.2.2 · native captures with synthetic sample data.</p>
           <div class="recording-controls" hidden>
             <button id="demo-play" type="button" aria-label="Pause preview" title="Pause preview"><span class="playback-icon" aria-hidden="true"><svg class="playback-play" viewBox="0 0 16 16"><path d="M4 2.5 13 8l-9 5.5z" /></svg><svg class="playback-pause" viewBox="0 0 16 16"><path d="M3 2h3v12H3zm7 0h3v12h-3z" /></svg></span></button>
             <span id="recording-status" class="visually-hidden" role="status"></span>
@@ -108,7 +108,7 @@
         </div>
         <div class="menu-preview">
           <div class="menu-viewport" tabindex="0" role="region" aria-label="Idle menu-bar remaining">
-            <img class="native-menu" src="/menu-bar-idle.png?v=frost-20260924" width="560" height="40" alt="Token Bar menu bar while idle: named Codex and Claude remaining, no speed line" />
+            <img class="native-menu" src="/menu-bar-idle.png?v=release-022-58ed505" width="560" height="40" alt="Token Bar menu bar while idle: named Codex and Claude remaining, no speed line" />
           </div>
         </div>
         <div class="surface-heading dashboard-heading">
@@ -116,7 +116,7 @@
           <p>Expand a module for its reading, reset time and activity details.</p>
         </div>
         <div class="popover-preview">
-          <img src="/popover-expanded.png?v=frost-20260924" width="440" height="655" loading="lazy" alt="Current Token Bar popover with Codex expanded, Claude and Grok modules, and recorded Today output" />
+          <img src="/popover-expanded.png?v=release-022-58ed505" width="440" height="655" loading="lazy" alt="Current Token Bar popover with Codex expanded, Claude and Grok modules, and recorded Today output" />
           <p class="recording-note">Each module opens in place. Reports brings together History, Cost and Allowances; Settings stays close at hand. Missing readings remain explicit. Optional allowance warnings appear on the affected tool.</p>
         </div>
       </section>

@@ -1,11 +1,11 @@
 # Changelog
 
-## 0.2.2 — Frost and glass (unreleased)
+## 0.2.2 — Released 2026-09-24
 
 - Replace lime marketing colors with graphite, silver and Frost; use one glass gauge icon for the app and website.
 - Add native Liquid Glass to live footer controls on macOS 26+, with native material or solid controls on earlier systems and when transparency is reduced.
 - Preserve saved accents and System defaults; Frost replaces Lime in the preset list.
-- Refresh the website and native sample captures; public downloads remain on the last published, notarized package.
+- Refresh the website and native sample captures alongside the signed, notarized 0.2.2 installer.
 - Keep candidate notes out of the public release list and load the changelog script and styles through files allowed by the site's Content Security Policy.
 - Coordinate click feedback across the website and native app: quick presses, stable play/pause icons, reversible disclosures and a moving report selection. Keep hidden module details out of keyboard and accessibility navigation, and respect Reduce Motion.
 
@@ -16,14 +16,14 @@
 
 - Lead History and Cost with their summary, compact source coverage and scope controls, distinguish report tabs from chart measures, and tighten attribution rows. Add proportional tool/cost composition and keep unpriced cost rows distinct from zero.
 
-## 0.2.1 — Read health and native architecture qualification
+### Architecture changes included in 0.2.2
 
 - Distinguish a completed usage read with incomplete coverage from a failed refresh; retain accepted totals, diagnostic scope and the last successful read across restart.
 - Share structured diagnostic details across Live, History and Cost, with separate coverage warnings and operational failures.
 - Give report scheduling and native window commands explicit owners; keep completed reports visible during source updates and reject obsolete filter results.
 - Retain History measure and breakdown and Cost breakdown across report navigation; reopen the live popover when the app is opened again.
 
-## 0.2.0 — Live, Reports and Settings
+### Live and Reports changes included in 0.2.2
 
 - Make the menu-bar popover the canonical live surface, with stable expandable provider modules and explicit speed and remaining labels.
 - Open History, Cost and Allowances in a dedicated Reports window; retain selection and filters across navigation.

@@ -1,7 +1,7 @@
 # macOS release
 
-The current public release is **v0.1.14**, with application version **0.1.14** and build
-**30114**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.1.14/TokenBar-0.1.14-arm64.pkg)
+The current public release is **v0.2.2**, with application version **0.2.2** and build
+**30202**. [Download the signed, notarized installer](https://github.com/rogu3bear/token-bar/releases/download/v0.2.2/TokenBar-0.2.2-arm64.pkg)
 for Apple silicon and macOS 14 or later. Open the `.pkg`, follow macOS Installer,
 then open Token Bar from Applications. No build tools or reboot are required.
 The installer preserves existing usage history and preferences.
@@ -12,6 +12,18 @@ credentials in Keychain; users need none of these to install.
 
 ## Current release binding
 
+The v0.2.2 tag is bound to source commit
+`58ed505c7e307effd28be3ce7b55d2e989f82bb5`. The signed and notarized package
+reproduces from that commit. Its anonymous GitHub download was verified on
+September 24, 2026: 4,148,011 bytes, SHA-256
+`b0995d02228d598dae3c3c9f441814f7911e3f38c314759d3d9a334ac79daaa9`.
+All fifteen native test groups passed; local upgrade, installed reports and
+warning dismissal were verified. Fresh-Mac installation, the complete native
+keyboard/reduced-motion workflow and VoiceOver are not qualified for this release.
+Later site and documentation commits do not move the native release tag.
+
+### Prior release binding
+
 The v0.1.14 tag is bound to source commit
 `8768db7ec51ea791f4cf1061261573ed6395961f`. The signed, notarized package
 reproduces from that commit through `scripts/verify-release.sh`. Its anonymous
@@ -19,13 +31,13 @@ GitHub download was verified on September 24, 2026: 4,043,153 bytes, SHA-256
 `c0377cfcc694d83525cfde28060e3b9dc35da1af056934c3e18c17ca79f4c63d`.
 Later site and documentation commits do not move the native release tag.
 
-## Preparing the successor
+## Release contents
 
-The working successor is **0.2.2**, build **30202**: shared expandable live
+Version **0.2.2**, build **30202**, includes shared expandable live
 modules, a three-destination Reports window, one Settings destination and common
 measurement-state language, structured read health and explicit report scheduling,
 with Frost branding, a glass gauge icon and native glass controls on macOS 26+.
-The successor installer is a product archive with one `TokenBar-component.pkg`.
+The 0.2.2 installer is a product archive with one `TokenBar-component.pkg`.
 Its native RTF welcome screen and Light/Dark background use a size conversion
 of `Assets/TokenBar.png`, the same artwork as the app icon; the installer keeps
 no separately maintained icon. Source verification
@@ -33,7 +45,7 @@ compares the welcome resource, Distribution, exact component inventory, payload,
 scripts and metadata. Published older component archives remain verifiable.
 Signing and source binding are separate from publication.
 For each successor, bump `VERSION`, prepare changelog notes, and advance the build number. Leave public download links and
-`site/public/release.json` on 0.1.14 until the next release is verified.
+`site/public/release.json` on the latest verified release until its successor is published.
 The generated public changelog includes dated releases and the historical
 initial public release only; candidate sections remain in the source changelog.
 
@@ -183,7 +195,7 @@ it, and that gate.
 Confirm before upload, from the release output directory:
 
 ```sh
-shasum -a 256 -c TokenBar-0.1.14-arm64.pkg.sha256
+shasum -a 256 -c TokenBar-0.2.2-arm64.pkg.sha256
 ```
 
 A package built before commit `24d4d0c` carries a sidecar naming an absolute
@@ -202,7 +214,7 @@ The existing bundle identifier is retained to preserve upgrades and saved menu-b
 
 GitHub Releases is the only installer distribution path. A private OCI archive
 `ghcr.io/rogu3bear/token-bar:0.1.0` was uploaded at the initial public release.
-It is not the current 0.1.14 installer, not an anonymous download, and not a
+It is not the current 0.2.2 installer, not an anonymous download, and not a
 runnable container. Do not publish a new Packages copy; do not treat a registry
 digest as Apple signing or notarization. Delete the leftover listing with a
 token that has `delete:packages` (this checkout's `gh` token has
