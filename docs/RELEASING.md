@@ -160,6 +160,16 @@ should run. GitHub Releases is the primary public installer distribution path.
 Upload the notarized `.pkg` and its checksum. Keep notarization receipts, logs
 and account-specific evidence local.
 
+GitHub Actions is disabled for this repository. The former required attribution
+workflow runs locally before source or tag publication:
+
+```sh
+python3 scripts/check-attribution.py <current-origin-main> <candidate-commit>
+```
+
+Use exact commits for the range. Preserve all other branch protections; do not
+enable Actions or recreate a required hosted check to publish a release.
+
 The checksum must name only the installer basename, never a private build
 path: the file is published beside the installer, and a path in it fails
 `shasum -a 256 -c` for every downloader. `scripts/checksum.sh` is the single
