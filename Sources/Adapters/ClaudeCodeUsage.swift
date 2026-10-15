@@ -34,6 +34,7 @@ enum ClaudeCodeUsage {
         var gitBranch: String?
         var clientVersion: String?
         var serviceTier: String?
+        var speed: String? = nil
         /// Sidechain records are subagent transcripts. They are real usage and
         /// are counted once, like any other message.
         var isSidechain: Bool
@@ -59,13 +60,23 @@ enum ClaudeCodeUsage {
         let context = input.addingReportingOverflow(cached)
         let fullContext = context.partialValue.addingReportingOverflow(written)
         guard !context.overflow, !fullContext.overflow, !fullContext.partialValue.addingReportingOverflow(output).overflow else { return nil }
-        let tokens = Tokens.canonical(
+        var tokens = Tokens.canonical(
             input: input,
             cacheRead: cached,
             cacheWrite: written,
             output: output,
             reasoning: 0,
             convention: .cacheBesideInput)
+        if let durations = usage["cache_creation"] as? [String: Any],
+           let five = durations["ephemeral_5m_input_tokens"] as? Int,
+           let hour = durations["ephemeral_1h_input_tokens"] as? Int,
+           five >= 0, hour >= 0, five <= written, hour == written - five {
+            tokens.cacheWrite5m = five; tokens.cacheWrite1h = hour
+        }
+        if let details = usage["output_tokens_details"] as? [String: Any],
+           let thinking = details["thinking_tokens"] as? Int, thinking >= 0, thinking <= output {
+            tokens.thinking = thinking
+        }
         guard includingZeroUsage || tokens.total > 0 else { return nil }
         let session = (root["sessionId"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? id
         return Turn(messageID: id,
@@ -77,6 +88,7 @@ enum ClaudeCodeUsage {
                     gitBranch: branch(root["gitBranch"]),
                     clientVersion: root["version"] as? String,
                     serviceTier: UsageMetadata.service(usage["service_tier"]),
+                    speed: UsageMetadata.service(usage["speed"]),
                     isSidechain: root["isSidechain"] as? Bool ?? false)
     }
 
@@ -98,9 +110,15 @@ enum ClaudeCodeUsage {
     }
     static func increment(_ new: Tokens, over old: Tokens) -> Tokens {
         let delta = zip(components(new), components(old)).map { $0 - $1 }
-        return Tokens.canonical(input: delta[0], cacheRead: delta[1],
+        var result = Tokens.canonical(input: delta[0], cacheRead: delta[1],
                                 cacheWrite: new.cacheWrite == nil ? nil : delta[2],
                                 output: delta[3], reasoning: 0, convention: .cacheBesideInput)
+        let details = new.delta(from: old)
+        if let five = details.cacheWrite5m, let hour = details.cacheWrite1h, five <= delta[2], hour == delta[2] - five {
+            result.cacheWrite5m = five; result.cacheWrite1h = hour
+        }
+        if let thinking = details.thinking, thinking <= delta[3] { result.thinking = thinking }
+        return result
     }
 
     static func date(_ raw: Any?) -> Date? { EventTime.parse(raw) }

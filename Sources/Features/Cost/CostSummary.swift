@@ -34,6 +34,14 @@ struct CostSummary: View {
                         failed: sourceHealth?.failed ?? (sourceError != nil)), date: sourceDate)
                 }
             }.moduleSurface()
+            if available, let reported = report.reportedGrokUsd {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("RECORDED GROK COST").font(.caption).foregroundStyle(.secondary)
+                    Text(CostPricing.dollars(reported)).font(PageStyle.metric).monospacedDigit()
+                    Text("USD retained in local Grok usage records. " + report.reportedGrokQualification + " Separate from the API estimate and amounts paid.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading).moduleSurface()
+            }
             if showsDiagnostics {
                 if let sourceHealth { UsageDiagnosticsView(health: sourceHealth, compact: true) }
                 else if let sourceError { ErrorNotice(message: sourceError) }

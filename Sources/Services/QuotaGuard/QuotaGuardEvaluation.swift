@@ -34,10 +34,10 @@ enum QuotaEvidence: String, Codable { case current, insufficient, stale, unavail
 enum QuotaRisk: String, Codable { case none, low, projectedExhaustion, observedExhaustion }
 enum QuotaReason: String, Codable {
     case fresh, learning, flat, gap, adjustment, duplicate, outOfOrder, future, invalidValue
-    case expiredReset, identityMismatch, sourceUnavailable, providerError, restored, stale, unsupportedSource
+    case expiredReset, identityMismatch, sourceUnavailable, providerError, restored, stale, displayExpired, displayGap, unsupportedSource
     var label: String {
         switch self {
-        case .fresh: return "Fresh account observation"
+        case .fresh: return "Account-matched observation"
         case .learning: return "Forecast needs 2+ minutes of distinct observations"
         case .flat: return "No positive quota burn observed"
         case .gap: return "Forecast paused after a gap over 2 minutes"
@@ -51,7 +51,9 @@ enum QuotaReason: String, Codable {
         case .sourceUnavailable: return "No supported account quota available"
         case .providerError: return "Provider refresh failed"
         case .restored: return "Awaiting a successful quota refresh"
-        case .stale: return "Too old for Quota Guard (2-minute maximum)"
+        case .stale: return "Too old for a new notification (2-minute maximum)"
+        case .displayExpired: return "Outside the provider's display window"
+        case .displayGap: return "Forecast paused after a gap beyond the provider's display window"
         case .unsupportedSource: return "This source cannot authenticate quota"
         }
     }
@@ -102,6 +104,13 @@ struct QuotaGuardDecision: Identifiable, Equatable, Codable {
 }
 enum QuotaGuardEvaluator {
     static func evaluate(_ input: QuotaGuardInput, now: Date, policy: QuotaGuardPolicy) -> [QuotaGuardDecision] {
+        assess(input, now: now, policy: policy, display: false)
+    }
+    /// Display may outlive action freshness. It never supplies notification eligibility.
+    static func display(_ input: QuotaGuardInput, now: Date, policy: QuotaGuardPolicy) -> [QuotaGuardDecision] {
+        assess(input, now: now, policy: policy, display: true)
+    }
+    private static func assess(_ input: QuotaGuardInput, now: Date, policy: QuotaGuardPolicy, display: Bool) -> [QuotaGuardDecision] {
         if input.readings.isEmpty {
             return [QuotaGuardDecision(tool: input.tool, accountID: input.accountID ?? "", evidence: .unavailable,
                                        reason: input.failed ? .providerError : .sourceUnavailable, evaluated: now)]
@@ -112,23 +121,28 @@ enum QuotaGuardEvaluator {
             func reject(_ evidence: QuotaEvidence, _ reason: QuotaReason) -> QuotaGuardDecision {
                 d.evidence = evidence; d.reason = reason; return d
             }
-            guard policy.valid, now.timeIntervalSince1970.isFinite, reading.used.isFinite,
-                  (0...100).contains(reading.used), reading.minutes > 0,
-                  reading.date.timeIntervalSince1970.isFinite else { return reject(.invalid, .invalidValue) }
-            guard !input.relay else { return reject(.unavailable, .unsupportedSource) }
-            guard !reading.bucket.isEmpty, !reading.window.isEmpty else { return reject(.invalid, .invalidValue) }
-            guard !reading.accountID.isEmpty, input.accountID == reading.accountID else { return reject(.invalid, .identityMismatch) }
-            guard !input.failed else { return reject(.unavailable, .providerError) }
-            guard input.authenticated else { return reject(.insufficient, .restored) }
-            guard reading.date <= now else { return reject(.invalid, .future) }
-            if let reset = reading.reset {
-                guard reset.timeIntervalSince1970.isFinite else { return reject(.invalid, .invalidValue) }
-                guard reset > now else { return reject(.unavailable, .expiredReset) }
+            guard policy.valid else { return reject(.invalid, .invalidValue) }
+            // Preserve qualification order and pass invalid horizons through to
+            // the shared boundary; min(infinity, 120) must not authenticate one.
+            let horizon = !display && input.horizon.isFinite && input.horizon > 0
+                ? min(input.horizon, QuotaGuardPolicy.freshness) : input.horizon
+            let qualification = AllowanceQualification.assess(reading, accountID: input.accountID, authenticated: input.authenticated,
+                failed: input.failed, relay: input.relay, now: now, horizon: horizon)
+            if case .refused(let reason) = qualification {
+                let evidence: QuotaEvidence
+                switch reason {
+                case .invalidValue, .identityMismatch, .future: evidence = .invalid
+                case .restored: evidence = .insufficient
+                case .stale: evidence = .stale
+                default: evidence = .unavailable
+                }
+                return reject(evidence, reason == .stale && display ? .displayExpired : QuotaReason(rawValue: reason.rawValue)!)
             }
-            guard input.horizon.isFinite, input.horizon > 0,
-                  now.timeIntervalSince(reading.date) < min(input.horizon, QuotaGuardPolicy.freshness) else { return reject(.stale, .stale) }
             d.remaining = reading.remaining
             if reading.used == 100 { d.risk = .observedExhaustion; return d }
+            // A measured low allowance is still meaningful without a reset clock.
+            // Actions retain their existing reset requirement below.
+            if display, d.remaining! <= policy.lowPercent { d.risk = .low }
             if reading.reset == nil { return d }
             if d.remaining! <= policy.lowPercent { d.risk = .low }
             func sameAllowance(_ value: QuotaReading) -> Bool {
@@ -153,7 +167,9 @@ enum QuotaGuardEvaluator {
                     }
                     if sample.date < last.date { segment = []; reason = .outOfOrder; continue }
                     else if sample.used < last.used { segment = []; reason = .adjustment }
-                    else if sample.date.timeIntervalSince(last.date) > QuotaGuardPolicy.maximumGap { segment = []; reason = .gap }
+                    else if sample.date.timeIntervalSince(last.date) > (display ? input.horizon : QuotaGuardPolicy.maximumGap) {
+                        segment = []; reason = display ? .displayGap : .gap
+                    }
                 }
                 segment.append(sample)
             }
@@ -161,12 +177,12 @@ enum QuotaGuardEvaluator {
                 d.evidence = .insufficient; d.reason = reason; return d
             }
             // One canonical burn formula. Qualification above never parses Runway copy.
-            let runway = Runway.estimate(reading, samples: segment, now: now,
-                                         horizon: min(input.horizon, QuotaGuardPolicy.freshness))
+            // Display keeps the estimate at its source time while that reading is valid;
+            // wall-clock ticks cannot shorten the measured burn window between refreshes.
+            let runway = Runway.estimate(reading, samples: segment, now: display ? reading.date : now, horizon: horizon)
             d.reason = runway.percentPerHour == 0 ? .flat : .fresh
             d.forecast = runway.exhaustion
-            if let forecast = d.forecast, let reset = reading.reset, forecast < reset,
-               forecast.timeIntervalSince(now) <= policy.leadMinutes * 60 { d.risk = .projectedExhaustion }
+            if let forecast = d.forecast, forecast.timeIntervalSince(now) <= policy.leadMinutes * 60 { d.risk = .projectedExhaustion }
             return d
         }
     }

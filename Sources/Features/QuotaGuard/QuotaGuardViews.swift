@@ -15,7 +15,7 @@ struct QuotaGuardSummary: View {
     @State private var expanded = false
     @Environment(\.noticeDismissals) private var notices
     private var warnings: [QuotaGuardDecision] {
-        coordinator.decisions.filter { $0.risk != .none && !notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level) }
+        coordinator.displayDecisions.filter { $0.risk != .none && !notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level) }
     }
     var body: some View {
         let warning = !warnings.isEmpty
@@ -105,7 +105,10 @@ struct QuotaGuardDetail: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(evidence.title).font(.headline).fixedSize(horizontal: false, vertical: true)
             if coordinator.selectedEvidence == nil { Text("Historical observation: this allowance is no longer current. It has not been redirected to another account or window.").foregroundStyle(.orange) }
-            else if !coordinator.selectedIsCurrent { Text("No fresh assessment is available for this allowance.").foregroundStyle(.orange) }
+            else if !coordinator.selectedIsCurrent { Text("No current display assessment is available for this allowance.").foregroundStyle(.orange) }
+            else if coordinator.selectedNotificationEvidence?.evidence == .stale {
+                Text("Valid for display. Too old to trigger a new notification; a fresh provider reading is required.").font(.callout).foregroundStyle(.secondary)
+            }
             Text(evidence.riskLabel + (evidence.remaining.map { " · " + CompactLiveCopy.percent($0) + " remaining" } ?? ""))
             Text(evidence.reason.label)
             if let r = evidence.reading {

@@ -59,43 +59,14 @@ extension UsageScanner {
         let baseID = Self.foreignIdentity(harness: ClaudeCodeUsage.harness, messageID: turn.messageID)
         let boundary = Calendar.current.startOfDay(for: ledger.started)
         guard rebuilding || (historical ? turn.date < boundary : turn.date >= boundary) else { return false }
-        var previous = ledger.claudeCounters?[baseID]
-        if previous == nil {
-            guard let known = identityKnown(baseID) else { return false }
-            if known {
-                do {
-                    let retained = try requestArchive?.entry(id: baseID) ?? ledger.entries.first { $0.recordID == baseID }
-                    if let retained, retained.recordID == baseID, retained.harness == ClaudeCodeUsage.harness,
-                       retained.provider == ClaudeCodeUsage.provider, retained.session == turn.session, retained.model == turn.model {
-                        previous = retained.tokens
-                    }
-                } catch { errors.append("A retained Claude counter baseline could not be read."); return false }
-                guard previous != nil else {
-                    errors.append("Some older Claude messages lack retained counter baselines; their totals are preserved and increases cannot be reconciled.")
-                    return false
-                }
-            }
-        }
-        let baseline = previous ?? Tokens()
-        guard ClaudeCodeUsage.components(baseline).allSatisfy({ $0 >= 0 }) else {
-            errors.append("A retained Claude counter baseline is inconsistent; its total was preserved.")
-            return false
-        }
-        guard ClaudeCodeUsage.dominates(turn.tokens, baseline) else {
-            if !ClaudeCodeUsage.dominates(baseline, turn.tokens) {
-                errors.append("Conflicting Claude counter revisions were retained without guessing a total.")
-            }
-            return false
-        }
-        let delta = ClaudeCodeUsage.increment(turn.tokens, over: baseline)
-        guard delta.total > 0 else { return false }
-        let fingerprint = previous == nil ? baseID : Self.foreignIdentity(harness: "Claude Code revision", messageID:
-            baseID + "|" + ClaudeCodeUsage.components(turn.tokens).map(String.init).joined(separator: ":"))
-        guard let known = identityKnown(fingerprint), !known else { return false }
+        let proof = assessClaude(turn, baseID: baseID, errors: &errors)
+        guard let evidence = proof.admission.evidence else { return false }
+        let delta = evidence.delta, fingerprint = evidence.fingerprint
         var entry = Entry(date: turn.date, session: turn.session, model: turn.model, tokens: delta, account: nil)
         entry.provider = ClaudeCodeUsage.provider
         entry.harness = ClaudeCodeUsage.harness
         entry.projectPath = turn.projectPath
+        entry.observedSpeed = turn.speed
         entry.observedService = turn.serviceTier
         entry.serviceEvidence = turn.serviceTier == nil ? nil : "message.usage.service_tier"
         entry.turnID = turn.messageID
@@ -106,8 +77,8 @@ extension UsageScanner {
         entry.requestInputTokens = turn.tokens.input
         entry.costMetadataVersion = 2
         // An increase belongs to the existing message, not a second request.
-        if previous != nil { entry.sampleCount = 0; entry.bucket = "revision" }
-        persistAdmitted(entry, fingerprint: fingerprint, date: turn.date)
+        if proof.revision { entry.sampleCount = 0; entry.bucket = "revision" }
+        persistAdmitted(entry, fingerprint: fingerprint, date: turn.date, admission: evidence)
         guard ledger.eventIDs?.contains(fingerprint) == true else { return false }
         if ledger.claudeCounters == nil { ledger.claudeCounters = [:] }
         ledger.claudeCounters?[baseID] = turn.tokens
@@ -171,9 +142,11 @@ extension UsageScanner {
 
     private func admit(openCode turn: OpenCodeUsage.Turn, historical: Bool) -> Bool {
         let fingerprint = Self.foreignIdentity(harness: OpenCodeUsage.harness, messageID: turn.messageID)
-        guard let duplicate = identityKnown(fingerprint), duplicate == false else { return false }
         let boundary = Calendar.current.startOfDay(for: ledger.started)
         guard rebuilding || (historical ? turn.date < boundary : turn.date >= boundary) else { return false }
+        let admission = assessUsage(UsageEvidence(source: "OpenCode|" + turn.messageID, provider: "OpenCode",
+            counters: turn.tokens, delta: turn.tokens, extent: nil, fingerprint: fingerprint))
+        guard let evidence = admission.evidence else { return false }
         var entry = Entry(date: turn.date, session: turn.session, model: turn.model, tokens: turn.tokens, account: nil)
         // The provider is whatever OpenCode routed to, which is not the tool.
         entry.provider = turn.provider
@@ -186,7 +159,7 @@ extension UsageScanner {
         entry.firstObserved = turn.date
         entry.requestInputTokens = turn.tokenFields.contains("input_tokens") ? turn.tokens.input : nil
         entry.costMetadataVersion = 2
-        persistAdmitted(entry, fingerprint: fingerprint, date: turn.date)
+        persistAdmitted(entry, fingerprint: fingerprint, date: turn.date, admission: evidence)
         return true
     }
 }

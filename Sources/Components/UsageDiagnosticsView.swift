@@ -16,11 +16,12 @@ struct UsageDiagnosticsView: View {
                     HStack(spacing: 8) {
                         if !notices.contains(key) {
                             Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
-                            Text("Partial source coverage · " + health.diagnostics.count.formatted() + " warnings" +
-                                 (health.affectedFiles > 0 ? " across " + health.affectedFiles.formatted() + " files" : "") + ". Retained usage included.")
+                            Text("Source coverage incomplete · " + health.diagnostics.count.formatted() +
+                                 (health.diagnostics.count == 1 ? " warning" : " warnings") +
+                                 (health.affectedFiles > 0 ? " across " + health.affectedFiles.formatted() + (health.affectedFiles == 1 ? " file" : " files") : "") + ". Recorded usage retained.")
                                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         } else {
-                            Text("Partial source coverage").foregroundStyle(.secondary)
+                            Text("Source coverage incomplete").foregroundStyle(.secondary)
                         }
                         Button("View details") { showingDetails = true }.buttonStyle(.link)
                             .accessibilityLabel("View diagnostic details")
@@ -69,14 +70,21 @@ struct UsageDiagnosticDetails: View {
             }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Next step").font(.headline)
+                        Text(health.failed
+                             ? "Close these details, then use Refresh history in History or Cost to retry local reads. Any previous results stay visible; a successful retry can still leave earlier coverage gaps."
+                             : "Refresh history checks available local sources for supported usage. It cannot recreate missing logs or resolve every earlier counter boundary.")
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(filtered) { diagnostic in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(diagnostic.provider + " · " + diagnostic.scope.rawValue.capitalized).font(.headline)
+                            Text(diagnostic.isFailure ? "Read failure" : diagnostic.isContinuity ? "Historical coverage gap" : "Incomplete counter evidence")
+                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                             Text(diagnostic.message)
                             if let source = diagnostic.source { Text(source).font(.caption.monospaced()) }
-                            if !diagnostic.isFailure {
-                                Text(recovery(diagnostic.recovery)).foregroundStyle(.secondary)
-                            }
+                            Text(recovery(diagnostic)).foregroundStyle(.secondary)
                             if let first = diagnostic.firstChecked {
                                 Text("First recorded by this version " + first.formatted(date: .abbreviated, time: .shortened))
                                     .font(.caption).foregroundStyle(.secondary)
@@ -92,11 +100,20 @@ struct UsageDiagnosticDetails: View {
             }
         }.padding(20).frame(width: 660, height: 480).appCanvas().onExitCommand { dismiss() }
     }
-    private func recovery(_ value: UsageDiagnostic.Recovery) -> String {
-        switch value {
+    private func recovery(_ diagnostic: UsageDiagnostic) -> String {
+        switch diagnostic.kind {
+        case .readFailure:
+            return "Check the reported source problem before retrying. Earlier results, when available, remain visible."
+        case .counterConflict:
+            return "Conflicting revisions need supporting evidence; refreshing does not choose a guessed total."
+        case .missingBaseline:
+            return "Earlier totals stay retained. Reconciling increases requires a supported counter baseline."
+        default: break
+        }
+        switch diagnostic.recovery {
         case .unresolved: return "Earlier counter boundary remains unresolved."
-        case .resumed: return "Supported usage has an admitted boundary; the historical gap remains."
-        case .unknown: return "Recovery has not been established."
+        case .resumed: return "A later counter boundary is supported; the historical gap remains."
+        case .unknown: return "Recovery beyond this earlier gap has not been established."
         }
     }
 }

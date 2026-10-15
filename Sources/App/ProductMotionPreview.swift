@@ -25,6 +25,7 @@ enum ProductMotionPreview {
         first.used = 34
         first.date = now.addingTimeInterval(-300)
         model.live.currentID = "sample-account"
+        model.live.lastQuotaRefresh = now
         model.live.state.accounts["sample-account"] = LiveAccount(id: "sample-account", email: "developer@example.com", plan: "pro", observed: now, quotas: [quota])
         model.live.state.samples = [first, quota]
         var claudeQuota = quota
@@ -41,6 +42,8 @@ enum ProductMotionPreview {
         // its measured allowance available while activity changes.
         model.claudeQuota.quota.samples = [claudeFirst]
         model.claudeQuota.quota.readings = [claudeQuota]
+        model.claudeQuota.quota.guardAccountID = claudeQuota.accountID
+        model.claudeQuota.quota.guardAuthenticated = true
         model.claudeMeter.unit = .minute
         var history = model.snapshot
         for index in 0..<8 {
@@ -70,7 +73,7 @@ enum ProductMotionPreview {
         let settings = MenuBarConfiguration()
         func menuView(now: Date) -> some View {
             AppearanceHost(preferences: model.appearance) {
-                MenuBarPreview(value: MenuBarPresentation.combined(settings, codex: model.tachometer,
+                MenuBarPreview(value: MenuBarPresentation.face(settings, codex: model.tachometer,
                     claude: model.claudeMeter, grok: model.grokMeter, monitor: model.live, now: now,
                     palette: model.appearance.toolPalette, claudeQuota: model.claudeQuota.quota,
                     grokQuota: model.grokQuota.quota))
@@ -93,7 +96,7 @@ enum ProductMotionPreview {
                 meter.activity = ActivitySnapshot(readAt: now, referenceDate: now)
                 meter.tick(now: now)
             }
-            // The idle remaining line names only tools used within the hour: completed turns, not running ones.
+            // Recent completed work retains its popover allowance but leaves the status item quiet.
             for (meter, tool, ago) in [(model.claudeMeter, LiveTool.claude, 300.0), (model.tachometer, .codex, 1200)] {
                 let date = now.addingTimeInterval(-ago), key = "sample-idle-" + tool.rawValue
                 meter.activity.turns[key] = TaskActivity(turn: key, started: date, observed: date, running: false,
@@ -107,19 +110,17 @@ enum ProductMotionPreview {
             menuHost.layoutSubtreeIfNeeded()
             try capture(menuHost, to: directory.appendingPathComponent("menu-idle.png"))
             try capture(dashboard, to: directory.appendingPathComponent("now-idle.png"))
-            let remaining = MenuBarPresentation.combined(settings, codex: model.tachometer, claude: model.claudeMeter,
+            let remaining = MenuBarPresentation.face(settings, codex: model.tachometer, claude: model.claudeMeter,
                 grok: model.grokMeter, monitor: model.live, now: now, palette: model.appearance.toolPalette,
                 claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota)
-            precondition(remaining.string.contains("Codex") && remaining.string.contains("remaining"), remaining.string)
-            precondition(remaining.string.contains("Claude") && remaining.string.contains("remaining"), remaining.string)
-            precondition(!remaining.string.contains("tok/"), remaining.string)
+            precondition(remaining.string == "◈", remaining.string)
             let receipt: [String: Any] = ["synthetic": true, "idle": true, "fixtureDate": now.ISO8601Format(),
-                "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels", "menu": "MenuBarPresentation.combined",
+                "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels", "menu": "MenuBarPresentation.face",
                 "appearance": "Dark", "accent": AppearancePreferences.marketingAccent,
                 "statusItem": remaining.string]
             try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
                 .write(to: directory.appendingPathComponent("capture.json"))
-            print("Evaluated idle remaining on the status item; native raster capture: true; output: \(directory.path)")
+            print("Evaluated the quiet idle status item; native raster capture: true; output: \(directory.path)")
             return
         }
         // Independent synthetic workloads and quota observations; never production conversion.
@@ -154,6 +155,7 @@ enum ProductMotionPreview {
                 model.tachometer.activity = activity; model.tachometer.tick(now: tickDate)
                 quota.used += Double(samples[sample]) * 0.0018
                 quota.date = tickDate
+                model.live.lastQuotaRefresh = tickDate
                 model.live.state.accounts["sample-account"]?.quotas = [quota]
                 model.live.state.samples.append(quota)
                 previousSample = sample
@@ -190,7 +192,7 @@ enum ProductMotionPreview {
             let claudeRunway = Runway.estimate(claudeQuota, samples: model.claudeQuota.quota.samples, now: tickDate)
             rows.append(["frame": frame, "seconds": elapsed, "codexQuotaRemaining": codexRunway.remaining, "claudeQuotaRemaining": claudeRunway.remaining, "codexProjectedZero": codexRunway.exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "claudeProjectedZero": claudeRunway.exhaustion.map { $0.timeIntervalSince1970 as Any } ?? NSNull(), "codexOutputTokensPerSecond": model.tachometer.rawRate, "claudeOutputTokensPerSecond": model.claudeMeter.rawRate, "codexAvailable": model.tachometer.hasRate, "claudeAvailable": model.claudeMeter.hasRate, "menuTool": model.menuTool.rawValue, "visibleTools": LiveTool.visible(codex: model.tachometer, claude: model.claudeMeter).map(\.rawValue)])
         }
-        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels / CompactToolRate", "menu": "MenuBarPresentation.combined", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
+        let receipt: [String: Any] = ["synthetic": true, "fixtureDate": now.ISO8601Format(), "sampleClock": "frame / 30", "loopStartSeconds": 45.3, "loopEndSeconds": 63.8, "dashboard": "QuickLiveView / LiveOverview / LiveToolPanels / CompactToolRate", "menu": "MenuBarPresentation.face", "appearance": "Dark", "accent": AppearancePreferences.marketingAccent, "frames": rows]
         try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("capture.json"))
         print("Evaluated \(frames) synthetic motion samples; native raster capture: \(!receiptsOnly); output: \(directory.path)")

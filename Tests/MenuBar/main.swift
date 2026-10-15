@@ -11,7 +11,7 @@ let settings = MenuBarPreferences(defaults: defaults)
                                              session: key, eventDate: date, tool: tool)
     return meter
 }
-assert(settings.configuration.enabled == [.quota, .rate, .dial])
+assert(settings.configuration.enabled == [.rate, .dial])
 settings.configuration.enabled = [.quota, .rate]
 settings.configuration.compact = true
 settings.configuration.unit = "h"
@@ -49,6 +49,22 @@ let meter = Tachometer()
 meter.rawRate = 2; meter.rate = 2; meter.hasRate = true; meter.unit = .minute
 var config = MenuBarConfiguration()
 let now = Date()
+do {
+    func working(_ tool: LiveTool, output: Int) -> Tachometer {
+        let result = Tachometer(), id = tool.rawValue
+        result.activity = ActivitySnapshot(turns: [id: TaskActivity(turn: id, started: now.addingTimeInterval(-10), observed: now,
+            running: true, kind: .chat, session: id, eventDate: now, tool: tool)],
+            measurements: [id: RateMeasurement(turn: id, date: now, duration: 1, output: output, model: "fixture")],
+            readAt: now, referenceDate: now)
+        result.tick(now: now)
+        return result
+    }
+    var instruments = MenuBarConfiguration(); instruments.enabled = [.dial, .rate]; instruments.unit = "s"
+    let face = MenuBarPresentation.face(instruments, codex: working(.codex, output: 2), claude: working(.claude, output: 3), grok: Tachometer(),
+        monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
+    assert(!face.string.contains("Total") && face.string.contains("~2 tok/s") && face.string.contains("~3 tok/s"),
+           "Auto must show each active CLI's own rate, never their sum: \(face.string)")
+}
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == "~120 tok/m")
 config.unit = "h"
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == "~7.2k tok/h")
@@ -59,6 +75,7 @@ assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: n
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.rate] == CompactLiveCopy.rate(false, amount: 0, unit: .hour))
 let quota = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 60, reset: now.addingTimeInterval(86400), date: now)
 monitor.currentID = "a"
+monitor.lastQuotaRefresh = now
 monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [quota])
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now)[.quota] == "40% remaining")
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now.addingTimeInterval(121))[.quota] == "Quota unavailable")
@@ -80,11 +97,17 @@ print("PASS: cross-surface units, independent override, missing rate, current/st
 // Existing v1 preferences have no tool field; every other choice must survive.
 var legacyObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(restored.configuration)) as! [String: Any]
 legacyObject.removeValue(forKey: "tool")
+legacyObject.removeValue(forKey: "names")
+legacyObject.removeValue(forKey: "roll")
 legacyObject["compact"] = true
 legacyObject["unit"] = "h"
 defaults.set(try JSONSerialization.data(withJSONObject: legacyObject), forKey: "menuBarConfiguration.v1")
 let migratedTools = MenuBarPreferences(defaults: defaults)
 assert(migratedTools.configuration.tool == .auto && migratedTools.configuration.compact && migratedTools.configuration.unit == "h")
+assert(migratedTools.configuration.showsNames && !migratedTools.configuration.rollsTools)
+migratedTools.configuration.showsNames = false
+migratedTools.configuration.rollsTools = true
+assert(!MenuBarPreferences(defaults: defaults).configuration.showsNames && MenuBarPreferences(defaults: defaults).configuration.rollsTools)
 migratedTools.configuration.tool = .claude
 assert(MenuBarPreferences(defaults: defaults).configuration.tool == .claude)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: now, tool: .claude)[.quota] == "Claude quota unavailable")
@@ -114,7 +137,7 @@ let zeroCache = try JSONDecoder().decode(ClaudeQuotaCache.self, from: cacheData(
 assert(zeroCache.readings(now: cacheNow).first?.used == 0)
 var firstClaude = freshClaude[0]
 firstClaude.used = 53; firstClaude.date = cacheNow.addingTimeInterval(-300)
-let ownQuota = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: ClaudeQuotaSource.horizon)
+let ownQuota = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: ClaudeQuotaSource.horizon, guardAccountID: freshClaude.first?.accountID, guardAuthenticated: true)
 let claudeValues = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow, tool: .claude, claudeQuota: ownQuota)
 assert(claudeValues[.quota] == "Claude 42% remaining")
 assert(claudeValues[.zero] != "Zero —")
@@ -122,7 +145,7 @@ let laterClaude = MenuBarPresentation.values(config, meter: meter, monitor: moni
 assert(laterClaude[.quota] == "Claude 42% remaining", "Claude Code refreshes on demand; two minutes is Codex's horizon, not Claude's")
 let staleClaude = MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(ClaudeQuotaSource.horizon), tool: .claude, claudeQuota: ownQuota)
 assert(staleClaude[.quota] == "Claude quota unavailable" && staleClaude[.zero] == "Zero —")
-let codexHorizon = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: Runway.defaultHorizon)
+let codexHorizon = ToolQuotaState(readings: freshClaude, samples: [firstClaude] + freshClaude, horizon: Runway.defaultHorizon, guardAccountID: freshClaude.first?.accountID, guardAuthenticated: true)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow.addingTimeInterval(120), tool: .claude, claudeQuota: codexHorizon)[.quota] == "Claude quota unavailable")
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(90)) == "")
 assert(Runway.ageLabel(freshClaude[0], now: cacheNow.addingTimeInterval(660)) == " · 11 min ago")
@@ -150,7 +173,7 @@ let siblingSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cac
 )).readings(now: cacheNow)
 assert(siblingSpent.contains { $0.window == "seven_day" && $0.used == 100 },
        "A null five-hour reset must not fail the weekly window")
-let siblingQuota = ToolQuotaState(readings: siblingSpent, samples: siblingSpent, horizon: ClaudeQuotaSource.horizon)
+let siblingQuota = ToolQuotaState(readings: siblingSpent, samples: siblingSpent, horizon: ClaudeQuotaSource.horizon, guardAccountID: siblingSpent.first?.accountID, guardAuthenticated: true)
 let siblingAllowance = AccountAllowancePresentation(quota: siblingQuota, now: cacheNow)
 assert(siblingAllowance.measuredZero && siblingAllowance.estimate?.remaining == 0)
 let sessionSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(
@@ -158,7 +181,7 @@ let sessionSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cac
     sevenDay: nil
 )).readings(now: cacheNow)
 assert(sessionSpent.count == 1 && sessionSpent[0].window == "five_hour" && sessionSpent[0].used == 100 && sessionSpent[0].reset == nil)
-let sessionQuota = ToolQuotaState(readings: sessionSpent, samples: sessionSpent, horizon: ClaudeQuotaSource.horizon)
+let sessionQuota = ToolQuotaState(readings: sessionSpent, samples: sessionSpent, horizon: ClaudeQuotaSource.horizon, guardAccountID: sessionSpent.first?.accountID, guardAuthenticated: true)
 let sessionAllowance = AccountAllowancePresentation(quota: sessionQuota, now: cacheNow)
 assert(sessionAllowance.measuredZero && sessionAllowance.estimate?.remaining == 0)
 assert(sessionAllowance.estimate?.exhaustion == nil, "A missing reset is not a projected-zero clock")
@@ -168,14 +191,13 @@ let remainingWithoutClock = try JSONDecoder().decode(ClaudeQuotaCache.self, from
     sevenDay: nil
 )).readings(now: cacheNow)
 assert(remainingWithoutClock.count == 1 && remainingWithoutClock[0].used == 40 && remainingWithoutClock[0].reset == nil)
-let remainingWithoutClockQuota = ToolQuotaState(readings: remainingWithoutClock, samples: remainingWithoutClock, horizon: ClaudeQuotaSource.horizon)
+let remainingWithoutClockQuota = ToolQuotaState(readings: remainingWithoutClock, samples: remainingWithoutClock, horizon: ClaudeQuotaSource.horizon, guardAccountID: remainingWithoutClock.first?.accountID, guardAuthenticated: true)
 assert(AccountAllowancePresentation(quota: remainingWithoutClockQuota, now: cacheNow).estimate?.remaining == 60)
 assert(MenuBarPresentation.values(config, meter: meter, monitor: monitor, now: cacheNow, tool: .claude, claudeQuota: remainingWithoutClockQuota)[.quota] == "Claude 60% remaining")
 var remainingWithoutClockBar = MenuBarConfiguration(); remainingWithoutClockBar.enabled = [.quota]
-let remainingWithoutClockLine = MenuBarPresentation.combined(remainingWithoutClockBar, codex: Tachometer(), claude: used(Tachometer(), .claude, ago: 60, now: cacheNow), grok: Tachometer(),
+let remainingWithoutClockLine = MenuBarPresentation.face(remainingWithoutClockBar, codex: Tachometer(), claude: used(Tachometer(), .claude, ago: 60, now: cacheNow), grok: Tachometer(),
     monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: remainingWithoutClockQuota)
-assert(remainingWithoutClockLine.string.contains("Claude") && remainingWithoutClockLine.string.contains("60% remaining"),
-       remainingWithoutClockLine.string)
+assert(remainingWithoutClockLine.string == "◈", "A valid allowance without a reset remains in the popover")
 let missingUsed = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(fiveHour: ["resets_at": weekStamp], sevenDay: nil))
 assert(missingUsed.readings(now: cacheNow).isEmpty, "Missing utilization stays unavailable, not a measured zero")
 print("PASS: Claude cache account binding, timestamp freshness, bounds, real zero, independent runway and selected-tool quota")
@@ -192,23 +214,23 @@ let relayRoot = FileManager.default.temporaryDirectory.appendingPathComponent("t
 try FileManager.default.createDirectory(at: relayRoot, withIntermediateDirectories: true)
 let cacheFile = relayRoot.appendingPathComponent("claude.json"), relayFile = relayRoot.appendingPathComponent("claude-statusline.json")
 try cacheData(age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
-assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "stale cache and no relay file")
+assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow).isEmpty, "stale cache and no relay file")
 try relayData().write(to: relayFile)
-let fromFiles = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow)
+let fromFiles = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow)
 assert(fromFiles.isEmpty, "an identity-free relay cannot replace a stale account-bound cache")
 try cacheData(account: "a", signedIn: "b", age: 2 * ClaudeQuotaSource.horizon).write(to: cacheFile)
-assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "account A relay cannot become account B quota")
+assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow).isEmpty, "account A relay cannot become account B quota")
 // A new monitor/read after a restart has the same files and must also reject it.
 let restarted = ClaudeQuotaMonitor(cacheURL: cacheFile, relayURL: relayFile)
-assert(ClaudeQuotaMonitor.readings(cacheURL: restarted.cacheURL, relayURL: restarted.relayURL, now: cacheNow).isEmpty)
+assert(ClaudeQuotaMonitor.readings(cacheURL: restarted.cacheURL, now: cacheNow).isEmpty)
 try cacheData().write(to: cacheFile)
-let cacheBound = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow)
+let cacheBound = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow)
 assert(cacheBound.count == 1 && cacheBound[0].used == 58, "fresh account-matched cache wins over newer identity-free relay")
 try cacheData(account: "b", signedIn: "b", used: 22).write(to: cacheFile)
-let accountB = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow)
+let accountB = ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow)
 assert(accountB.count == 1 && accountB[0].used == 22 && accountB[0].accountID == ClaudeQuotaSource.accountID("b"))
 try Data("{}".utf8).write(to: cacheFile)
-assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, relayURL: relayFile, now: cacheNow).isEmpty, "no signed-in account, no relay reading")
+assert(ClaudeQuotaMonitor.readings(cacheURL: cacheFile, now: cacheNow).isEmpty, "no signed-in account, no relay reading")
 try? FileManager.default.removeItem(at: relayRoot)
 print("PASS: identity-free relay rejected across stale cache, account switch, sign-out and restart; account-bound cache retained")
 
@@ -377,9 +399,9 @@ assert(LiveTool.visible(codex: soloCodex, claude: joiningClaude) == [.codex, .cl
 soloCodex.hasRate = false
 assert(LiveTool.visible(codex: soloCodex, claude: joiningClaude) == [.claude])
 let initial = MenuBarConfiguration()
-assert(initial.order.filter { initial.enabled.contains($0) } == [.dial, .rate, .quota])
+assert(initial.order.filter { initial.enabled.contains($0) } == [.dial, .rate])
 assert(initial.separator == "  " && initial.compact == false)
-print("PASS: progressive tool visibility and dial/rate/quota default")
+print("PASS: progressive tool visibility and independent dial/rate default")
 
 let existingMenu = MenuBarPreferences(defaults: defaults).configuration
 let persistedCodex = Tachometer(tool: .codex, defaults: defaults)
@@ -406,221 +428,109 @@ assert(absent[.quota] == "Claude quota unavailable" && absent[.zero] == "Zero �
 assert(Tachometer().unit == .second, "Unconfigured synthetic meters cannot read production preferences")
 print("PASS: independent persisted dashboard units, inherited compact values, Auto selection, menu override, caller-selected identity color and missing quota")
 
-let combinedCodex = Tachometer(), combinedClaude = Tachometer(), combinedGrok = Tachometer()
-combinedCodex.hasRate = true; combinedCodex.rawRate = 20; combinedCodex.unit = .minute
-combinedGrok.hasRate = true; combinedGrok.rawRate = 30; combinedGrok.unit = .hour
-var combinedConfig = MenuBarConfiguration(); combinedConfig.enabled = [.rate, .quota]; combinedConfig.unit = "s"
-var combinedPalette = ToolPalette(); combinedPalette.overrides["grok"] = .pink
-let combined = MenuBarPresentation.combined(combinedConfig, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
-    monitor: monitor, now: now, palette: combinedPalette, claudeQuota: ToolQuotaState())
-assert(combined.string.contains("Total") && combined.string.contains("~50 tok/s"))
-assert(combined.string.contains("Codex") && !combined.string.contains("Grok quota unavailable"))
-combinedConfig.tool = .grok
-let onlyGrok = MenuBarPresentation.combined(combinedConfig, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
-    monitor: monitor, now: now, palette: combinedPalette, claudeQuota: ToolQuotaState())
-assert(!onlyGrok.string.contains("Total") && onlyGrok.string.contains("~30 tok/s"))
-assert(onlyGrok.string.hasPrefix("Grok") && onlyGrok.string.contains("Quota unavailable") && !onlyGrok.string.contains("40% remaining"))
-let grokLabel = (onlyGrok.string as NSString).range(of: "Quota unavailable").location
-assert((onlyGrok.attribute(.foregroundColor, at: grokLabel, effectiveRange: nil) as? NSColor) == NSColor(combinedPalette.color("grok", fallback: .green)))
-assert(MenuBarPresentation.values(combinedConfig, meter: combinedGrok, monitor: monitor, now: now, tool: .grok)[.quota] == "Grok quota unavailable")
-assert(LiveTool.visible(codex: combinedCodex, claude: combinedClaude, grok: combinedGrok) == [.codex, .grok])
-print("PASS: combined rates, explicit Grok selection, tool-colored remaining labels and Grok quota isolation")
-
-let idleCodex = Tachometer(), idleClaude = Tachometer(), openGrok = Tachometer()
-openGrok.activity.turns["g"] = TaskActivity(turn: "g", started: now, observed: now, running: true, kind: .chat, session: "g", tool: .grok)
-assert(openGrok.runningCount == 1 && !openGrok.hasRate)
-assert(MenuBarTool.auto.resolve(codex: idleCodex, claude: idleClaude, grok: openGrok) == .grok)
-var grokOnlyConfig = MenuBarConfiguration(); grokOnlyConfig.enabled = [.rate, .activity]
-let grokOnly = MenuBarPresentation.combined(grokOnlyConfig, codex: idleCodex, claude: idleClaude, grok: openGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(grokOnly.string.hasPrefix("Grok"), "Auto must name Grok when it is the only active tool")
-assert(!grokOnly.string.contains("Total") && !grokOnly.string.contains("Codex"))
-let staleGrok = Tachometer()
-staleGrok.activity.turns["g"] = TaskActivity(turn: "g", started: now.addingTimeInterval(-400), observed: now.addingTimeInterval(-400), running: true, kind: .chat, session: "g", tool: .grok)
-assert(staleGrok.runningCount == 0 && staleGrok.activity.uncertain == 1)
-assert(LiveTool.visible(codex: idleCodex, claude: idleClaude, grok: staleGrok).isEmpty)
-assert(MenuBarTool.auto.resolve(codex: idleCodex, claude: idleClaude, grok: staleGrok) == .codex)
-let unconfirmed = MenuBarPresentation.combined(grokOnlyConfig, codex: idleCodex, claude: idleClaude, grok: staleGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(!unconfirmed.string.contains("Codex") && !unconfirmed.string.contains("Grok"), "Stale Grok activity must not keep an inactive tool visible")
-monitor.currentID = "a"
-var autoGrokQuota = MenuBarConfiguration(); autoGrokQuota.enabled = [.rate, .quota]
-let grokWithCodexQuota = MenuBarPresentation.combined(autoGrokQuota, codex: idleCodex, claude: idleClaude, grok: openGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(grokWithCodexQuota.string.hasPrefix("Grok") && !grokWithCodexQuota.string.contains("Codex 40% remaining"))
-assert(!grokWithCodexQuota.string.contains("Grok quota unavailable"))
-autoGrokQuota.tool = .grok
-let explicitGrokQuota = MenuBarPresentation.combined(autoGrokQuota, codex: idleCodex, claude: idleClaude, grok: openGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(explicitGrokQuota.string.hasPrefix("Grok") && explicitGrokQuota.string.contains("Quota unavailable") && !explicitGrokQuota.string.contains("40% remaining"))
-let grokReading = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premium+", window: "weekly", minutes: 10080, used: 49, reset: now.addingTimeInterval(86400), date: now)
-let grokState = ToolQuotaState(readings: [grokReading], samples: [grokReading])
-assert(MenuBarPresentation.values(autoGrokQuota, meter: openGrok, monitor: monitor, now: now, tool: .grok, grokQuota: grokState)[.quota] == "Grok 51% remaining")
-let grokMeasured = MenuBarPresentation.combined(autoGrokQuota, codex: idleCodex, claude: idleClaude, grok: openGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: grokState)
-assert(grokMeasured.string.hasPrefix("Grok") && grokMeasured.string.contains("51% remaining") && !grokMeasured.string.contains("quota unavailable"))
-assert(!grokMeasured.string.contains("Codex 40% remaining"))
-print("PASS: Auto menu bar follows Grok activity without a rate and without falling back to Codex")
-print("PASS: Auto does not borrow unused Codex remaining beside Grok speed; explicit Grok does not inherit Codex quota")
-// Used within the hour, most recent first: Claude 5m, Codex 20m, Grok 40m. None is working now.
-let usedCodex = used(Tachometer(), .codex, ago: 20 * 60, now: now)
-let usedClaude = used(Tachometer(), .claude, ago: 5 * 60, now: now)
-let usedGrok = used(Tachometer(), .grok, ago: 40 * 60, now: now)
+// Date-bound independent instruments. No retained hasRate flag can establish occupancy.
+func instrumentMeter(_ tool: LiveTool, rate: Int, at date: Date, unit: RateUnit = .second) -> Tachometer {
+    let result = Tachometer(), id = tool.rawValue
+    result.activity = ActivitySnapshot(turns: [id: TaskActivity(turn: id, started: date.addingTimeInterval(-10), observed: date,
+        running: true, kind: .chat, session: id, eventDate: date, tool: tool)],
+        measurements: [id: RateMeasurement(turn: id, date: date, duration: 1, output: rate, model: "fixture")],
+        readAt: date, referenceDate: date)
+    result.tick(now: date); result.unit = unit
+    return result
+}
+func dialIdentities(_ value: NSAttributedString) -> [String] {
+    var ids: [String] = []
+    value.enumerateAttribute(MenuBarDial.identity, in: NSRange(location: 0, length: value.length)) { id, _, _ in
+        if let id = id as? String { ids.append(id) }
+    }
+    return ids
+}
+let idleCodex = Tachometer(), idleClaude = Tachometer(), openGrok = Tachometer(), staleGrok = Tachometer()
+openGrok.activity.turns["g"] = TaskActivity(turn: "g", started: now, observed: now, running: true, kind: .chat, session: "g", eventDate: now, tool: .grok)
+staleGrok.activity.turns["g"] = TaskActivity(turn: "g", started: now.addingTimeInterval(-400), observed: now.addingTimeInterval(-400), running: true, kind: .chat, session: "g", eventDate: now.addingTimeInterval(-400), tool: .grok)
+let workingCodex = instrumentMeter(.codex, rate: 12, at: now)
 let claudeSpent = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: ClaudeQuotaSource.bucket, name: ClaudeQuotaSource.name, window: "five_hour", minutes: 300, used: 100, reset: now.addingTimeInterval(3600), date: now)
-let claudeSpentState = ToolQuotaState(readings: [claudeSpent], samples: [claudeSpent], horizon: ClaudeQuotaSource.horizon)
-var spentBar = MenuBarConfiguration(); spentBar.enabled = [.dial, .rate, .quota, .fable]
-let spent = MenuBarPresentation.combined(spentBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudeSpentState)
-assert(spent.string.contains("Claude") && spent.string.contains("0% remaining"), spent.string)
-assert(spent.string.contains("Codex") && spent.string.contains("40% remaining"), spent.string)
-assert(!spent.string.contains("Fable") && !spent.string.contains("tok/"), spent.string)
-assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : nil }) == [.claude])
-assert(LiveTool.compact(codex: idleCodex, claude: idleClaude, grok: staleGrok, remaining: { _ in 0 }) == [.codex, .claude, .grok])
-let previousAccount = monitor.state.accounts["a"]
-let spentCodex = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 100, reset: now.addingTimeInterval(3600), date: now)
-monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [spentCodex])
-let grokSpent = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premium+", window: "weekly", minutes: 10080, used: 100, reset: now.addingTimeInterval(86400), date: now)
-var unusedZeroBar = MenuBarConfiguration(); unusedZeroBar.enabled = [.dial, .rate, .quota]
-let unusedZeros = MenuBarPresentation.combined(unusedZeroBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: ToolQuotaState(readings: [grokSpent], samples: [grokSpent]))
-assert(unusedZeros.string.contains("Codex") && unusedZeros.string.contains("0% remaining"),
-       "Idle Auto names a measured Codex zero: \(unusedZeros.string)")
-assert(unusedZeros.string.contains("Grok") && unusedZeros.string.contains("0% remaining"),
-       "Idle Auto names a measured Grok zero: \(unusedZeros.string)")
-assert(!unusedZeros.string.contains("Claude") && !unusedZeros.string.contains("tok/"),
-       unusedZeros.string)
-monitor.state.accounts["a"] = previousAccount
-var unusedRemainingBar = MenuBarConfiguration(); unusedRemainingBar.enabled = [.dial, .rate, .quota]
-let unusedRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(unusedRemaining.string.hasPrefix("Codex") && unusedRemaining.string.contains("40% remaining"),
-       "Idle Auto names Codex remaining you still have: \(unusedRemaining.string)")
-assert(!unusedRemaining.string.contains("tok/") && !unusedRemaining.string.contains("Speed dial"),
-       "Idle remaining is not a speed line: \(unusedRemaining.string)")
-let idleGrokRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(), grokQuota: grokState)
-assert(idleGrokRemaining.string.contains("Grok") && idleGrokRemaining.string.contains("51% remaining"),
-       "Idle Auto names measured Grok remaining: \(idleGrokRemaining.string)")
-assert(!idleGrokRemaining.string.contains("tok/"), idleGrokRemaining.string)
-let workingCodex = Tachometer()
-workingCodex.hasRate = true; workingCodex.rawRate = 12; workingCodex.rate = 12
-let claudePlenty = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude",
-                                window: "five_hour", minutes: 300, used: 40, reset: now.addingTimeInterval(3600), date: now)
-let claudePlentyState = ToolQuotaState(readings: [claudePlenty], samples: [claudePlenty], horizon: ClaudeQuotaSource.horizon)
-let workingWithUnusedClaude = MenuBarPresentation.combined(unusedRemainingBar, codex: workingCodex, claude: idleClaude, grok: staleGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
-assert(workingWithUnusedClaude.string.hasPrefix("Codex") && !workingWithUnusedClaude.string.contains("Claude"),
-       "Working Auto does not borrow unused Claude remaining: \(workingWithUnusedClaude.string)")
-let workingWithClaudeZero = MenuBarPresentation.combined(unusedRemainingBar, codex: workingCodex, claude: idleClaude, grok: staleGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudeSpentState)
-assert(workingWithClaudeZero.string.hasPrefix("Codex") && !workingWithClaudeZero.string.contains("Claude"),
-       "Claude-at-zero occupies idle Auto only, not a second working-line occupant: \(workingWithClaudeZero.string)")
-assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 0 : ($0 == .codex ? 40 : nil) }) == [.codex, .claude])
-assert(LiveTool.compact(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : ($0 == .codex ? 40 : nil) }) == [.codex])
-let idleClaudeRemaining = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
-assert(idleClaudeRemaining.string == "Claude 60% Codex 40% remaining",
-       "Idle Auto names each recent tool once, most recent first, and says remaining once: \(idleClaudeRemaining.string)")
-assert(!idleClaudeRemaining.string.contains("Total") && !idleClaudeRemaining.string.contains("tok/"), idleClaudeRemaining.string)
-func remainingFaceSize(_ text: NSAttributedString, matching: String) -> CGFloat? {
-    let range = (text.string as NSString).range(of: matching)
-    guard range.location != NSNotFound else { return nil }
-    return (text.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont)?.pointSize
-}
-assert(remainingFaceSize(unusedRemaining, matching: "40% remaining") == 13)
-assert(remainingFaceSize(idleClaudeRemaining, matching: "40% remaining") == 13,
-       "Idle remaining on the status item is the 13pt remaining face, not mixed quota labels")
-assert(remainingFaceSize(idleClaudeRemaining, matching: "60%") == 13)
-let savedIdleAccount = monitor.state.accounts["a"]
-monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
-let idleClaudeOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState)
-assert(idleClaudeOnly.string.hasPrefix("Claude") && idleClaudeOnly.string.contains("60% remaining") && !idleClaudeOnly.string.contains("Codex"),
-       idleClaudeOnly.string)
-let idleIconOnly = MenuBarPresentation.combined(unusedRemainingBar, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
-assert(idleIconOnly.string == "◈", "Idle Auto without a measured remaining is the app icon: \(idleIconOnly.string)")
-monitor.state.accounts["a"] = savedIdleAccount
+let claudeSpentState = ToolQuotaState(readings: [claudeSpent], samples: [claudeSpent], horizon: ClaudeQuotaSource.horizon, guardAccountID: claudeSpent.accountID, guardAuthenticated: true)
+monitor.currentID = "a"
+monitor.lastQuotaRefresh = now
 do {
-    let savedAccount = monitor.state.accounts["a"]
-    defer { monitor.state.accounts["a"] = savedAccount }
-    for order: [MenuBarPart] in [[.risk, .quota, .icon], [.quota, .icon, .risk]] {
-        var ordered = MenuBarConfiguration(); ordered.enabled = [.quota, .icon, .risk]; ordered.order = order
-        let savedOrder = ordered.order, savedEnabled = ordered.enabled
-        func line(twoAccounts: Bool) -> String {
-            monitor.state.accounts["a"] = twoAccounts ? savedAccount : LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [])
-            return MenuBarPresentation.combined(ordered, codex: usedCodex, claude: usedClaude, grok: usedGrok,
-                monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: claudePlentyState, riskText: "Quota warning").string
-        }
-        let one = line(twoAccounts: false), two = line(twoAccounts: true), oneAgain = line(twoAccounts: false)
-        assert(one == oneAgain, "One-to-two-to-one retains the existing single-tool face")
-        for text in [one, two] {
-            let markers = order.map { $0 == .risk ? "Quota warning" : $0 == .icon ? "◈" : "remaining" }
-            let positions = markers.map { (text as NSString).range(of: $0).location }
-            assert(positions.allSatisfy { $0 != NSNotFound } && positions == positions.sorted(), "Saved field order must survive idle account-count transitions: \(text)")
-            assert(text.components(separatedBy: "Quota warning").count == 2 && text.components(separatedBy: "◈").count == 2)
-        }
-        assert(two.contains("Codex") && two.contains("Claude") && !one.contains("Codex"))
-        assert(ordered.order == savedOrder && ordered.enabled == savedEnabled)
+    let fixed = Date(timeIntervalSinceReferenceDate: 810_000_000)
+    let codex = instrumentMeter(.codex, rate: 2, at: fixed, unit: .minute)
+    let claude = instrumentMeter(.claude, rate: 3, at: fixed, unit: .hour)
+    let grok = instrumentMeter(.grok, rate: 7, at: fixed)
+    var bar = MenuBarConfiguration()
+    func face(at date: Date = fixed, warnings: Set<LiveTool> = []) -> NSAttributedString {
+        MenuBarPresentation.face(bar, codex: codex, claude: claude, grok: grok, monitor: monitor,
+            now: date, palette: ToolPalette(), claudeQuota: claudeSpentState, warningTools: warnings)
     }
-    print("PASS: reordered icon, grouped remaining and warning retain saved order across one-to-two-to-one idle accounts")
-}
-print("PASS: idle Auto names measured Codex, Claude, and Grok remaining, including measured zeros")
-print("PASS: unavailable remaining stays off Auto; remaining you still have is named; Claude-at-zero does not join a working line")
-// Menu-bar remaining line: full names, "remaining" once, only tools used within the last hour.
-do {
-    assert(CompactLiveCopy.remainingLine([("Claude", 45), ("Grok", 80), ("Codex", 12)]) == "Claude 45% Grok 80% Codex 12% remaining")
-    assert(CompactLiveCopy.remainingLine([("Claude", 0)]) == "Claude 0% remaining", "A measured zero is named, not dropped")
-    let codexReading = QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 88, reset: now.addingTimeInterval(3600), date: now)
-    let claudeReading = QuotaReading(accountID: ClaudeQuotaSource.accountID("a"), bucket: "claude", name: "Claude", window: "five_hour", minutes: 300, used: 55, reset: now.addingTimeInterval(3600), date: now)
-    let grokReading = QuotaReading(accountID: "grok:x", bucket: "grok", name: "X Premium+", window: "weekly", minutes: 10080, used: 20, reset: now.addingTimeInterval(86400), date: now)
-    let claudeState = ToolQuotaState(readings: [claudeReading], samples: [claudeReading], horizon: ClaudeQuotaSource.horizon)
-    let grokState = ToolQuotaState(readings: [grokReading], samples: [grokReading])
-    let savedAccount = monitor.state.accounts["a"]
-    defer { monitor.state.accounts["a"] = savedAccount }
-    monitor.state.accounts["a"] = LiveAccount(id: "a", email: "fixture", plan: "pro", observed: now, quotas: [codexReading])
-    var bar = MenuBarConfiguration(); bar.enabled = [.dial, .rate, .quota]
-    func line(codex: Tachometer, claude: Tachometer, grok: Tachometer, at date: Date = now) -> String {
-        MenuBarPresentation.combined(bar, codex: codex, claude: claude, grok: grok, monitor: monitor, now: date,
-                                     palette: ToolPalette(), claudeQuota: claudeState, grokQuota: grokState).string
+    let all = face()
+    assert(dialIdentities(all) == ["codex", "claude", "grok"])
+    for value in ["Codex", "Claude", "Grok", "~120 tok/m", "~10.8k tok/h", "~7 tok/s"] { assert(all.string.contains(value), all.string) }
+    assert(!all.string.contains("Total") && !all.string.contains("remaining"))
+    assert(MenuBarDial.spokenLabel(all).contains("Claude, Working, ~10.8k tok/h"))
+    bar.showsNames = false
+    let unnamed = face()
+    assert(dialIdentities(unnamed) == ["codex", "claude", "grok"])
+    assert(!unnamed.string.contains("Codex") && !unnamed.string.contains("Claude") && !unnamed.string.contains("Grok"))
+    assert(MenuBarDial.spokenLabel(unnamed) == MenuBarDial.spokenLabel(all), "Hiding visual names cannot erase spoken identity")
+    bar.unit = "s"
+    assert(face().string.contains("~2 tok/s") && face().string.contains("~3 tok/s"))
+    assert(codex.unit == .minute && claude.unit == .hour, "Menu override cannot change saved per-tool units")
+    bar.rollsTools = true
+    for index in 0..<6 {
+        let rolled = face(at: fixed.addingTimeInterval(Double(index) * MenuBarPresentation.rollInterval))
+        assert(dialIdentities(rolled) == [["codex", "claude", "grok"][index % 3]])
     }
-    // Several tools within the hour share one line, most recent first.
-    let multi = line(codex: used(Tachometer(), .codex, ago: 50 * 60, now: now), claude: used(Tachometer(), .claude, ago: 2 * 60, now: now),
-                     grok: used(Tachometer(), .grok, ago: 10 * 60, now: now))
-    assert(multi == "Claude 45% Grok 80% Codex 12% remaining", multi)
-    assert(multi.components(separatedBy: "remaining").count == 2, "remaining appears once: \(multi)")
-    for code in [" C ", " G ", " X ", "C:", "G:", "X:"] { assert(!multi.contains(code), "No single-letter provider codes: \(multi)") }
-    // A tool idle for more than an hour drops off; the others stay.
-    let partial = line(codex: used(Tachometer(), .codex, ago: 61 * 60, now: now), claude: used(Tachometer(), .claude, ago: 2 * 60, now: now),
-                       grok: used(Tachometer(), .grok, ago: 3 * 3600, now: now))
-    assert(partial == "Claude 45% remaining", partial)
-    // Exactly one hour is outside the window.
-    assert(line(codex: used(Tachometer(), .codex, ago: 3600, now: now), claude: Tachometer(), grok: Tachometer()) == "◈")
-    // Every tool stale: the clean idle face, no leftover remaining clutter.
-    let stale = line(codex: used(Tachometer(), .codex, ago: 2 * 3600, now: now), claude: used(Tachometer(), .claude, ago: 90 * 60, now: now),
-                     grok: used(Tachometer(), .grok, ago: 5 * 3600, now: now))
-    assert(stale == "◈", "All stale is the clean idle face: \(stale)")
-    // The same meters age out as the clock moves; nothing is retained past the window.
-    let codexUsed = used(Tachometer(), .codex, ago: 30 * 60, now: now)
-    assert(line(codex: codexUsed, claude: Tachometer(), grok: Tachometer()) == "Codex 12% remaining")
-    assert(line(codex: codexUsed, claude: Tachometer(), grok: Tachometer(), at: now.addingTimeInterval(31 * 60)) == "◈")
-    // Evidence is dated lifecycle or counter data; an undated turn is not recent use.
-    let undated = Tachometer()
-    undated.activity.turns["u"] = TaskActivity(turn: "u", started: now, observed: now, running: false, kind: .chat, session: "u", tool: .claude)
-    assert(undated.activity.lastEvidence(at: now) == nil)
-    assert(LiveTool.recent(codex: Tachometer(), claude: undated, grok: Tachometer(), now: now).isEmpty)
-    // A working tool keeps its speed face; others used within the hour join the remaining line by name.
-    let working = Tachometer(); working.hasRate = true; working.rawRate = 12; working.rate = 12
-    let joined = line(codex: working, claude: used(Tachometer(), .claude, ago: 15 * 60, now: now), grok: used(Tachometer(), .grok, ago: 2 * 3600, now: now))
-    assert(joined.hasPrefix("Codex") && joined.hasSuffix("Codex 12% Claude 45% remaining") && !joined.contains("Grok"), joined)
-    let alone = line(codex: working, claude: used(Tachometer(), .claude, ago: 2 * 3600, now: now), grok: Tachometer())
-    assert(alone.hasPrefix("Codex") && alone.hasSuffix("12% remaining") && alone.components(separatedBy: "Codex").count == 2,
-           "A lone working tool is named once: \(alone)")
-    // Explicit selection stays on its own tool's remaining.
+    let retained = codex.activity
+    codex.activity.turns["codex"]?.running = false
+    assert(dialIdentities(face()).count == 1 && !dialIdentities(face()).contains("codex"), "Roll cannot retain a completed tool")
+    codex.activity = retained
+    bar.rollsTools = false; bar.showsNames = true
+    let before = face()
+    codex.hasRate = false; codex.rawRate = 999
+    assert(face().string == before.string && dialIdentities(face()) == dialIdentities(before), "Presentation derives a reading without depending on meter tick order")
+    assert(!codex.hasRate && codex.rawRate == 999, "Presentation cannot mutate the process meter")
+    let aged = face(at: fixed.addingTimeInterval(30))
+    assert(dialIdentities(aged).count == 3 && !aged.string.contains("tok/"), "Lifecycle-confirmed work may have unavailable speed")
+    assert(MenuBarDial.spokenLabel(aged).contains("rate unavailable"))
+    assert(face(at: fixed.addingTimeInterval(300)).string == "◈", "Five minutes without evidence becomes unconfirmed")
+    assert(face(at: fixed.addingTimeInterval(-1)).string == "◈", "Future evidence is not current activity")
+    codex.activity.turns["codex"]?.running = false
+    claude.activity.turns["claude"]?.running = false
+    grok.activity.turns["grok"]?.running = false
+    assert(face().string == "◈", "Completed work cannot survive in retained rate flags")
+    bar.enabled = Set(MenuBarPart.allCases)
+    assert(face(warnings: [.claude]).string == "◈", "Allowance and warning evidence never create activity")
+    codex.activity = retained
+    let qualified = face(warnings: [.claude])
+    assert(dialIdentities(qualified) == ["codex"] && !qualified.string.contains("Claude"))
+    assert(!qualified.string.contains("remaining") && !qualified.string.contains("Fable") && !qualified.string.contains("Zero"))
+    let warned = face(warnings: [.codex])
+    var warnedColor: NSColor?
+    warned.enumerateAttribute(MenuBarDial.accent, in: NSRange(location: 0, length: warned.length)) { color, _, _ in
+        if let color = color as? NSColor { warnedColor = color }
+    }
+    assert(warnedColor == .systemOrange)
     bar.tool = .claude
-    assert(line(codex: used(Tachometer(), .codex, ago: 60, now: now), claude: Tachometer(), grok: Tachometer()).hasSuffix("45% remaining"))
-    print("PASS: menu-bar remaining line names recent tools in full, says remaining once, drops tools idle over an hour, and all-stale is the clean idle face")
+    assert(face().string == "◈", "Explicit selection does not bring an idle provider onto the bar")
+    bar.tool = .codex
+    assert(dialIdentities(face()) == ["codex"])
+    // Observation/read timestamps and an open process without lifecycle/counter evidence do not qualify.
+    codex.activity.turns["codex"]?.eventDate = .distantPast
+    codex.activity.measurements = [:]
+    codex.hasRate = true
+    assert(face().string == "◈")
+    codex.activity.turns["codex"]?.eventDate = fixed.addingTimeInterval(-400)
+    codex.activity.turns["codex"]?.observed = fixed
+    assert(face().string == "◈", "A recent file touch cannot refresh old lifecycle evidence")
+    codex.activity = ActivitySnapshot(readAt: fixed, error: "fixture failure")
+    assert(face().string == "◈")
 }
+let grokOnly = MenuBarPresentation.face(MenuBarConfiguration(), codex: idleCodex, claude: idleClaude, grok: openGrok,
+    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
+assert(dialIdentities(grokOnly) == ["grok"] && grokOnly.string.contains("Grok") && grokOnly.string.contains("—"))
+assert(!grokOnly.string.contains("tok/"), "Working without a rate cannot invent a unit-bearing measurement")
+print("PASS: independent dated instruments, names and speech, units, rolling, completion, expiry, warnings and quiet idle")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .claude ? 40 : 64 }) == [.codex],
        "Working Now does not give idle Claude a column")
 assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: staleGrok, remaining: { $0 == .codex ? 64 : nil }) == [.codex],
@@ -644,17 +554,17 @@ assert(LiveTool.nowOccupied(codex: workingCodex, claude: idleClaude, grok: stale
        "Unconfirmed idle neighbor is not a working Now column")
 assert(LiveTool.idleNamed(remaining: { _ in nil }).isEmpty, "Auto still omits unconfirmed remaining")
 print("PASS: Now seats are working tools, idle measured remainings, or unconfirmed chairs, never a never-seen unavailable")
-assert(unusedRemaining.string.hasPrefix("Codex") && unusedRemaining.string.contains("40% remaining"), unusedRemaining.string)
 assert(AccountAllowancePresentation(quota: claudeSpentState, now: now).measuredZero)
-assert(!AccountAllowancePresentation(quota: claudePlentyState, now: now).measuredZero)
+var claudeAvailable = claudeSpentState; claudeAvailable.readings[0].used = 40
+assert(!AccountAllowancePresentation(quota: claudeAvailable, now: now).measuredZero)
 var riskBar = MenuBarConfiguration(); riskBar.enabled = [.dial, .rate, .quota, .risk]
-let idleRisk = MenuBarPresentation.combined(riskBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
+let idleRisk = MenuBarPresentation.face(riskBar, codex: idleCodex, claude: idleClaude, grok: staleGrok,
     monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState(),
-    riskText: "Codex weekly 8% · Low allowance")
-assert(idleRisk.string.contains("Codex weekly 8% · Low allowance"), idleRisk.string)
+    warningTools: [.codex])
+assert(idleRisk.string == "◈", idleRisk.string)
 assert(!idleRisk.string.contains("tok/") && !idleRisk.string.contains("Speed dial"),
        "Quota Guard warning is not an idle Codex speed line: \(idleRisk.string)")
-print("PASS: idle Auto warning field is risk text, not occupancy")
+print("PASS: inactive warnings stay off the quiet status item")
 let exhausted = Runway.estimate(QuotaReading(accountID: "a", bucket: "codex", name: "Codex", window: "primary", minutes: 10080, used: 100, reset: now.addingTimeInterval(3600), date: now), samples: [], now: now)
 assert(CompactLiveCopy.rate(true, amount: 7680, unit: .minute) == "~7.7k tok/m")
 assert(CompactLiveCopy.rate(true, amount: 128 * RateUnit.minute.multiplier, unit: .minute) == "~7.7k tok/m")
@@ -680,7 +590,7 @@ print("PASS: compact popover remaining copy stays short and does not invent a fi
 
 do {
     let measured = QuotaReading(accountID: "field-account", bucket: "claude", name: "Claude", window: "five_hour", minutes: 300, used: 40, reset: nil, date: now)
-    let current = ToolQuotaState(readings: [measured], samples: [measured], horizon: ClaudeQuotaSource.horizon, guardAccountID: measured.accountID)
+    let current = ToolQuotaState(readings: [measured], samples: [measured], horizon: ClaudeQuotaSource.horizon, guardAccountID: measured.accountID, guardAuthenticated: true)
     let running = Tachometer(); running.hasRate = true; running.rate = 12; running.rawRate = 12
     var settings = MenuBarConfiguration(); settings.unit = "s"
     func fields(_ state: ToolQuotaState, at date: Date = now) -> [MenuBarPart: String] {
@@ -719,7 +629,7 @@ for selection in MenuBarTool.allCases {
     var themeSettings = MenuBarConfiguration()
     themeSettings.tool = selection
     themeSettings.enabled = [.icon, .quota, .rate]
-    let text = MenuBarPresentation.combined(themeSettings, codex: themeCodex, claude: themeClaude, grok: themeGrok,
+    let text = MenuBarPresentation.face(themeSettings, codex: themeCodex, claude: themeClaude, grok: themeGrok,
         monitor: monitor, now: now, palette: competing, claudeQuota: ToolQuotaState())
     var accentRuns = 0
     text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { value, _, _ in
@@ -731,46 +641,30 @@ for selection in MenuBarTool.allCases {
 }
 print("PASS: Auto and every selected tool preserve exactly one menu accent despite legacy overrides")
 
-// Names belong to the composed single-tool readout, not each configurable field.
-// Exercise every enabled-field subset, both densities and both order directions.
-for selection in [MenuBarTool.codex, .claude, .grok, .auto] {
-    let label = selection == .claude ? "Claude" : selection == .grok ? "Grok" : "Codex"
-    for compact in [false, true] {
+// Every supported field subset preserves independent identities, order and names-off speech.
+for selection in MenuBarTool.allCases {
+    for names in [false, true] {
         for reverse in [false, true] {
-            for mask in 0..<(1 << MenuBarPart.allCases.count) {
-                var choice = MenuBarConfiguration()
-                choice.tool = selection; choice.compact = compact
-                choice.order = reverse ? Array(MenuBarPart.allCases.reversed()) : MenuBarPart.allCases
-                choice.enabled = Set(MenuBarPart.allCases.enumerated().filter { mask & (1 << $0.offset) != 0 }.map { $0.element })
-                for date in [now, now.addingTimeInterval(121)] {
-                    let composed = MenuBarPresentation.combined(choice, codex: usedCodex, claude: idleClaude, grok: usedGrok,
-                        monitor: monitor, now: date, palette: combinedPalette, claudeQuota: ToolQuotaState(), grokQuota: grokState)
-                    if selection == .auto {
-                        let namesRemaining = choice.enabled.contains(.quota) && date == now
-                        if namesRemaining {
-                            assert(composed.string.contains("Codex 40% Grok 51% remaining"),
-                                   "Idle Auto names recent Codex and Grok remaining on one line: \(composed.string)")
-                            assert(!composed.string.contains("Claude"),
-                                   "Idle Auto does not invent Claude: \(composed.string)")
-                        } else {
-                            assert(!composed.string.contains("Codex") && !composed.string.contains("Claude") && !composed.string.contains("Grok"),
-                                   "Idle Auto does not invent a tool: \(composed.string)")
-                        }
-                        assert(!composed.string.contains("Fable"), "Idle Auto omits unused Fable copy: \(composed.string)")
-                        assert(!composed.string.contains("tok/"), "Idle Auto has no speed line: \(composed.string)")
-                    } else {
-                        let expected = label
-                        assert(composed.string.components(separatedBy: expected).count - 1 == 1,
-                               "One tool label per readout: \(composed.string)")
-                    }
-                    let plain = MenuBarPresentation.title(choice, meter: idleCodex, monitor: monitor, now: date, tool: .codex)
-                    assert(plain.components(separatedBy: "Codex").count - 1 == 1, "Plain titles follow the same identity rule")
+            let parts = MenuBarPart.allCases.filter { MenuBarConfiguration.instrumentParts.contains($0) }
+            for mask in 0..<(1 << parts.count) {
+                var choice = MenuBarConfiguration(); choice.tool = selection; choice.showsNames = names
+                choice.order = reverse ? Array(parts.reversed()) : parts
+                choice.enabled = Set(parts.enumerated().filter { mask & (1 << $0.offset) != 0 }.map { $0.element })
+                let text = MenuBarPresentation.face(choice, codex: instrumentMeter(.codex, rate: 2, at: now),
+                    claude: instrumentMeter(.claude, rate: 3, at: now), grok: instrumentMeter(.grok, rate: 4, at: now),
+                    monitor: monitor, now: now, palette: ToolPalette(), claudeQuota: ToolQuotaState())
+                let expected = selection == .auto ? LiveTool.allCases : [LiveTool(rawValue: selection.rawValue)!]
+                for tool in LiveTool.allCases {
+                    assert(text.string.components(separatedBy: tool.label).count - 1 == (names && expected.contains(tool) ? 1 : 0))
+                    assert(MenuBarDial.spokenLabel(text).contains(tool.label) == expected.contains(tool))
                 }
+                assert(dialIdentities(text) == (choice.enabled.contains(.dial) ? expected.map(\.rawValue) : []))
+                assert(!text.string.contains("Total"))
             }
         }
     }
 }
-print("PASS: every field subset, compactness and order direction names the selected tool exactly once, including stale quota")
+print("PASS: supported field subsets preserve independent instrument identity, names, speech and dial membership")
 
 // Speed panels have no idle fallback; independent account allowances persist.
 assert(LiveTool.active(codex: idleCodex, claude: idleClaude, grok: staleGrok).isEmpty)
@@ -911,7 +805,7 @@ do {
     assert(activeOnly.tools == [.claude])
     let reading = QuotaReading(accountID: "synthetic-a", bucket: "codex", name: "Account", window: "primary", minutes: 300,
                                used: 36, reset: now.addingTimeInterval(3600), date: now)
-    let current = ToolQuotaState(readings: [reading], accountLabel: "Synthetic account", guardAccountID: "synthetic-a")
+    let current = ToolQuotaState(readings: [reading], accountLabel: "Synthetic account", guardAccountID: "synthetic-a", guardAuthenticated: true)
     let shown = AccountAllowancePresentation(quota: current, now: now)
     assert(shown.remaining == "64%" && shown.qualifier == "Remaining")
     assert(shown.detail.contains("Resets") && shown.detail.contains("Quota read") && shown.detail.contains("Synthetic account"))
@@ -1031,20 +925,10 @@ do {
     assert(MenuBarPresentation.values(fableMenu, meter: meter, monitor: monitor, now: cacheNow, claudeQuota: fableExhausted)[.fable] == "",
            "A measured Fable zero does not occupy the status item")
     fableMenu.tool = .codex
-    let codexWithFable = MenuBarPresentation.combined(fableMenu, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
-        monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
-    assert(codexWithFable.string.hasPrefix("Codex") && codexWithFable.string.hasSuffix("Fable 68% · 5h"), codexWithFable.string)
-    fableMenu.tool = .auto
-    let totalWithFable = MenuBarPresentation.combined(fableMenu, codex: combinedCodex, claude: combinedClaude, grok: combinedGrok,
-        monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
-    assert(totalWithFable.string.hasPrefix("Total") && totalWithFable.string.components(separatedBy: "Fable 68% · 5h").count == 2, totalWithFable.string)
-    fableMenu.enabled = [.rate, .quota, .fable, .fablePace]
-    let idleWithFable = MenuBarPresentation.combined(fableMenu, codex: idleCodex, claude: used(Tachometer(), .claude, ago: 600, now: cacheNow), grok: staleGrok,
-        monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
-    assert(!idleWithFable.string.contains("Fable") && !idleWithFable.string.contains("tok/"),
-           "Idle Auto omits unused Fable remaining: \(idleWithFable.string)")
-    assert(idleWithFable.string.contains("Claude") && idleWithFable.string.contains("remaining"),
-           "Idle Auto still names Claude remaining: \(idleWithFable.string)")
+    let withLegacyFields = MenuBarPresentation.face(fableMenu, codex: instrumentMeter(.codex, rate: 2, at: cacheNow),
+        claude: Tachometer(), grok: Tachometer(), monitor: monitor, now: cacheNow, palette: ToolPalette(), claudeQuota: bound)
+    assert(withLegacyFields.string.contains("Codex") && !withLegacyFields.string.contains("Fable"))
+    assert(!withLegacyFields.string.contains("remaining"), "Legacy allowance fields are retained in preferences, not displayed on the active bar")
     print("PASS: Claude model-scoped weekly rows, microsecond resets and the Fable tightest-limit roll-up across selections; missing or stale inputs stay unavailable")
 }
 
@@ -1266,3 +1150,16 @@ do {
            "Starting another tool preserves the known idle module")
     print("PASS: live modules preserve tool identity through active, idle and unavailable states")
 }
+
+// Raw arithmetic and a plausible timestamp are not current allowance evidence.
+do {
+    let raw = QuotaReading(accountID: "qualification", bucket: "codex", name: "Synthetic", window: "primary", minutes: 300,
+                           used: 40, reset: now.addingTimeInterval(3600), date: now)
+    var state = ToolQuotaState(readings: [raw], guardAccountID: raw.accountID)
+    assert(raw.remaining == 60 && AccountAllowancePresentation(quota: state, now: now).estimate == nil)
+    state.guardAuthenticated = true
+    assert(AccountAllowancePresentation(quota: state, now: now).remaining == "60%")
+    state.guardAccountID = nil
+    assert(AccountAllowancePresentation(quota: state, now: now).estimate == nil, "No implicit account binding at presentation")
+}
+print("PASS: current allowance requires the shared account/authentication qualification boundary")

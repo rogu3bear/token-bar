@@ -5,7 +5,7 @@ import Foundation
 struct UsageDiagnostic: Codable, Equatable, Identifiable {
     enum Kind: String, Codable {
         case sessionChanged, sessionReplaced, unresolvedBoundary, legacyAliases
-        case counterConflict, missingBaseline, readFailure
+        case counterConflict, counterOverlap, missingBaseline, readFailure
     }
     enum Scope: String, Codable { case live, history, provider }
     enum Recovery: String, Codable { case unresolved, resumed, unknown }
@@ -17,7 +17,12 @@ struct UsageDiagnostic: Codable, Equatable, Identifiable {
     var message: String
     var firstChecked: Date?
     var lastChecked: Date?
-    var id: String { [provider, scope.rawValue, source ?? "", kind.rawValue, message].joined(separator: "|") }
+    /// Logical coverage identity is not a source filename.
+    var coverageID: String?
+    var id: String {
+        [provider, scope.rawValue, source ?? "", kind.rawValue, message].joined(separator: "|") +
+            (coverageID.map { "|" + $0 } ?? "")
+    }
     var isFailure: Bool { kind == .readFailure }
     var isContinuity: Bool {
         [.sessionChanged, .sessionReplaced, .unresolvedBoundary, .legacyAliases].contains(kind)
@@ -27,6 +32,7 @@ struct UsageDiagnostic: Codable, Equatable, Identifiable {
         if message == "Source continuity is incomplete across a session change; prior totals retained." { return .sessionChanged }
         if message == "Source continuity is incomplete; retained prior totals and admitted only independently supported requests." { return .unresolvedBoundary }
         if message == "Multiple legacy cursor aliases required reconciliation; prior totals retained and coverage remains incomplete." { return .legacyAliases }
+        if message == "Counter coverage overlaps without a proved uncovered interval; prior totals retained." { return .counterOverlap }
         if message == "Conflicting Claude counter revisions were retained without guessing a total." { return .counterConflict }
         if message == "Some older Claude messages lack retained counter baselines; their totals are preserved and increases cannot be reconciled." { return .missingBaseline }
         return .readFailure
@@ -82,9 +88,10 @@ struct UsageReadHealth: Equatable {
     var summary: String {
         let gaps = diagnostics.filter { !$0.isFailure }.count
         let coverageFiles = Set(diagnostics.filter { !$0.isFailure }.compactMap(\.source)).count
-        let coverage = gaps == 0 ? "" : "\(gaps.formatted()) coverage warnings" +
-            (coverageFiles > 0 ? " across \(coverageFiles.formatted()) source files" : "") + ". Available usage is retained."
-        let failures = failureCount == 0 ? "" : "\(failureCount.formatted()) source read failures. Previous results are retained."
+        let coverage = gaps == 0 ? "" : "\(gaps.formatted()) coverage " + (gaps == 1 ? "warning" : "warnings") +
+            (coverageFiles > 0 ? " across \(coverageFiles.formatted()) source " + (coverageFiles == 1 ? "file" : "files") : "") + ". Available usage is retained."
+        let failures = failureCount == 0 ? "" : "\(failureCount.formatted()) source read " +
+            (failureCount == 1 ? "failure" : "failures") + ". Available results are retained."
         return [failures, coverage].filter { !$0.isEmpty }.joined(separator: " ")
     }
 }
@@ -118,6 +125,12 @@ extension UsageScanner {
         if ledger.sourceErrors == nil, let legacy = ledger.historyError { sources["Saved history"] = legacy }
         var issues = sources.keys.sorted().flatMap { key in
             UsageDiagnostic.decodeLegacy(scope: key, message: sources[key]!)
+        }
+        for key in (ledger.usageCoverage ?? [:]).keys.sorted() {
+            guard let coverage = ledger.usageCoverage?[key], coverage.unresolved else { continue }
+            issues.append(UsageDiagnostic(provider: coverage.provider, scope: .provider, source: nil,
+                kind: .counterOverlap, recovery: .unresolved,
+                message: "Counter coverage overlaps without a proved uncovered interval; prior totals retained.", coverageID: key))
         }
         for index in issues.indices {
             if let source = issues[index].source {

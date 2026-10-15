@@ -407,3 +407,22 @@ do {
     check(RelativeAgeText.label(from: stamp, to: now) == "10 minutes", "History and contribution captions use the shared relative age")
 }
 print("PASS: History updated and contribution last-activity share one relative-age face")
+
+// A Grok turn with four model calls is not a single request context.
+let multiHome = root.appendingPathComponent("multi-grok")
+let multiURL = multiHome.appendingPathComponent("sessions/multi/usage.json")
+var multiTurn = turn(1, ended: "2026-09-07T12:00:00Z", input: 500_000, output: 10_000, cached: 400_000, writes: 0, reasoning: 5_000, total: 510_000, ticks: 30_000_000_000)
+multiTurn["modelCalls"] = 4; multiTurn["costIsPartial"] = true
+try writeJSON(["sessionId": "multi", "updatedAt": "2026-09-07T12:00:00Z", "session": multiTurn, "turns": [multiTurn]], to: multiURL)
+let multiScanner = UsageScanner(home: root.appendingPathComponent("no-multi-codex"), stateURL: root.appendingPathComponent("multi-state/ledger.json"), grokHome: multiHome)
+multiScanner.ledger.started = Date(timeIntervalSince1970: 2_000_000_000); multiScanner.rebuilding = true
+let multiSnapshot = multiScanner.scan(historical: true)
+let multiRow = multiSnapshot.entries.first!
+check(multiRow.requestInputTokens == nil && multiRow.contextBand == nil && !multiRow.isSingleRequest,
+      "Multi-call turn never becomes one prompt or an OpenAI context band")
+check(multiRow.costUsdTicks == 30_000_000_000 && multiRow.modelCalls == 4 && multiRow.costIsPartial == true,
+      "Provider costs, call counts and partial-cost evidence survive admission/compaction")
+let multiReport = CostReport.build(source: multiSnapshot.entries, query: UsageQuery(period: 1), catalog: [:])
+check(multiReport.reportedGrokUsd == 3 && multiReport.amounts.total == 0 && multiReport.csv().contains("partial") && multiReport.reportedGrokQualification.contains("marked partial"),
+      "Partial recorded Grok dollars remain visible and separate from API totals")
+print("PASS: Grok multi-call request boundary and separately reported partial costs")

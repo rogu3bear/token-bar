@@ -19,7 +19,15 @@ enum CostPreview {
         let suite = "local.token-bar.cost-preview." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        try PreviewModelScope.run(root: root, defaults: defaults) { model in
+        let recovery = CommandLine.arguments.contains("--sample-recovery")
+        try PreviewModelScope.run(root: root, defaults: defaults, prepare: {
+            if recovery { try RecoveryPreviewData.seed(root: root) }
+        }) { model in
+            if recovery {
+                try RecoveryPreviewData.bind(model, root: root)
+                runInteractive(model)
+                return
+            }
             try run(model, root: root, destination: destination, navigation: navigation)
         }
     }
@@ -46,11 +54,23 @@ enum CostPreview {
                 entries.append(e)
             }
         }
+        if CommandLine.arguments.contains("--sample-provider-pricing") {
+            var claude = Entry(date: now, session: "sample-claude", model: "claude-opus-5-5",
+                tokens: Tokens(["input_tokens": 1_000_000, "cached_input_tokens": 600_000, "cache_write_input_tokens": 100_000, "output_tokens": 100_000]), account: nil)
+            claude.provider = "anthropic"; claude.harness = "Claude Code"; claude.tokenFields = ClaudeCodeUsage.recordedFields
+            claude.tokens.cacheWrite5m = 60_000; claude.tokens.cacheWrite1h = 40_000
+            claude.observedSpeed = "standard"; claude.observedService = "standard"; claude.pricingDay = UsageMetadata.day(now)
+            entries.append(claude)
+            var grok = claude; grok.session = "sample-grok"; grok.model = "grok-4.7-build"; grok.provider = "xai"; grok.harness = Harness.grok
+            grok.tokens.cacheWrite = 0; grok.tokens.cacheWrite5m = nil; grok.tokens.cacheWrite1h = nil
+            grok.costUsdTicks = 25_000_000_000; grok.modelCalls = 4; grok.observedSpeed = nil
+            entries.append(grok)
+        }
         var missing = entries[0]; missing.model = "sample-unpriced-model"; missing.effort = nil
         if CommandLine.arguments.contains("partial") { entries.append(missing) }
         for index in entries.indices {
             entries[index].recordID = "preview-\(index)"
-            entries[index].requestInputTokens = entries[index].tokens.input
+            if entries[index].provider != "xai" || entries[index].modelCalls == 1 { entries[index].requestInputTokens = entries[index].tokens.input }
             try model.scanner.requestArchive?.record(entries[index], admitted: true)
         }
         model.retainedRequests = try model.scanner.requestArchive?.count
@@ -85,7 +105,9 @@ enum CostPreview {
         model.costRecoveryMessage = "Sample data only. No real account or usage records were read."
         model.rebuild()
         if navigation { try verifyScope(model, root: root) }
-        if navigation { try configurePageState(model, root: root, entries: entries) }
+        if navigation || CommandLine.arguments.contains("--sample-state") || CommandLine.arguments.contains("--sample-many-diagnostics") {
+            try configurePageState(model, root: root, entries: entries)
+        }
         if interactive && destination == nil {
             var integrity = IntegrityReport()
             integrity.record([.negativeCounter])
@@ -106,12 +128,18 @@ enum CostPreview {
             return
         }
         let page: Destination = CommandLine.arguments.contains("--sample-history") ? .history : navigation ? .now : .cost
+        let diagnostics = CommandLine.arguments.contains("--sample-diagnostic-details")
         let view = AppearanceHost(preferences: model.appearance) {
-            DashboardRoot(model: model, initialDestination: page).frame(minWidth: 900, minHeight: 700)
-                .appCanvas()
+            if diagnostics {
+                UsageDiagnosticDetails(health: model.snapshot.readHealth)
+            } else {
+                DashboardRoot(model: model, initialDestination: page).frame(minWidth: 900, minHeight: 700)
+                    .appCanvas()
+            }
         }
         let host = NSHostingView(rootView: view.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } })
-        host.frame = NSRect(x: 0, y: 0, width: 1064, height: 900)
+        host.frame = diagnostics ? NSRect(x: 0, y: 0, width: 660, height: 480)
+            : NSRect(x: 0, y: 0, width: 1064, height: CommandLine.arguments.contains("--sample-full-report") ? 1600 : 900)
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable, .miniaturizable, .resizable] : [.borderless], backing: .buffered, defer: false)
         let closer = CostPreviewClose()
         if destination == nil { window.delegate = closer }
@@ -241,12 +269,13 @@ enum CostPreview {
         }
         if arguments.contains("--sample-many-diagnostics") {
             model.snapshot.diagnostics = nil
-            model.snapshot.error = PreviewFixture.sourceDiagnostics
+            model.snapshot.error = [model.snapshot.error, PreviewFixture.sourceDiagnostics].compactMap { $0 }.joined(separator: "\n")
             // Exercise other consumers of the same shared notice without a live provider.
             model.live.error = "Synthetic account service unavailable."
         }
         if state != "empty" {
             let observed = PreviewFixture.date.addingTimeInterval(state == "failed" ? -600 : 0)
+            model.live.lastQuotaRefresh = observed
             let quota = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Codex", window: "primary", minutes: 300, used: 36, reset: PreviewFixture.date.addingTimeInterval(3600), date: observed)
             model.live.state.accounts["synthetic-account"] = LiveAccount(id: "synthetic-account", email: "sample@example.com", plan: "pro", observed: observed, quotas: [quota])
             if arguments.contains("--sample-spark-accounts") {
@@ -265,7 +294,8 @@ enum CostPreview {
                 }
             }
             if state != "failed" {
-                model.tachometer.activity.turns["sample"] = TaskActivity(turn: "sample", started: observed, observed: observed, running: true, kind: .chat, session: "sample")
+                model.tachometer.activity.turns["sample"] = TaskActivity(turn: "sample", started: observed, observed: observed, running: true, kind: .chat, session: "sample", eventDate: observed)
+                model.tachometer.activity.measurements["sample"] = RateMeasurement(turn: "sample", date: observed, duration: 1, output: 72, model: "sample-model")
                 model.tachometer.rawRate = 72; model.tachometer.rate = 72; model.tachometer.hasRate = true; model.tachometer.reportingCount = 1
                 model.tachometer.models = ["sample-model"]
             }

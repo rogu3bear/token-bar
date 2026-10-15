@@ -47,8 +47,15 @@ enum QuotaGuardPreview {
         model.live.state.samples = samples + [weekly]
         model.live.lastQuotaRefresh = now
         var claude = latest; claude.accountID = "synthetic-claude"; claude.bucket = "claude"; claude.name = "Model allowance"
-        claude.date = now.addingTimeInterval(-180); claude.used = 95
-        model.claudeQuota.quota = ToolQuotaState(readings: [claude], samples: [claude], horizon: ClaudeQuotaSource.horizon,
+        var claudeAge: TimeInterval = 180
+        if let index = arguments.firstIndex(of: "--sample-claude-age") {
+            guard arguments.indices.contains(index + 1), let age = Double(arguments[index + 1]), age.isFinite, (0...3600).contains(age) else { throw CocoaError(.coderInvalidValue) }
+            claudeAge = age
+        }
+        claude.date = now.addingTimeInterval(-claudeAge); claude.used = 92
+        if arguments.contains("--sample-no-reset") { claude.reset = nil }
+        var priorClaude = claude; priorClaude.date = claude.date.addingTimeInterval(-900); priorClaude.used = 84
+        model.claudeQuota.quota = ToolQuotaState(readings: [claude], samples: [priorClaude, claude], horizon: ClaudeQuotaSource.horizon,
             guardAccountID: claude.accountID, guardAuthenticated: true)
         model.grokQuota.quota = ToolQuotaState(unavailable: "No supported account quota available")
         if arguments.contains("--sample-unavailable") {
@@ -78,7 +85,7 @@ enum QuotaGuardPreview {
         print("PASS: synthetic model and navigation construct zero system notification adapters")
         defer { PreviewModelScope.close(delegate.detailWindow); PreviewModelScope.close(delegate.settingsWindow) }
         if arguments.contains("--verify-quota-navigation") {
-            guard let target = model.quotaGuard.decisions.first(where: { $0.risk != .none }) else { throw CocoaError(.coderInvalidValue) }
+            guard let target = model.quotaGuard.displayDecisions.first(where: { $0.tool == .claude && $0.risk != .none }) else { throw CocoaError(.coderInvalidValue) }
             model.quotaGuard.view(target)
             let window = delegate.detailWindow; let host = window?.contentViewController
             guard window != nil, delegate.dashboardSelection.destination == .accounts, model.quotaGuard.selected?.id == target.id else { throw CocoaError(.coderInvalidValue) }
@@ -96,15 +103,18 @@ enum QuotaGuardPreview {
         let width: CGFloat = arguments.contains("--sample-default-size") ? 1120 : 900
         let height: CGFloat = arguments.contains("--sample-default-size") ? 800 : 700
         let settings = arguments.contains("--sample-settings")
+        let detail = arguments.contains("--sample-warning-detail")
+        if detail { model.quotaGuard.view(model.quotaGuard.displayDecisions.first { $0.tool == .claude }!) }
         let view = AppearanceHost(preferences: model.appearance, clock: model.clock) {
             Group {
-                if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
+                if detail, let selected = model.quotaGuard.selected { QuotaGuardDetail(coordinator: model.quotaGuard, decision: selected) }
+                else if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer) }
                 else { DashboardRoot(model: model, initialDestination: settings ? .menuBar : .now) }
-            }.frame(width: compact ? 440 : width, height: compact ? nil : height)
+            }.frame(width: detail ? 508 : compact ? 440 : width, height: compact || detail ? nil : height)
                 .appCanvas()
-        }.previewStill()
+        }.environment(\.nativeCommands, delegate.commands).previewStill()
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : width, height: compact ? host.fittingSize.height : height)
+        host.frame = NSRect(x: 0, y: 0, width: detail ? 508 : compact ? 440 : width, height: compact || detail ? host.fittingSize.height : height)
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
         let closer = QuotaGuardPreviewClose()
         if destination == nil { window.delegate = closer }

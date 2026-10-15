@@ -292,14 +292,6 @@ extension UsageScanner {
         if selected.isEmpty, let previous = cursor.previous {
             let (total, fields) = GrokUsage.tokens(usage.session)
             if total == previous { return }
-            let delta: Tokens
-            if total.input >= previous.input && total.output >= previous.output {
-                delta = total.delta(from: previous)
-            } else if let last = turns.last {
-                delta = GrokUsage.tokens(last).0
-            } else {
-                delta = Tokens()
-            }
             let ticks = GrokUsage.tickDelta(session: sessionTicks, previous: cursor.previousTicks)
             guard let stamp = GrokUsage.date(usage.updatedAt, iso: iso, plain: plainISO)
                 ?? GrokUsage.date(turns.last?["endedAt"] ?? turns.last?["ended_at"], iso: iso, plain: plainISO)
@@ -307,10 +299,11 @@ extension UsageScanner {
             cursor.previous = total
             cursor.previousFields = fields
             cursor.previousTicks = sessionTicks
-            try admitGrok(session: sessionID, model: model, tokens: delta, fields: fields,
+            cursor.usageEpoch = try admitGrok(session: sessionID, model: model, tokens: total, fields: fields,
                           date: stamp, turn: cursor.turnID ?? "session", ticks: ticks,
                           raw: usage.session, historical: historical, last: nil, effort: cursor.effort,
-                          projectPath: projectPath)
+                          projectPath: projectPath, previous: previous, cumulative: true,
+                          fallback: turns.last.map { GrokUsage.tokens($0).0 }, epoch: cursor.usageEpoch ?? "initial")
             return
         }
         if cursor.previous == nil, parent != nil, let last = turns.last {
@@ -326,22 +319,25 @@ extension UsageScanner {
                 cursor.previousTicks = sessionTicks
                 return
             }
-            try admitGrokTurn(last, session: sessionID, model: model, historical: historical, effort: cursor.effort, projectPath: projectPath)
+            try admitGrokTurn(last, session: sessionID, model: model, historical: historical, effort: cursor.effort, projectPath: projectPath,
+                extent: Self.grokExtents([last], total: sessionTokens).first ?? nil, epoch: cursor.usageEpoch ?? "initial")
             cursor.previous = sessionTokens
             cursor.turnID = GrokUsage.int(last, "turnNumber").map(String.init)
             cursor.previousFields = turnFields
             cursor.previousTicks = sessionTicks
             return
         }
-        for turn in selected {
-            try admitGrokTurn(turn, session: sessionID, model: model, historical: historical, effort: cursor.effort, projectPath: projectPath)
+        let extents = Self.grokExtents(selected, total: GrokUsage.tokens(usage.session).0)
+        for (index, turn) in selected.enumerated() {
+            try admitGrokTurn(turn, session: sessionID, model: model, historical: historical, effort: cursor.effort, projectPath: projectPath,
+                extent: extents[index], epoch: cursor.usageEpoch ?? "initial")
             cursor.turnID = GrokUsage.int(turn, "turnNumber").map(String.init) ?? cursor.turnID
         }
         cursor.previous = GrokUsage.tokens(usage.session).0
         cursor.previousFields = GrokUsage.tokens(usage.session).1
         cursor.previousTicks = sessionTicks
     }
-    private func admitGrokTurn(_ turn: [String: Any], session: String, model: String, historical: Bool, effort: String?, projectPath: String?) throws {
+    private func admitGrokTurn(_ turn: [String: Any], session: String, model: String, historical: Bool, effort: String?, projectPath: String?, extent: UsageExtent?, epoch: String) throws {
         let (tokens, fields) = GrokUsage.tokens(turn)
         guard tokens.total > 0 else { return }
         guard let date = GrokUsage.date(turn["endedAt"] ?? turn["ended_at"], iso: iso, plain: plainISO) else {
@@ -349,12 +345,9 @@ extension UsageScanner {
         }
         let turnID = GrokUsage.int(turn, "turnNumber").map(String.init) ?? "turn"
         let ticks = GrokUsage.int(turn, "costUsdTicks", "total_cost_usd_ticks")
-        try admitGrok(session: session, model: model, tokens: tokens, fields: fields, date: date, turn: turnID, ticks: ticks, raw: turn, historical: historical, last: tokens, effort: effort, projectPath: projectPath)
+        _ = try admitGrok(session: session, model: model, tokens: tokens, fields: fields, date: date, turn: turnID, ticks: ticks, raw: turn, historical: historical, last: tokens, effort: effort, projectPath: projectPath, extent: extent, epoch: epoch)
     }
-    private func admitGrok(session: String, model: String, tokens: Tokens, fields: [String], date: Date, turn: String, ticks: Int?, raw: [String: Any], historical: Bool, last: Tokens?, effort: String?, projectPath: String?) throws {
-        let boundary = Calendar.current.startOfDay(for: ledger.started)
-        guard rebuilding || (historical ? date < boundary : date >= boundary) else { return }
-        guard tokens.total > 0 else { return }
+    private func admitGrok(session: String, model: String, tokens: Tokens, fields: [String], date: Date, turn: String, ticks: Int?, raw: [String: Any], historical: Bool, last: Tokens?, effort: String?, projectPath: String?, previous: Tokens? = nil, cumulative: Bool = false, fallback: Tokens? = nil, extent: UsageExtent? = nil, epoch: String) throws -> String {
         let canonical = (try? JSONSerialization.data(withJSONObject: raw.filter { key, _ in
             ["inputTokens", "outputTokens", "cachedReadTokens", "cacheCreationTokens", "reasoningTokens", "totalTokens",
              "input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "reasoning_tokens",
@@ -362,19 +355,35 @@ extension UsageScanner {
         }, options: [.sortedKeys])) ?? Data()
         let identity = "grok|\(session)|\(turn)|\(String(decoding: canonical, as: UTF8.self))"
         let fingerprint = EventIdentity.hash(identity)
-        if let duplicate = identityKnown(fingerprint) { if duplicate { return } } else { return }
+        var nextEpoch: String? = epoch
+        let evidence = cumulative ? Self.cumulativeEvidence(source: "grok|" + session, provider: "Grok", total: tokens,
+            previous: previous, last: fallback, fingerprint: fingerprint, epoch: &nextEpoch) :
+            UsageEvidence(source: "grok|" + session, epoch: epoch, provider: "Grok", counters: tokens,
+                delta: tokens, extent: extent, fingerprint: fingerprint)
+        let boundary = Calendar.current.startOfDay(for: ledger.started)
+        guard rebuilding || (historical ? date < boundary : date >= boundary) else { return nextEpoch ?? epoch }
+        let admission = assessUsage(evidence)
+        guard admission.evidence != nil else {
+            if let loadError { throw NSError(domain: "CodexTokenBar", code: 3, userInfo: [NSLocalizedDescriptionKey: loadError]) }
+            return nextEpoch ?? epoch
+        }
         var cursor = Cursor(); cursor.turnID = turn; cursor.provider = GrokUsage.provider; cursor.model = model
         cursor.effort = effort
         cursor.projectPath = projectPath
-        var entry = Entry(date: date, session: session, model: model, tokens: tokens, account: nil)
+        var entry = Entry(date: date, session: session, model: model, tokens: evidence.delta, account: nil)
         entry.provider = GrokUsage.provider
         entry.harness = Harness.grok
         entry.projectPath = projectPath
         entry.effort = effort
         entry.costUsdTicks = ticks
+        entry.costIsPartial = raw["costIsPartial"] as? Bool
+        entry.modelCalls = GrokUsage.int(raw, "modelCalls").flatMap { $0 > 0 ? $0 : nil }
         UsageMetadata.enrich(&entry, cursor: cursor, fields: fields, fingerprint: fingerprint, last: last, info: [:])
+        // A turn can aggregate many requests; its total is not a prompt size.
+        if entry.modelCalls != 1 { entry.requestInputTokens = nil }
         if rebuilding { entry.account = restoredAccounts[Self.restoreKey(entry)] }
-        persistAdmitted(entry, fingerprint: fingerprint, date: date)
+        persistAdmitted(entry, fingerprint: fingerprint, date: date, admission: evidence)
         if loadError != nil { throw NSError(domain: "CodexTokenBar", code: 3, userInfo: [NSLocalizedDescriptionKey: loadError!]) }
+        return nextEpoch ?? epoch
     }
 }

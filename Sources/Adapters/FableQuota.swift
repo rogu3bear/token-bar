@@ -32,8 +32,8 @@ extension ClaudeQuotaSource {
         var budget: FableBudget?
         for limit in fableLimits(quota) {
             // Any missing, stale, reset or other-account input leaves the budget unknown.
-            guard let reading = limit.reading, reading.accountID == account, reading.used.isFinite, (0...100).contains(reading.used),
-                  let reset = reading.reset, reset > now, reading.date <= now, now.timeIntervalSince(reading.date) < quota.horizon else { return nil }
+            guard let reading = limit.reading, reading.accountID == account,
+                  quota.qualification(reading, now: now).reading != nil, let reset = reading.reset, reset > now else { return nil }
             let leftover = reading.remaining
             if leftover < (budget?.remaining ?? .infinity) {
                 budget = FableBudget(remaining: leftover, binding: limit.binding)

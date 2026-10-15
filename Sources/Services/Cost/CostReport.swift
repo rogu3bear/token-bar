@@ -33,6 +33,9 @@ struct CostRow: Identifiable {
     var pricedTokens = 0
     var unpricedTokens = 0
     var records = 0
+    var reportedUsd: Decimal?
+    var reportedPartial = false
+    var reportedUnverified = false
     var hasPricedRecords = false
     var output = CostOutput()
 }
@@ -77,6 +80,15 @@ struct CostReport {
     var totalTokens: Int { pricedTokens + unpricedTokens }
     var coverage: Double? { totalTokens > 0 ? Double(pricedTokens) / Double(totalTokens) : nil }
     var coverageText: String { CostPricing.percent(coverage) }
+    var reportedGrokUsd: Decimal? {
+        let amounts = models.compactMap(\.reportedUsd)
+        return amounts.isEmpty ? nil : amounts.reduce(0, +)
+    }
+    var reportedGrokQualification: String {
+        if models.contains(where: { $0.reportedPartial }) { return "Includes costs Grok marked partial. Missing amounts remain unavailable." }
+        if models.contains(where: { $0.reportedUnverified }) { return "Cost coverage or completeness is unverified for some retained records." }
+        return "Completeness as reported by Grok; independently unverified."
+    }
     var hasPricedRecords: Bool { lines.contains { $0.estimate.amounts != nil } }
     var availabilityMessage: String {
         guard calculatedAt != nil else { return "Cost results are not available yet." }
@@ -100,6 +112,11 @@ struct CostReport {
             var row = rows[key] ?? CostRow(id: key, title: title)
             if let value = estimate.amounts { row.amounts = row.amounts + value; row.pricedTokens += entry.tokens.total; row.hasPricedRecords = true }
             else { row.unpricedTokens += entry.tokens.total }
+            if entry.provider == "xai", entry.harness == Harness.grok {
+                row.reportedPartial = row.reportedPartial || entry.costIsPartial == true
+                row.reportedUnverified = row.reportedUnverified || entry.costIsPartial == nil || entry.costUsdTicks == nil || (entry.costUsdTicks ?? 0) < 0
+                if let ticks = entry.costUsdTicks, ticks >= 0 { row.reportedUsd = (row.reportedUsd ?? 0) + Decimal(ticks) / 10_000_000_000 }
+            }
             row.output.add(entry, estimate: estimate)
             row.records += entry.eventCount; rows[key] = row
         }
@@ -149,18 +166,22 @@ struct CostReport {
     }
     func csv(card: CostRateCard = .reference, service: CostService = .standard) -> String {
         func quote(_ value: String) -> String { RequestExport.quote(value) }
-        let header = "timestamp,session,provider,model,reasoning_level,input,cached_input,cache_write_input,output,reasoning_subset,granularity,record_count,context_band,effective_context_band,context_scope,reference_rate_card,reference_service,currency,estimated_usd,input_usd,cached_usd,cache_write_usd,reasoning_usd,answer_usd,unpriced_reason,schema_version,rate_card,service_selection,applied_service,observed_service,requested_service,price_basis,effective_from,effective_until,verified_on,rate_source"
+        let header = "timestamp,session,provider,model,reasoning_level,input,cached_input,cache_write_input,output,reasoning_subset,granularity,record_count,context_band,effective_context_band,context_scope,reference_rate_card,reference_service,currency,estimated_usd,input_usd,cached_usd,cache_write_usd,reasoning_usd,answer_usd,unpriced_reason,schema_version,rate_card,service_selection,applied_service,observed_service,requested_service,price_basis,effective_from,effective_until,verified_on,rate_source,unsplit_output_usd,cache_write_5m_input,cache_write_1h_input,observed_speed,provider_reported_usd,provider_cost_completeness,model_calls"
         let iso = ISO8601DateFormatter()
         let rows = lines.map { line -> String in
             let e = line.entry, a = line.estimate.amounts
+            let referenceRule = card.rules.first { $0.provider == e.provider && $0.model == e.model }
+            let referenceSource = referenceRule.map { ($0.source ?? card.source).absoluteString } ?? ""
             var values: [String] = [iso.string(from: e.date), e.session, e.provider ?? "Unknown", e.model, e.effort ?? "Unknown"]
-            values += [e.hasField("input_tokens") ? String(e.tokens.input) : "", e.hasField("cached_input_tokens") ? String(e.tokens.cached) : "", e.tokens.cacheWrite.map { String($0) } ?? "", e.hasField("output_tokens") ? String(e.tokens.output) : "", e.hasField("reasoning_output_tokens") ? String(e.tokens.reasoning) : ""]
+            values += [e.hasField("input_tokens") ? String(e.tokens.input) : "", e.hasField("cached_input_tokens") ? String(e.tokens.cached) : "", e.tokens.cacheWrite.map { String($0) } ?? "", e.hasField("output_tokens") ? String(e.tokens.output) : "", e.tokens.thinking.map(String.init) ?? (e.hasField("reasoning_output_tokens") ? String(e.tokens.reasoning) : "")]
             let reference = line.estimate.priceBasis == CostPriceBasis.reference.rawValue
             values += [e.bucket ?? "event", String(e.eventCount), e.contextBand ?? "Unknown", line.estimate.effectiveContextBand ?? "Unknown", line.estimate.contextScope ?? "Unknown", reference ? (line.estimate.rateCardID ?? card.id) : "", reference ? service.rawValue : "", "USD"]
-            let amounts: [Decimal?] = [a?.total, a?.input, a?.cached, a?.cacheWrite, a?.reasoning, a?.answer]
+            let amounts: [Decimal?] = [a?.total, a?.input, a?.cached, a?.cacheWrite, e.tokens.thinking != nil || e.hasField("reasoning_output_tokens") ? a?.reasoning : nil, e.tokens.thinking != nil || e.hasField("reasoning_output_tokens") ? a?.answer : nil]
             values += amounts.map { $0.map(CostPricing.decimal) ?? "" }
             values.append(line.estimate.unavailable ?? "")
-            values += ["2", line.estimate.rateCardID ?? (reference ? card.id : ""), service.rawValue, line.estimate.appliedService ?? "", e.observedService ?? "", e.requestedService ?? "", line.estimate.priceBasis ?? "", line.estimate.effectiveFrom ?? "", line.estimate.effectiveUntil ?? "", line.estimate.verifiedOn ?? (reference ? card.observedOn : ""), line.estimate.rateSource ?? (reference ? card.source.absoluteString : "")]
+            values += ["3", line.estimate.rateCardID ?? (reference ? card.id : ""), service.rawValue, line.estimate.appliedService ?? "", e.observedService ?? "", e.requestedService ?? "", line.estimate.priceBasis ?? "", line.estimate.effectiveFrom ?? "", line.estimate.effectiveUntil ?? "", line.estimate.verifiedOn ?? (reference ? card.observedOn : ""), line.estimate.rateSource ?? (reference ? referenceSource : "")]
+            let reported = e.provider == "xai" && e.harness == Harness.grok ? e.costUsdTicks.flatMap { $0 >= 0 ? Decimal($0) / 10_000_000_000 : nil } : nil
+            values += [a.map { CostPricing.decimal($0.unsplitOutput) } ?? "", e.tokens.cacheWrite5m.map(String.init) ?? "", e.tokens.cacheWrite1h.map(String.init) ?? "", e.observedSpeed ?? "", reported.map(CostPricing.decimal) ?? "", reported == nil ? "" : e.costIsPartial.map { $0 ? "partial" : "reported complete" } ?? "unverified", e.modelCalls.map(String.init) ?? ""]
             return values.map(quote).joined(separator: ",")
         }
         return ([header] + rows).joined(separator: "\n")

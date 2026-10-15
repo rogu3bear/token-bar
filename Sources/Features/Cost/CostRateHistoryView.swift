@@ -11,7 +11,7 @@ struct CostRateHistoryView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: PageStyle.related) {
-            Text("Published standard API base prices · USD per million tokens. These are the shipped historical sources, separate from your usage and subscription allowance. The last verification was September 9, 2026; later market changes may be absent.")
+            Text("Published standard API base prices · USD per million tokens. These are the shipped historical sources, separate from your usage and subscription allowance. Verification dates are shown for each version; later market changes may be absent.")
                 .font(.callout).foregroundStyle(.secondary)
             if selectedModel == "All models" {
                 Picker("Model", selection: $model) { ForEach(models, id: \.self) { Text($0).tag($0) } }
@@ -23,6 +23,10 @@ struct CostRateHistoryView: View {
                         .font(.headline)
                     Text("Input " + CostPricing.dollars(version.rule.input) + " · cache read " + CostPricing.dollars(version.rule.cached) + " · output " + CostPricing.dollars(version.rule.output))
                         .monospacedDigit()
+                    if version.rule.cacheWrite1hMultiplier != nil {
+                        Text("Cache write · 5m " + CostPricing.dollars(version.rule.input * (version.rule.cacheWriteMultiplier ?? 1)) + " · 1h " + CostPricing.dollars(version.rule.input * version.rule.cacheWrite1hMultiplier!))
+                            .monospacedDigit()
+                    }
                     if index > 0 {
                         Text(CostRateHistory.changeCaption(from: versions[index - 1].rule, to: version.rule))
                     }

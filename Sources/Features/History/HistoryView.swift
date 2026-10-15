@@ -48,6 +48,7 @@ struct HistoryView: View {
                 Text("Total = input + output. Cached input is already in input; reasoning is already in output. These are processed tokens, not quota or billed cost.")
                 Text("Reused context is counted on each processing pass, so totals are not unique written tokens. Repeated counter snapshots and inherited fork counters are deduplicated. Older records are grouped by day, task, and model; raw logs remain unchanged.")
                 Text("Account identity marked inferred comes from local sign-in observations, not execution or billing records. Historical usage without that evidence remains unattributed.")
+                Text("A completed read can retain historical coverage gaps. Refresh history retries available local sources while keeping previous results visible; it cannot recreate missing logs or resolve every earlier counter boundary. View diagnostic details for the source and recovery evidence.")
             }
         }
     }
@@ -55,6 +56,7 @@ struct HistoryView: View {
         PageHeader(.history) {
             MethodButton(title: "How history is counted") { showMethod = true }
             Button("Refresh history") { model.refresh(history: true) }.disabled(model.busy)
+                .help("Retry local usage reads. Previous results stay visible; earlier coverage gaps may remain.")
             Button("Export CSV") { model.export() }.disabled(model.filtering || model.busy)
         }
     }

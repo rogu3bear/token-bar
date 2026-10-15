@@ -53,7 +53,7 @@ struct AccountsView: View {
                             ForEach(quotas) { quota in
                                 QuotaTrendCard(quota: quota, history: monitor.state.quotaHistory ?? monitor.state.samples, samples: monitor.state.samples,
                                     current: account.id == monitor.currentID,
-                                    confirmed: account.id == monitor.currentID && !model.quota(for: .codex).guardFailed)
+                                    confirmed: model.quota(for: .codex).qualification(quota, now: now).reading != nil)
                             }
                         }
                         let plans = monitor.state.plans.filter { $0.accountID == account.id }.sorted { $0.firstSeen < $1.firstSeen }

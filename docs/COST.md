@@ -5,13 +5,13 @@
 The Cost view estimates API-equivalent cost by period, model and recorded
 reasoning level using the shipped, dated rules below. It preserves unknown
 fields, token accounting and fork deduplication. Filters, contribution details,
-source recovery and CSV export use the same evidence boundaries. This describes
-the v0.1 rate card; the original verification dates do not claim that current
-market prices were rechecked during a documentation update.
+source recovery and CSV export use the same evidence boundaries. Provider comparison rules were checked October 2, 2026. Original historical
+verification dates remain attached to their own versions.
 
 ## Meaning of the estimate
 
-Cost defaults to **Historical rates**: a dated USD API-equivalent estimate where a verified schedule exists. **Reference rates** instead applies the 2026-09-09 card to any selected period. Neither is an invoice, subscription charge or reconstruction of amounts paid. Standard and Fast are explicit comparison scenarios. Recorded tier uses only `token_count.info.service_tier`; a turn's requested `service_tier` is retained separately and never substituted for observed usage metadata. Missing or unsupported tiers remain unpriced. Pricing is shipped as sourced, versioned data; there are no network pricing requests or uploads.
+Cost defaults to **Historical rates**: a dated USD API-equivalent estimate where a verified schedule exists. **Reference rates** instead applies the 2026-10-02 card to any selected period. Neither is an invoice, subscription charge or reconstruction of amounts paid. Standard and Fast are explicit comparison scenarios. Recorded tier uses observed provider metadata; Claude additionally requires
+`message.usage.speed` to distinguish Fast from Standard. Codex uses `token_count.info.service_tier`; a turn's requested `service_tier` is retained separately and never substituted for observed usage metadata. Missing or unsupported tiers remain unpriced. Pricing is shipped as sourced, versioned data; there are no network pricing requests or uploads.
 
 Historical base rates (USD per million input / cached input / output tokens):
 
@@ -29,9 +29,9 @@ as lasting three months. The shipped open interval retains the last verified
 rate; it does not establish a permanent tariff. An exact expiration instant or
 replacement rate is not established here and is not invented.
 
-Verification date is September 9, 2026. Price-change days are entirely unpriced because the exact UTC cutover is unknown. Historical Fast pricing is supported only from July 31; historical long-context surcharges only from September 9. Complete older GPT-5.5 and GPT-5.3-Codex schedules are not established here; their historical rules start at the September 9 observation. The last verified version continues forward until explicitly updated; it can become stale. CSV schema 2 preserves the original column prefix and appends each applied version, source, verification date, interval, selected service and applied service. Legacy reference columns are blank for historical rows; generic rate-card and price-basis columns identify the historical schedule. Unsupported intervals stay unpriced even when reference pricing is available.
+Verification date is September 9, 2026. Price-change days are entirely unpriced because the exact UTC cutover is unknown. Historical Fast pricing is supported only from July 31; historical long-context surcharges only from September 9. Complete older GPT-5.5 and GPT-5.3-Codex schedules are not established here; their historical rules start at the September 9 observation. The last verified version continues forward until explicitly updated; it can become stale. The current CSV schema 3 preserves the original column prefix and appends each applied version, source, verification date, interval, selected service and applied service. Legacy reference columns are blank for historical rows; generic rate-card and price-basis columns identify the historical schedule. Unsupported intervals stay unpriced even when reference pricing is available.
 
-The model/provider match is exact. Current verified rules cover OpenAI GPT-6 Astra, GPT-5.6 Sol/Terra/Luna, the documented GPT-5.6 alias, GPT-5.5, and GPT-5.3-Codex. Other models, providers, and unsupported service scenarios remain unpriced. Extending the rate card does not add another usage connector. There are no network pricing calls or uploads.
+The model/provider match is exact. Current verified rules cover OpenAI GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol/Luna, GPT-5.6 Sol/Terra/Luna, the documented GPT-5.6 alias, GPT-5.5, GPT-5.4/Mini, GPT-5.3-Codex, and the currently documented Daybreak Blue alias. Other models, providers, and unsupported service scenarios remain unpriced. Extending the rate card does not add another usage connector. There are no network pricing calls or uploads.
 
 Sources checked 2026-09-09:
 
@@ -43,34 +43,127 @@ Sources checked 2026-09-09:
 
 Charges for tools, images outside reported token counters, taxes, regional uplifts, billing-specific discounts, credits and subscriptions are excluded. Date selectors filter usage dates. Historical pricing selects the retained UTC usage day; unresolved legacy daily buckets need exact source recovery before historical pricing; a local-day bucket date alone cannot supply a UTC pricing day. Summaries retain daily granularity while the separate request archive preserves source timestamps.
 
+### Pricing additions — October 2, 2026
+
+The October 2 reference card retains the previously shipped rates, rechecked
+against the official model pages, and adds these exact OpenAI model IDs.
+Amounts are USD per million tokens; these are API-equivalent comparisons.
+Each added rule exports its own model source. Existing historical versions
+retain their original verification dates and intervals.
+
+| Model | Input | Cache read | Cache write | Output | Source |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `gpt-6.1-sol` | 2 | 0.10 | 2.50 | 10 | [Model](https://developers.openai.com/api/docs/models/gpt-6.1-sol) |
+| `gpt-6-sol` | 2 | 0.20 | 2.50 | 10 | [Model](https://developers.openai.com/api/docs/models/gpt-6-sol) |
+| `gpt-6-luna` | 0.10 | 0.01 | 0.125 | 0.50 | [Model](https://developers.openai.com/api/docs/models/gpt-6-luna) |
+| `gpt-5.4` | 2.50 | 0.25 | Unverified | 15 | [Model](https://developers.openai.com/api/docs/models/gpt-5.4) |
+| `gpt-5.4-mini` | 0.75 | 0.075 | Unverified | 4.50 | [Model](https://developers.openai.com/api/docs/models/gpt-5.4-mini) |
+| `gpt-daybreak-blue-latest` | 4 | 0.40 | 5 | 20 | [Documented GPT-5.6 Sol snapshot](https://developers.openai.com/api/docs/models/gpt-daybreak-blue-latest), [Sol tariff](https://developers.openai.com/api/docs/models/gpt-5.6-sol) |
+
+GPT-6 Sol, 6.1 Sol, Luna and the current Daybreak Blue snapshot use the
+request-wide >272,000-input-token surcharge: 2× input/cache rates and 1.5×
+output. Fast is 2× the applicable Standard tariff. GPT-5.4 instead uses
+session-wide context, including observations outside the selected filters;
+its [March 5 launch](https://openai.com/index/introducing-gpt-5-4/) also
+establishes Priority at 2× Standard. Mini has no documented long-context
+surcharge or verified Fast tariff here. Nonzero cache writes on 5.4/Mini
+remain unpriced; absent writes can be valued because those schedules have
+no separately verified cache-write charge.
+
+The [dated changelog](https://developers.openai.com/api/docs/changelog)
+establishes short-context Standard base prices from September 22 for Sol/Luna
+and September 29 for 6.1 Sol. Those entire launch days remain unpriced because
+the UTC cutover is unknown. Historical Fast and long-context pricing for the
+new GPT-6 models starts at the October 2 observation. 6.1 Sol's launch includes
+cache-write pricing; Sol/Luna writes are verified only from October 2 and
+nonzero older writes remain unpriced. GPT-5.4's short-context historical
+schedule starts at its dated March 5 launch; the session-wide long-context
+modifier is verified only from October 2. Complete dated Mini tariffs and
+historical Daybreak alias bindings were not established: their historical
+versions start October 2, while Reference rates can compare older usage.
+Missing provider, UTC day, token fields or applicable context evidence still
+prevents pricing. New rates do not change retained token totals or recover
+missing metadata.
+
+Other retained model names were investigated on October 2. No public verified
+tariff was established for `codex-auto-review` or `gpt-5.3-codex-spark`; neither
+inherits another model's rate. Unknown model/provider records remain unknown.
+Claude rates and xAI API rates are now shipped as described below. Retained
+`grok-4.6-build` and `grok-4.7-build` records expose their local recorded USD
+amounts separately. Their exact Build IDs have no verified API tariff binding
+here and their turns aggregate multiple model calls; neither a guessed alias
+nor a summed turn size selects an API tariff. The recorded dollars do not
+enter the API-equivalent total or its pricing-coverage numerator. Local
+`lmstudio` and OpenCode (`kimi-k2.5-free`, `glm-5-free`, `big-pickle`) records
+also have no verified provider/model tariff in this card; a name containing
+“free” does not establish a measured zero charge.
+
 ## Accounting and unknowns
 
-### Claude pricing qualification — September 13, 2026
+### Anthropic and xAI pricing qualification — October 2, 2026
 
-Claude API-equivalent cost remains unpriced. `ClaudeCodeUsage` retains the
-disjoint base input, cache read, total cache creation, and output counters,
-but does not retain `cache_creation.ephemeral_5m_input_tokens` and
-`cache_creation.ephemeral_1h_input_tokens`. The ledger, request archive, and
-compacted records therefore cannot distinguish cache-write lifetimes.
-The [official Anthropic pricing table](https://platform.claude.com/docs/en/about-claude/pricing),
-checked September 13, 2026, prices those writes separately: for Opus 5,
-five-minute writes are $6.25 per million tokens and one-hour writes are $10.
-The [prompt-caching response contract](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#1-hour-cache-duration)
-confirms that `cache_creation_input_tokens` is the sum of those two fields,
-so the aggregate alone cannot select a correct write rate. No default lifetime or model alias is inferred, and no Anthropic
-rate card is shipped in 0.1.0. Adding one requires retaining and qualifying
-the lifetime split through admission, increments, compaction, and recovery;
-legacy records without that evidence must remain unpriced. Claude also lacks
-a separately recorded reasoning-output counter; its total output must not be
-presented as a measured answer/reasoning split.
+The [official Anthropic tariff](https://platform.claude.com/docs/en/about-claude/pricing)
+and [model ID contract](https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions)
+were checked October 2. `ProviderCostRates`, composed into `CostRateCard.reference`,
+ships these exact retained model IDs. USD per million tokens:
+
+| Model ID | Input | Cache read | Output | 5m write | 1h write |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| claude-fable-5-1 | 10 | 0.25 | 50 | 12.5 | 20 |
+| claude-opus-5-5 | 4 | 0.20 | 20 | 5 | 8 |
+| claude-sonnet-5-5 | 2 | 0.20 | 10 | 2.5 | 4 |
+| claude-haiku-4-5-20251001 | 1 | 0.10 | 5 | 1.25 | 2 |
+| claude-fable-5 | 10 | 1 | 50 | 12.5 | 20 |
+| claude-opus-5 | 5 | 0.50 | 25 | 6.25 | 10 |
+| claude-opus-4-8 | 5 | 0.50 | 25 | 6.25 | 10 |
+| claude-sonnet-5 | 2 | 0.20 | 10 | 2.5 | 4 |
+
+Claude 4.6 and later use standard rates across the full context window; Haiku
+4.5 has a 200k window. Verified Fast scenarios are 2x for Opus 5.5, Opus 5 and
+Opus 4.8; other retained models have no shipped Fast tariff. Regional uplifts,
+batch discounts and tool charges are excluded from this comparison.
+
+Claude admission retains `cache_creation.ephemeral_5m_input_tokens` and
+`ephemeral_1h_input_tokens` only when nonnegative and summing exactly to total
+cache creation. The [response contract](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#1-hour-cache-duration)
+owns that split. Nonzero writes with missing duration remain unpriced; measured
+zero writes need no assumed lifetime. Optional details survive increments,
+ledger serialization, duration-aware compaction, matched recovery, the request
+archive and exports. Unknown revision baselines cannot invent a duration delta.
+
+`output_tokens_details.thinking_tokens`, when present and within output, is
+retained as an optional subset. Older unsplit output can still be priced at the
+output tariff and is presented as **Output · unsplit**, with blank reasoning and
+answer USD cells. Thinking is never charged on top of output. Unknown older
+metadata remains unknown.
+
+The [official xAI tariff](https://docs.x.ai/developers/pricing), checked October 2,
+ships exact API IDs `grok-4.7` and `grok-4.6` at 2 / 0.5 / 6, and
+`grok-build-0.1` at 1 / 0.2 / 2 (input / cache read / output). Requests with
+at least 200k prompt tokens double all three rates. A single-request input count
+is required; a multi-call Grok turn or daily bucket is not a request. Fast Build
+pricing has no exact retained speed/ID binding here and remains unsupported.
+No separately priced cache-creation tariff is assumed for xAI.
+
+Grok Build's persisted `costUsdTicks` is converted at 10^10 ticks per USD,
+following [xAI's usage owner](https://github.com/xai-org/grok-build/blob/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8/crates/codegen/xai-chat-state/src/usage.rs).
+**Recorded Grok cost** is displayed in a separate summary and model row, and
+exported separately. Only nonnegative retained ticks contribute. Missing costs
+are unknown; older records without completeness flags remain unverified. This
+is source-reported cost, not a subscription payment or a complete invoice.
+
+These complete provider comparison tariffs are observations from October 2.
+Historical versions start on that date; earlier full schedules are not established.
+Select **Reference rates** to compare older Claude usage at the October 2 tariff.
+Recovery enriches only exactly matching groups and cannot supply absent logs.
 
 ### Calculation rules
 
-USD arithmetic uses Decimal without rounding intermediate entries. Displayed contributions round independently and can differ from the rounded total by a cent; CSV retains decimal precision. Input is divided into uncached input, cache reads, and cache writes. Output is divided into reasoning and answer. Their five priced contributions sum once. Invalid subsets are unpriced rather than clamped into a plausible cost. A missing cache-write counter is not treated as zero where the tariff distinguishes it.
+USD arithmetic uses Decimal without rounding intermediate entries. Displayed contributions round independently and can differ from the rounded total by a cent; CSV retains decimal precision. Input is divided into uncached input, cache reads, and cache writes. Output is divided into reasoning and answer where a subset is recorded; otherwise it remains combined output. The disjoint priced contributions sum once. Invalid subsets are unpriced rather than clamped into a plausible cost. A missing cache-write counter is not treated as zero where the tariff distinguishes it.
 
 The selected reasoning effort comes from each turn context; a missing setting resets it to Unknown. Effort does not multiply a price. Provider comes from session metadata or an explicit turn override. Request size is classified only when the admitted usage delta matches the reported last request, including cache-write counters. Multi-request cumulative deltas retain usage totals but cannot establish a request-size band. Daily compaction preserves provider, effort, context band and cache-write availability separately.
 
-Coverage uses processed tokens in priced records divided by all processed tokens matching the filters. A zero denominator is unavailable (an em dash), not 0%. Displayed coverage is one tenth-of-a-percent face on the Cost headline, evidence grid, and output comparison. Empty selections have no estimate; supported zero-token records can have a measured zero-dollar estimate, including in model and effort rows. Nonzero usage with no supported prices has 0% coverage and an unavailable estimate. Unpriced records remain visible by model/effort and reason. A partial dollar amount is labeled partial. CSV carries full-precision decimal amounts, reference card/service, unknown reasons, observed request context band, effective pricing context band/scope and granularity; blank dollar cells mean unpriced, never zero. Formula-leading source labels are escaped for spreadsheet use.
+Coverage uses processed tokens in priced records divided by all processed tokens matching the filters. A zero denominator is unavailable (an em dash), not 0%. Displayed coverage is one tenth-of-a-percent face on the Cost headline, evidence grid, and output comparison. Empty selections have no estimate; supported zero-token records can have a measured zero-dollar estimate, including in model and effort rows. Nonzero usage with no supported prices has 0% coverage and an unavailable estimate. Unpriced records remain visible by model/effort and reason. A partial dollar amount is labeled partial. Cost CSV schema 3 appends unsplit output, cache-write lifetimes, observed speed, model-call counts and separately reported Grok USD/completeness to the existing column prefix. Request CSV appends the corresponding retained metadata. CSV carries full-precision decimal amounts, reference card/service, unknown reasons, observed request context band, effective pricing context band/scope and granularity; blank dollar cells mean unpriced, never zero. Formula-leading source labels are escaped for spreadsheet use.
 
 ## Cost relative to output
 
@@ -167,9 +260,21 @@ Archive rows are written pending before ledger admission. After the JSON ledger 
 
 ## Compatible recovery
 
-Optional fields preserve old ledger decoding. On the first historical refresh with legacy records, and on explicit **Recover details**, source records are read using the existing scanner and event deduplication into a temporary private ledger. A day/task/model group can be enriched only if all four original token counters and its record count match exactly, attribution is uniform, and already recorded metadata is preserved. Known cache-write counts must match exactly even when other metadata is missing. Unmatched or unavailable groups remain intact. No guessed proportional allocation is performed.
+Optional fields preserve old ledger decoding. On the first historical refresh with legacy records, and on explicit **Rebuild pricing details**, source records are read using the existing scanner and event deduplication into a temporary private ledger. A day/task/model group can be enriched only if all four original token counters and its record count match exactly, attribution is uniform, and already recorded metadata is preserved. Independently readable Claude/Grok groups may be recovered in an isolated pass when unrelated source reads fail; other providers remain unchanged. Identified conflicting Claude revisions exclude the whole affected session from enrichment, preserving the source warning. Any unscoped decode/read failure still blocks provider recovery. Known duration and thinking details must also agree. Known cache-write counts must match exactly even when other metadata is missing. Unmatched or unavailable groups remain intact. No guessed proportional allocation is performed.
 
-Before saving enrichment, retain a private `ledger-before-cost-<UUID>.json` next to the original ledger. Cursor offsets and the event index are not replaced. Metadata on an old cursor is enriched only when the reconstructed file offset, model, turn identity and token counters match its existing boundary; otherwise it remains unchanged. Recovering details never adds raw prompt text to the ledger. The temporary ledger is removed after use; failures preserve existing history.
+History and Cost both offer **Refresh history** to retry local usage reads.
+**Rebuild pricing details** also explicitly rechecks pricing metadata. Neither
+action can recreate missing logs or supply unsupported rates. A completed read
+can retain source-coverage gaps, and retained tokens can remain unpriced and
+excluded from dollar estimates. Allowance refresh follows the installed provider
+tools independently of these local usage actions.
+
+Before saving enrichment, retain a private `ledger-before-cost-<UUID>.json` next to the original ledger. Cursor offsets and the event index are not replaced. The admitted Claude counter baseline in `usageCoverage` (with the legacy
+`claudeCounters` compatibility mirror) may gain missing duration/thinking details
+only at an exactly matching counter boundary with all known details preserved.
+This enriches metadata without adding coverage, usage or requests. The admission
+authority is defined once in [Architecture](../ARCHITECTURE.md#log-to-ledger).
+Metadata on an old cursor is enriched only when the reconstructed file offset, model, turn identity and token counters match its existing boundary; otherwise it remains unchanged. Recovering details never adds raw prompt text to the ledger. The temporary ledger is removed after use; failures preserve existing history.
 
 ## Local verification
 

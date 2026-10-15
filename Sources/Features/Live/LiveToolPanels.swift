@@ -28,9 +28,9 @@ struct LiveToolPanels: View {
             ForEach(tools) { tool in
                 let quota = model.quota(for: tool)
                 let allowance = AccountAllowancePresentation(quota: quota, now: now)
-                let decision = model.quotaGuard.decisions.first { $0.tool == tool && $0.risk != .none }
-                let warning = decision.flatMap {
-                    notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level) ? nil : $0
+                let decisions = model.quotaGuard.displayDecisions.filter { $0.tool == tool && $0.risk != .none }
+                let warning = decisions.first {
+                    !notices.containsAllowance($0.id, reset: $0.reading?.reset, level: $0.level)
                 }
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
@@ -53,7 +53,7 @@ struct LiveToolPanels: View {
                             Divider().padding(.horizontal, 12)
                             VStack(alignment: .leading, spacing: 12) {
                                 providerDetails(tool, allowance: allowance, now: now)
-                                if let warning = decision {
+                                if let warning = warning ?? decisions.first {
                                     HStack {
                                         Button("View allowance") { model.quotaGuard.view(warning) }
                                         Button(model.quotaGuard.isSnoozed(warning) ? "Snoozed" : "Snooze 30 min") { model.quotaGuard.snooze(warning) }

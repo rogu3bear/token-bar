@@ -4,6 +4,27 @@ enum LiveTool: String, Codable, CaseIterable, Identifiable {
     case codex, claude, grok
     static let liveCoverage = "Codex quota uses the installed app-server. Claude quota uses an account-matched local cache that the installed Claude Code refreshes every 15 minutes. Grok remaining uses the installed Grok agent’s billing reading. Grok activity follows locally open sessions and recent summary updates; its speed uses successive usage.json output counts."
     static let compactCoverage = "Popover: name, rate, remaining. Click a row for reset and projected zero. Today’s token bar uses recorded usage only."
+    /// Status instruments require dated lifecycle/counter evidence at the supplied clock.
+    /// Discovery, polling/mtime and a retained meter flag do not establish activity.
+    static func confirmed(_ activity: ActivitySnapshot, now: Date) -> ActivitySnapshot {
+        var result = activity
+        result.referenceDate = now
+        result.measurements = activity.measurements.filter { _, sample in
+            sample.duration.isFinite && sample.duration > 0 && sample.output >= 0 && sample.rate.isFinite
+        }
+        result.turns = activity.turns.filter { _, task in
+            guard task.running else { return false }
+            let sample = result.measurements[task.session].flatMap { $0.turn == task.turn ? $0 : nil }
+            let dates = [task.eventDate, sample?.date].compactMap { $0 }
+            return dates.contains { $0 > .distantPast && $0 <= now && now.timeIntervalSince($0) < 300 }
+        }
+        // Tick consumes observation time, so bind it to the actual evidence rather than a later file touch.
+        for (key, task) in result.turns {
+            let sample = result.measurements[task.session].flatMap { $0.turn == task.turn ? $0 : nil }
+            result.turns[key]?.observed = [task.eventDate, sample?.date].compactMap { $0 }.filter { $0 <= now }.max() ?? .distantPast
+        }
+        return result
+    }
     static func active(codex: Tachometer, claude: Tachometer, grok: Tachometer? = nil) -> [LiveTool] {
         var tools: [LiveTool] = []
         if codex.hasRate || codex.runningCount > 0 { tools.append(.codex) }
@@ -92,8 +113,8 @@ struct AccountAllowancePresentation {
         }
     }
     var reading: QuotaReading? {
-        guard !quota.guardFailed else { return nil }
-        return Runway.priority(matching, samples: quota.samples, now: now, horizon: quota.horizon)
+        let qualified = quota.readings.compactMap { quota.qualification($0, now: now).reading }
+        return Runway.priority(qualified, samples: quota.samples, now: now, horizon: quota.horizon)
     }
     var estimate: Runway? { reading.map { Runway.estimate($0, samples: quota.samples, now: now, horizon: quota.horizon) } }
     /// Occupancy exception: remaining is a measured zero, not missing.
@@ -118,6 +139,7 @@ struct AccountAllowancePresentation {
             parts.append(estimate.message)
         } else {
             parts.append(qualifier + " · " + quota.unavailable)
+            parts.append("Remaining is unknown; recorded token usage is separate. Check the tool’s sign-in and source status. Allowance reads retry automatically.")
             if let last = matching.max(by: { $0.date < $1.date }) {
                 parts.append("Last quota read " + last.date.formatted(date: .abbreviated, time: .shortened))
                 if let when = last.resetWhen { parts.append("Reported reset " + when) }
