@@ -41,7 +41,9 @@ struct CostView: View {
                     }.moduleSurface()
                     if !report.issues.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Usage still awaiting a price").font(.headline)
+                            Text("Unpriced usage").font(.headline)
+                            Text("Included in token totals; excluded from dollar estimates. The reasons below describe missing pricing evidence.")
+                                .font(.caption).foregroundStyle(.secondary)
                             ForEach(report.issues.keys.sorted(), id: \.self) { reason in
                                 HStack { Text(reason); Spacer(); Text(compact(report.issues[reason] ?? 0) + " tokens").monospacedDigit() }
                             }
@@ -53,6 +55,8 @@ struct CostView: View {
                     Spacer()
                     Button("Rebuild pricing details") { model.refresh(history: true, recoverCosts: true) }.disabled(model.busy)
                 }
+                Text("Retries local reads and looks for missing pricing metadata. Missing logs and unsupported rates can leave usage unpriced.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DetailSheet("Report details and exports") {
                     if report.calculatedAt != nil && model.costSourceAvailable {
                         CostUsageContext(model: model, monitor: model.live).padding(.top, 12)
@@ -60,7 +64,7 @@ struct CostView: View {
                         CostRateHistoryView(selectedModel: model.modelFilter)
                         CostEvidenceView(model: model, monitor: model.live)
                     } else {
-                        Text("Evidence details require an available calculated report. Rebuild pricing details retries the local usage read.")
+                        Text("Evidence details require an available calculated report. Use Refresh history to retry local usage reads.")
                             .font(.callout).foregroundStyle(.secondary).padding(.top, 12)
                     }
                 }
@@ -72,6 +76,8 @@ struct CostView: View {
     }
     private var header: some View {
         PageHeader(.cost) {
+            Button("Refresh history") { model.refresh(history: true) }.disabled(model.busy)
+                .help("Retry local usage reads. Previous results stay visible; earlier coverage gaps may remain.")
             Button("Export CSV") { model.exportCosts() }.disabled(model.filtering || model.busy || report.lines.isEmpty)
             MethodButton(title: "How cost is calculated") { showMethod = true }
         }
@@ -126,12 +132,12 @@ struct CostView: View {
                 ReportComposition(parts: [
                     ("Input", report.amounts.input), ("Cache reads", report.amounts.cached),
                     ("Cache writes", report.amounts.cacheWrite), ("Reasoning", report.amounts.reasoning),
-                    ("Answer", report.amounts.answer)
+                    ("Answer", report.amounts.answer), ("Output · unsplit", report.amounts.unsplitOutput)
                 ].map { CompositionPart(id: $0.0, amount: NSDecimalNumber(decimal: $0.1).doubleValue, value: CostPricing.dollars($0.1)) })
             } else {
                 Text("No priced usage to break down.").foregroundStyle(.secondary)
             }
-            Text("Input excludes cache reads and writes. Reasoning and answer split output. Unpriced usage is excluded.")
+            Text("Input excludes cache reads and writes. Output stays combined where a thinking/reasoning split was not recorded. Unpriced usage is excluded.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -145,8 +151,13 @@ struct CostView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Text(row.hasPricedRecords ? CostPricing.dollars(row.amounts.total) : "Unpriced")
-                .font(.callout.weight(.medium)).monospacedDigit()
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(row.hasPricedRecords ? CostPricing.dollars(row.amounts.total) : "API estimate unavailable")
+                    .font(.callout.weight(.medium)).monospacedDigit()
+                if let reported = row.reportedUsd {
+                    Text(CostPricing.dollars(reported) + " recorded by Grok" + (row.reportedPartial ? " · partial" : row.reportedUnverified ? " · completeness unverified" : "")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
         }.padding(.vertical, 4)
     }
     private var method: some View {
@@ -158,7 +169,11 @@ struct CostView: View {
             Text("Effort is the setting recorded for a turn. It is not inferred from reasoning-token counts and does not multiply prices. Missing effort stays Unknown; models with no verified price stay unpriced.")
             Text("A single-request observation is needed to choose a long-context rate. For session-wide pricing, all observed usage in that task is considered even outside your filters. Missing evidence is never assumed to be short context.")
             Text("Rebuild pricing details reads available local logs into temporary storage and enriches only groups whose token totals and record counts match existing history. Missing files, changed totals, or mixed account attribution leave the original group intact. A private rollback ledger is saved before enrichment.")
+            Text("Refresh history retries local usage reads. Rebuild pricing details also rechecks pricing metadata; it cannot supply an unsupported rate or recreate missing source evidence. Unpriced tokens stay in usage totals and remain excluded from dollar estimates.")
             Link(destination: CostRateCard.reference.source) { Text("OpenAI pricing source").foregroundStyle(accent) }
+            Link("Anthropic pricing source", destination: ProviderCostRates.anthropicSource).foregroundStyle(accent)
+            Link("xAI pricing source", destination: ProviderCostRates.xaiSource).foregroundStyle(accent)
+            Text("Claude estimates require the recorded cache-write duration when writes are nonzero. Current first-party Standard and Fast scenarios exclude regional uplifts and batch discounts. Grok Build’s recorded dollars are shown separately from API-equivalent estimates; retained cost completeness may be unverified. Build model IDs are not silently substituted with API model IDs.")
         }
     }
 }

@@ -206,7 +206,9 @@ import ServiceManagement
         if tool == .claude { return claudeQuota.quota }
         let account = live.currentID.flatMap { live.state.accounts[$0] }
         return ToolQuotaState(readings: account?.quotas ?? [], samples: live.state.samples, unavailable: "Awaiting fresh Codex quota", accountLabel: account.map { $0.email + " · " + $0.plan.uppercased() },
-                              guardAccountID: live.currentID, guardFailed: live.error != nil)
+                              guardAccountID: live.currentID,
+                              guardAuthenticated: live.lastQuotaRefresh != nil && (account?.quotas.allSatisfy { $0.date == live.lastQuotaRefresh } ?? false),
+                              guardFailed: live.error != nil)
     }
     var periodChoices: [(Int, String)] {
         var choices = [(0, "Today"), (6, "This week"), (2, "Last 7 days"), (3, "Last 30 days"), (1, "All history"), (4, "Custom dates")]
@@ -513,18 +515,19 @@ struct QuickLiveView: View {
             }
         }
     }
-    func updateStatusItem(now: Date = Date()) {
-        let presentation = MenuBarPresentation.combined(model.menuBarPreferences.configuration,
+    func updateStatusItem(now: Date? = nil) {
+        let now = now ?? model.referenceDate ?? Date()
+        let presentation = MenuBarPresentation.face(model.menuBarPreferences.configuration,
             codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter,
             monitor: model.live, now: now, palette: model.appearance.toolPalette,
             claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota,
-            riskText: model.quotaGuard.menuText(selection: model.menuBarPreferences.configuration.tool))
+            warningTools: MenuBarPresentation.warnedTools(model.quotaGuard, notices: model.appearance.notices))
         guard let button = item.button else { return }
         statusAnimator.update(presentation, in: button, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak button] in
             button?.attributedTitle = $0
         }
         // Break accessibility recursion: plain text only, no attachment characters.
-        let plainLabel = presentation.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial")
+        let plainLabel = MenuBarDial.spokenLabel(presentation)
         button.setAccessibilityLabel(plainLabel)
         button.toolTip = plainLabel
     }
@@ -587,6 +590,15 @@ struct QuickLiveView: View {
 }
 @main struct Main {
     @MainActor static func main() {
+        // Isolated GUI fixtures must be opened with their recorded arguments.
+        // A tool's argument-free relaunch must never start real monitoring.
+        if Bundle.main.bundleIdentifier?.hasPrefix("local.star.TokenBarPreview.") == true,
+           !CommandLine.arguments.contains("--preview-tools"),
+           !CommandLine.arguments.contains("--preview-quota-guard"),
+           !CommandLine.arguments.contains("--preview-cost-navigation") {
+            fputs("Token Bar preview requires its recorded synthetic launch arguments.\n", stderr)
+            exit(2)
+        }
         if CommandLine.arguments.contains("--preview-quota-guard") || CommandLine.arguments.contains("--render-quota-guard") {
             let arguments = CommandLine.arguments
             let destination = arguments.firstIndex(of: "--render-quota-guard").flatMap { arguments.indices.contains($0 + 1) ? URL(fileURLWithPath: arguments[$0 + 1]) : nil }

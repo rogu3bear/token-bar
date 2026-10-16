@@ -219,7 +219,7 @@ let product = try String(contentsOf: sourceRoot.appendingPathComponent("App/Prod
 assert(product.contains("else { DashboardRoot(model: model, initialDestination: .now) }"), "Live still must render the shipping host")
 let motion = try String(contentsOf: sourceRoot.appendingPathComponent("App/ProductMotionPreview.swift"), encoding: .utf8)
 assert(motion.contains("QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)"))
-assert(motion.contains("MenuBarPresentation.combined("))
+assert(motion.contains("MenuBarPresentation.face("))
 assert(!motion.contains("MenuBarPresentation.attributed("))
 print("PASS: all hosting/capture routes retain the appearance boundary and marketing uses shipping composition")
 
@@ -266,7 +266,7 @@ assert(!speedHeader.contains("Estimated ·") && !speedHeader.contains("Rate repo
 let nowSummary = try String(contentsOf: sourceRoot.appendingPathComponent("Features/Live/ToolQuotaSummary.swift"), encoding: .utf8)
 assert(!nowSummary.contains("Text(\"Account allowances\")"), "Idle Now must not retitle remaining as the Allowances destination")
 assert(costPreview.contains("else { state = \"populated\" }"))
-assert(costPreview.contains("PreviewModelScope.run(root: root, defaults: defaults)"))
+assert(costPreview.contains("PreviewModelScope.run(root: root, defaults: defaults, prepare:"))
 assert(motion.contains("let elapsed = Double(frame) / 30"), "Motion samples must not depend on rendering speed")
 print("PASS: fixed UTC fixture clock, shipping Cost shell, clean default and frame-indexed motion samples")
 
@@ -370,7 +370,7 @@ MainActor.assumeIsolated {
     let now = PreviewFixture.date
     let reading = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Sample", window: "primary", minutes: 300,
                                used: 36, reset: now.addingTimeInterval(3600), date: now)
-    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account")
+    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account", guardAccountID: reading.accountID, guardAuthenticated: true)
     let idleMeter = Tachometer(defaults: defaults)
     idleMeter.activity = ActivitySnapshot(readAt: now, referenceDate: now)
     @MainActor func capture<V: View>(_ name: String, _ content: V, width: CGFloat) -> CGFloat {
@@ -485,7 +485,7 @@ MainActor.assumeIsolated {
     let now = PreviewFixture.date
     let reading = QuotaReading(accountID: "synthetic-account", bucket: "sample", name: "Sample", window: "primary", minutes: 300,
                                used: 36, reset: now.addingTimeInterval(3600), date: now)
-    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account")
+    let quota = ToolQuotaState(readings: [reading], samples: [reading], accountLabel: "Synthetic account", guardAccountID: reading.accountID, guardAuthenticated: true)
     for width: CGFloat in [796, 1096] {
         for tools: [LiveTool] in [[.codex], [.codex, .claude]] {
             let probes = ProviderLayoutProbes()

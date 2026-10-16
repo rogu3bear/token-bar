@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Decide log usage once through admitted counter coverage across Codex, Claude, Grok and OpenCode. Preserve unknown legacy coverage and recovery witnesses; covered intervals cannot add usage under another receipt or scan scope.
+- Qualify current allowance numbers through one account, source-date and authentication boundary shared by Live, Settings, Fable and Quota Guard. Keep relay and undated refresh replies as transport/completion evidence.
+
+- Clarify historical coverage gaps, current read failures, unknown allowance and unpriced usage. Add Refresh history to Cost and a History route from live source details; explain recovery limits while preserving retained usage and diagnostics.
+
+- Keep allowance warnings visible for each provider's display window while retaining the stricter notification freshness and confirmation rules. Show aged Claude warnings without sending new alerts; preserve account/reset boundaries and measured remaining when a reset clock is missing.
+- Give each confirmed active CLI its own menu-bar dial and output rate. Auto shows all active tools, with optional five-second rotation and hidden names that preserve spoken provider identity.
+- Derive status-item activity from dated lifecycle and counter evidence; keep idle quiet and show unavailable speed as an em dash. Preserve saved units and appearance, with allowances in the popover.
+
 ## 0.2.2 — Released 2026-09-24
 
 - Replace lime marketing colors with graphite, silver and Frost; use one glass gauge icon for the app and website.

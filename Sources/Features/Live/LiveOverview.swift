@@ -67,6 +67,9 @@ struct LiveOverview: View {
         .sheet(isPresented: $showSources) {
             MethodSheet(title: "Data sources", done: { showSources = false }) {
                 UsageDiagnosticsView(health: model.snapshot.readHealth)
+                if !model.snapshot.readHealth.diagnostics.isEmpty {
+                    Button("Open History") { showSources = false; commands.reports(.history) }
+                }
                 ForEach(Array(sourceErrors.enumerated()), id: \.offset) { _, error in
                     ErrorNotice(message: error)
                 }
@@ -83,9 +86,12 @@ struct LiveMethod: View {
         MethodSheet(title: "How live readings work", done: done) {
             Text("Output speed").font(.headline)
             Text("Estimated from output-counter changes and elapsed time. Each tool has its own rate and units. Completed tasks stop contributing; missing or expired measurements show —.")
+            Text("The menu bar shows a separate instrument for each confirmed active tool. Auto shows them together; optional Roll shows one every five seconds. Hiding names keeps the instruments separate. Remaining allowance stays here in the popover.")
             Text("Provider allowance").font(.headline)
             Text(LiveTool.liveCoverage)
             Text("Remaining is provider allowance, not a token balance. Projected exhaustion uses recent allowance burn, never output speed. Missing reset times stay unavailable. Claude readings remain current for 30 minutes and show their age after two minutes.")
+            Text("Allowance warnings follow each provider’s display window. New notifications require readings less than two minutes old and keep their own confirmation and snooze rules. An older Claude warning can remain visible without triggering another notification.")
+            Text("Unavailable remaining needs a fresh, account-matched provider reading. Check the tool’s sign-in and any reported source error. Allowance reads retry automatically; Refresh history reads local usage logs. Claude Code’s usage screen can refresh its own cache; Connect only sets up status-line transport.")
             Text("Activity and recorded usage").font(.headline)
             Text("Task lifecycle and counter observations identify activity. Quiet work becomes unconfirmed after five minutes. Today's chart contains recorded tokens; account associations in history are inferred from stable local sign-in observations.")
         }

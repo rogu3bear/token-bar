@@ -26,7 +26,8 @@ enum UsageMetadata {
         entry.costMetadataVersion = 2
     }
     static func aggregationKey(_ entry: Entry) -> String {
-        "\(entry.pricingDay ?? "unknown")|\(entry.tokenFields?.sorted().joined(separator: ",") ?? "unknown")|\(entry.observedService ?? "unknown")|\(entry.requestedService ?? "unknown")"
+        let details = "\(entry.tokens.cacheWrite5m == nil ? "unknown" : "known")|\(entry.tokens.cacheWrite1h == nil ? "unknown" : "known")|\(entry.tokens.thinking == nil ? "unknown" : "known")|\(entry.observedSpeed ?? "unknown")|\(entry.costUsdTicks == nil ? "unknown" : "known")|\(entry.costIsPartial.map(String.init) ?? "unknown")"
+        return details + "|" + "\(entry.pricingDay ?? "unknown")|\(entry.tokenFields?.sorted().joined(separator: ",") ?? "unknown")|\(entry.observedService ?? "unknown")|\(entry.requestedService ?? "unknown")"
     }
     /// Fill a missing UTC pricing day from a real source timestamp. Does not change counters.
     static func recoverPricingDay(_ entry: inout Entry) {

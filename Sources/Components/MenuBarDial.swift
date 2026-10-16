@@ -2,6 +2,12 @@ import SwiftUI
 import QuartzCore
 
 struct MenuBarDial {
+    static let speech = NSAttributedString.Key("TokenBar.instrumentSpeech")
+    static func spokenLabel(_ value: NSAttributedString) -> String {
+        guard value.length > 0 else { return "Token Bar" }
+        return value.attribute(speech, at: 0, effectiveRange: nil) as? String
+            ?? value.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial")
+    }
     static let position = NSAttributedString.Key("TokenBar.dialPosition")
     static let available = NSAttributedString.Key("TokenBar.dialAvailable")
     static let accent = NSAttributedString.Key("TokenBar.dialAccent")
@@ -175,7 +181,7 @@ struct MenuBarPreview: NSViewRepresentable {
         field.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         context.coordinator.update(value, in: field, reduceMotion: reduceMotion) { [weak field] in field?.attributedStringValue = $0 }
         // Break accessibility recursion: plain text only, no attachment characters
-        let plainLabel = value.string.replacingOccurrences(of: "\u{FFFC}", with: "Speed dial")
+        let plainLabel = MenuBarDial.spokenLabel(value)
         field.setAccessibilityLabel(plainLabel)
     }
     static func dismantleNSView(_ view: NSTextField, coordinator: MenuBarValueAnimator) { coordinator.cancel() }

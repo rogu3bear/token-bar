@@ -88,19 +88,19 @@ builds (202xx). Keep minor and patch components below 100 so build numbers
 remain distinct. The bundle identifier and local storage paths stay stable
 across this transition.
 
-macOS Installer does not decide upgrades by build number. With bundle version
-checking on, it compares the short version first, so an installed 2.x
-development build counts as newer than any 0.1.x package: Installer skips the
-bundle, still reports success and writes a receipt, and the old app stays.
-Packages 0.1.0 through 0.1.4 behave this way over a 2.x build (reproduced from
-`/var/log/install.log` and a synthetic-bundle install). From 0.1.5 the component
-plist leaves version checking off, and `preinstall` compares build numbers
-itself: it replaces an older or legacy build, reinstalls the same build in
-place, and refuses a newer installed build with a visible error before stopping
-anything. `package.sh` stages the packaged bundle's exact `CFBundleVersion`
-beside the scripts for that comparison, and a package without it fails closed.
-Anyone on a 2.x build who installs 0.1.4 or earlier must first move the old
-`/Applications/Token Bar.app` to the Trash.
+`preinstall` requires the packaged bundle's exact numeric `CFBundleVersion`,
+staged by `package.sh`. It compares installed and incoming build numbers before
+stopping the app: older builds are replaced, the same build can be repaired in
+place, and a newer installed build is refused visibly. Missing incoming build
+metadata fails closed. Keep the issued build sequence monotone.
+
+The component plist disables PackageKit bundle-version checking because field
+installations may still carry 2.x development short versions, which sort above
+0.1.x despite lower build numbers. The bypass can be retired only after proving
+those installations are absent and qualifying native upgrade ordering, same-build
+repair and visible downgrade refusal. No such field-absence evidence is retained
+here, so the workaround remains required. Its repair history is in
+[the archive note](archive/admission-repair-history.md#installer-history).
 
 The package installs only `/Applications/Token Bar.app`, explicitly sets
 BundleIsRelocatable to false in its component plist, and declares `upgrade-bundle`

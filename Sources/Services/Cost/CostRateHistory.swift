@@ -14,6 +14,7 @@ struct CostRateVersion {
     var qualificationSource: URL?
     // Historical base prices are documented; do not backdate today's context surcharge without evidence.
     var longContextVerifiedFrom = "2026-09-09"
+    var cacheWriteVerifiedFrom: String?
     func includes(_ day: String) -> Bool { day >= effectiveFrom && (effectiveUntil.map { day < $0 } ?? true) }
 }
 enum CostRateHistory {
@@ -40,10 +41,37 @@ enum CostRateHistory {
         add("gpt-5.6-luna", from: "2026-07-09", until: "2026-07-30", input: "1", cached: "0.1", output: "6", source: launch)
         add("gpt-5.6-luna", from: "2026-07-30", input: "0.2", cached: "0.02", output: "1.2", source: reductions)
         add("gpt-6-astra", from: "2026-09-03", input: "10", cached: "1", output: "50", source: changelog)
+        // Launch records establish short-context base rates. Current model docs
+        // establish modifiers on the observation date, not retroactively.
+        for (model, from) in [("gpt-6-sol", "2026-09-22"), ("gpt-6-luna", "2026-09-22"), ("gpt-6.1-sol", "2026-09-29")] {
+            let rule = CostRateCard.reference.rules.first { $0.model == model }!
+            values.append(CostRateVersion(id: "\(model)-\(from)", effectiveFrom: from, verifiedOn: "2026-10-02",
+                source: changelog, rule: rule, transitionDays: [from], fastFrom: "2026-10-02",
+                longContextVerifiedFrom: "2026-10-02", cacheWriteVerifiedFrom: model == "gpt-6.1-sol" ? from : "2026-10-02"))
+        }
+        let gpt54 = CostRateCard.reference.rules.first { $0.model == "gpt-5.4" }!
+        values.append(CostRateVersion(id: "gpt-5.4-2026-03-05", effectiveFrom: "2026-03-05", verifiedOn: "2026-10-02",
+            source: URL(string: "https://openai.com/index/introducing-gpt-5-4/")!, rule: gpt54,
+            transitionDays: ["2026-03-05"], fastFrom: "2026-03-05", longContextVerifiedFrom: "2026-10-02"))
+        // No dated complete tariff or historical alias binding was established
+        // for these models. Reference comparison works for older usage; history
+        // starts at the observation and never copies today's alias into the past.
+        for model in ["gpt-5.4-mini", "gpt-daybreak-blue-latest"] {
+            let rule = CostRateCard.reference.rules.first { $0.model == model }!
+            values.append(CostRateVersion(id: "\(model)-observed-2026-10-02", effectiveFrom: "2026-10-02", verifiedOn: "2026-10-02",
+                source: rule.source!, rule: rule, fastFrom: rule.fastMultiplier == nil ? nil : "2026-10-02",
+                longContextVerifiedFrom: "2026-10-02", cacheWriteVerifiedFrom: "2026-10-02"))
+        }
         // Earlier complete schedules are not established by the launch post's input/output prices alone.
         // Keep the dated observation instead of manufacturing a retrospective cache/context tariff.
         for rule in CostRateCard.reference.rules where ["gpt-5.5", "gpt-5.3-codex"].contains(rule.model) {
             values.append(CostRateVersion(id: "\(rule.model)-observed-2026-09-09", effectiveFrom: "2026-09-09", source: CostRateCard.reference.source, rule: rule))
+        }
+        for rule in ProviderCostRates.rules {
+            values.append(CostRateVersion(id: "\(rule.model)-observed-2026-10-02", effectiveFrom: "2026-10-02", verifiedOn: "2026-10-02",
+                source: rule.source!, rule: rule, fastFrom: rule.fastMultiplier == nil ? nil : "2026-10-02",
+                qualification: "Current tariff observed October 2. Earlier complete tariffs are not established; use Reference rates to compare older usage at this tariff.",
+                longContextVerifiedFrom: "2026-10-02", cacheWriteVerifiedFrom: "2026-10-02"))
         }
         return values
     }()
@@ -56,8 +84,11 @@ enum CostRateHistory {
         if applied == .fast {
             guard let from = version.fastFrom, day >= from else { return .missing("Historical Fast/Priority rate not verified") }
         }
-        let band = version.rule.contextScope == .session ? sessionBand : entry.contextBand
+        let band = version.rule.contextScope == .session ? sessionBand : version.rule.contextScope == .providerRequest ? entry.requestInputTokens.map { $0 >= 200_000 ? "long" : "short" } : entry.contextBand
         if band == "long" && day < version.longContextVerifiedFrom { return .missing("Historical long-context tariff not verified") }
+        if let from = version.cacheWriteVerifiedFrom, day < from, (entry.tokens.cacheWrite ?? 0) > 0 {
+            return .missing("Historical cache-write tariff not verified")
+        }
         let card = CostRateCard(id: version.id, observedOn: version.verifiedOn, source: version.source, rules: [version.rule])
         var result = CostPricing.estimate(entry, card: card, service: service, sessionBand: sessionBand)
         result.rateCardID = version.id; result.rateSource = version.source.absoluteString; result.verifiedOn = version.verifiedOn

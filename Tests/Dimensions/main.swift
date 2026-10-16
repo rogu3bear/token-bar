@@ -263,10 +263,10 @@ defer { try? FileManager.default.removeItem(at: aggTemp) }
 let aggScanner = UsageScanner(home: aggTemp, stateURL: aggTemp.appendingPathComponent("agg.json"))
 
 let yesterday = Calendar.current.date(byAdding: .day, value: -3, to: Date())!
-func historical(_ project: String?, harness: String?, output: Int) -> Data {
+func historical(_ project: String?, harness: String?, output: Int, totalOutput: Int? = nil) -> Data {
     record(["timestamp": stamp.string(from: yesterday), "type": "event_msg", "payload": [
         "type": "token_count", "info": [
-            "total_token_usage": ["input_tokens": output * 10, "output_tokens": output],
+            "total_token_usage": ["input_tokens": (totalOutput ?? output) * 10, "output_tokens": totalOutput ?? output],
             "last_token_usage": ["input_tokens": output * 10, "output_tokens": output],
         ]]])
 }
@@ -283,15 +283,21 @@ aggScanner.consume(metaFor("/Users/x/dev/alpha", harness: "Codex Desktop"), sess
 aggScanner.consume(ctx, session: "agg", cursor: &alphaCursor, account: nil, poll: yesterday, historical: true)
 aggScanner.consume(historical(nil, harness: nil, output: 10), session: "agg", cursor: &alphaCursor, account: nil, poll: yesterday, historical: true)
 
-var betaCursor = Cursor()
+// The next request shares the established session baseline. Its independent
+// 200/20 request advances cumulative counters from 100/10 to 300/30.
+var betaCursor = alphaCursor
 aggScanner.consume(metaFor("/Users/x/dev/beta", harness: "Codex Desktop"), session: "agg", cursor: &betaCursor, account: nil, poll: yesterday, historical: true)
 aggScanner.consume(ctx, session: "agg", cursor: &betaCursor, account: nil, poll: yesterday, historical: true)
-aggScanner.consume(historical(nil, harness: nil, output: 20), session: "agg", cursor: &betaCursor, account: nil, poll: yesterday, historical: true)
+aggScanner.consume(historical(nil, harness: nil, output: 20, totalOutput: 30), session: "agg", cursor: &betaCursor, account: nil, poll: yesterday, historical: true)
 
 let buckets = aggScanner.ledger.entries.filter { $0.bucket == "day" }
 let bucketProjects = Set(buckets.compactMap { Project.name($0.projectPath) })
 check(bucketProjects == ["alpha", "beta"],
       "day buckets must keep projects apart, got \(bucketProjects.sorted())")
+check(buckets.first { Project.name($0.projectPath) == "alpha" }?.tokens.total == 110 &&
+      buckets.first { Project.name($0.projectPath) == "beta" }?.tokens.total == 220 &&
+      buckets.reduce(0) { $0 + $1.eventCount } == 2,
+      "Each project retains its exact request without using project metadata as usage identity")
 print("PASS: historical day buckets do not merge separate projects")
 
 let toolQuery = UsageQuery(period: 1, harness: ClaudeCodeUsage.harness)

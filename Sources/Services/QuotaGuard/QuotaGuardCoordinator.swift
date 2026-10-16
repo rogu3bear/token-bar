@@ -45,6 +45,7 @@ struct QuotaGuardDisk: Codable {
 @Observable final class QuotaGuardCoordinator {
     private(set) var settings = QuotaGuardSettings()
     private(set) var decisions: [QuotaGuardDecision] = []
+    private(set) var displayDecisions: [QuotaGuardDecision] = []
     private(set) var snoozedUntil: [String: Date] = [:]
     private(set) var permission: QuotaNotificationPermission = .unavailable
     private(set) var persistenceError: String?
@@ -141,6 +142,7 @@ struct QuotaGuardDisk: Codable {
     private func evaluate(allowNotifications: Bool) {
         let now = clock()
         decisions = QuotaGuardEvaluator.prioritized(inputs.flatMap { QuotaGuardEvaluator.evaluate($0, now: now, policy: settings.policy) })
+        displayDecisions = QuotaGuardEvaluator.prioritized(inputs.flatMap { QuotaGuardEvaluator.display($0, now: now, policy: settings.policy) })
         prune(now: now)
         guard allowNotifications, ready, persistenceError == nil else { return }
         for decision in decisions {
@@ -224,14 +226,23 @@ struct QuotaGuardDisk: Codable {
         tick()
     }
     func menuText(selection: MenuBarTool?) -> String? {
-        let warning = decisions.first { $0.risk != .none && (selection == nil || selection == .auto || selection?.rawValue == $0.tool.rawValue) }
+        let warning = displayDecisions.first { $0.risk != .none && (selection == nil || selection == .auto || selection?.rawValue == $0.tool.rawValue) }
         return warning.map { $0.tool.label + " " + $0.windowLabel + ($0.remaining.map { " " + CompactLiveCopy.percent($0) } ?? "") + " · " + $0.riskLabel }
     }
     func view(_ decision: QuotaGuardDecision) { selected = decision; reveal?() }
     var selectedEvidence: QuotaGuardDecision? {
-        guard let selected, let reset = selected.reading?.reset else { return nil }
+        selectedAssessment(in: displayDecisions)
+    }
+    var selectedNotificationEvidence: QuotaGuardDecision? {
+        selectedAssessment(in: decisions)
+    }
+    private func selectedAssessment(in assessments: [QuotaGuardDecision]) -> QuotaGuardDecision? {
+        guard let selected else { return nil }
+        guard let reset = selected.reading?.reset else {
+            return assessments.first { $0.id == selected.id && $0.reading?.reset == nil }
+        }
         let anchor = disk.episodes[selected.id].flatMap { samePeriod(selected, reset: $0.reset) ? $0.reset : nil } ?? reset
-        return decisions.first { $0.id == selected.id && samePeriod($0, reset: anchor) }
+        return assessments.first { $0.id == selected.id && samePeriod($0, reset: anchor) }
     }
     var selectedIsCurrent: Bool { selectedEvidence?.remaining != nil }
     func handleAction(id: String, snooze: Bool) {

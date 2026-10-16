@@ -35,10 +35,8 @@ enum ClaudeQuotaSource {
         "claude:" + EventIdentity.hash(uuid)
     }
     static func reading(accountID: String, window: String, minutes: Int, used: Double, reset: Date?, date: Date, now: Date) -> QuotaReading? {
-        guard used.isFinite, (0...100).contains(used),
-              date <= now, now.timeIntervalSince(date) < horizon else { return nil }
-        if let reset, reset <= now { return nil }
-        return QuotaReading(accountID: accountID, bucket: bucket, name: name, window: window, minutes: minutes, used: used, reset: reset, date: date)
+        let value = QuotaReading(accountID: accountID, bucket: bucket, name: name, window: window, minutes: minutes, used: used, reset: reset, date: date)
+        return AllowanceQualification.assess(value, accountID: accountID, authenticated: true, now: now, horizon: horizon).reading
     }
     /// Short Connect panel: the relay is transport, not account quota.
     static let connectionCaption = "Connect captures local status-line data. Quota uses Claude Code’s account-matched usage cache; relay readings have no account identity."
@@ -167,7 +165,7 @@ struct ClaudeStatuslineRelay: Decodable {
         self.cacheURL = cacheURL; self.relayURL = relayURL
         self.refreshDirectory = refreshDirectory; self.executable = executable
     }
-    static func readings(cacheURL: URL, relayURL: URL, now: Date) -> [QuotaReading] {
+    static func readings(cacheURL: URL, now: Date) -> [QuotaReading] {
         let cache = try? JSONDecoder().decode(ClaudeQuotaCache.self, from: Data(contentsOf: cacheURL))
         // Identity-free relay observations are rejected even after restart or
         // when the current cache is stale. Only the cache binds its own sample

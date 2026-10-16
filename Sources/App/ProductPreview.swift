@@ -32,14 +32,18 @@ enum ProductPreview {
             model.appearance.hex = CommandLine.arguments[index + 1].uppercased()
         }
         let now = PreviewFixture.date
+        let instruments = CommandLine.arguments.contains("--sample-instruments")
+        if CommandLine.arguments.contains("--sample-no-names") { model.menuBarPreferences.configuration.showsNames = false }
+        if CommandLine.arguments.contains("--sample-roll") { model.menuBarPreferences.configuration.rollsTools = true }
         let initiallyExpanded: LiveTool? = CommandLine.arguments.firstIndex(of: "--sample-expanded").flatMap {
             CommandLine.arguments.indices.contains($0 + 1) ? LiveTool(rawValue: CommandLine.arguments[$0 + 1]) : nil
         }
         var activity = ActivitySnapshot(readAt: now, referenceDate: now)
         for index in 0..<6 {
             let id = "sample-\(index)"
-            activity.turns[id] = TaskActivity(turn: id, started: now.addingTimeInterval(-120), observed: now, running: true, kind: index < 4 ? .chat : .agent, session: id, name: "Sample task \(index + 1)")
+            activity.turns[id] = TaskActivity(turn: id, started: now.addingTimeInterval(-120), observed: now, running: true, kind: index < 4 ? .chat : .agent, session: id, name: "Sample task \(index + 1)", eventDate: now)
         }
+        for id in activity.turns.keys { activity.measurements[id] = RateMeasurement(turn: id, date: now, duration: 6, output: 128, model: "sample-model") }
         model.tachometer.activity = activity
         model.tachometer.rate = 128; model.tachometer.rawRate = 128
         model.tachometer.minimum = 80; model.tachometer.scale = 180
@@ -52,6 +56,7 @@ enum ProductPreview {
         let quota = QuotaReading(accountID: "sample-account", bucket: "sample", name: "Account quota", window: "primary", minutes: 10080, used: 36, reset: now.addingTimeInterval(86400 * 4), date: now)
         var first = quota; first.used = 34; first.date = now.addingTimeInterval(-300)
         model.live.currentID = "sample-account"
+        model.live.lastQuotaRefresh = now
         model.live.state.accounts["sample-account"] = LiveAccount(id: "sample-account", email: "developer@example.com", plan: "pro", observed: now, quotas: [quota])
         model.live.state.samples = [first, quota]
         var claudeQuota = quota
@@ -64,7 +69,7 @@ enum ProductPreview {
         var claudeFirst = claudeQuota
         claudeFirst.used = 53
         claudeFirst.date = now.addingTimeInterval(-300)
-        model.claudeQuota.quota = ToolQuotaState(readings: [claudeQuota], samples: [claudeFirst, claudeQuota], horizon: ClaudeQuotaSource.horizon)
+        model.claudeQuota.quota = ToolQuotaState(readings: [claudeQuota], samples: [claudeFirst, claudeQuota], horizon: ClaudeQuotaSource.horizon, guardAccountID: claudeQuota.accountID, guardAuthenticated: true)
         var grokActivity = ActivitySnapshot(readAt: now, referenceDate: now)
         grokActivity.turns["grok-sample"] = TaskActivity(turn: "grok-sample", started: now.addingTimeInterval(-45), observed: now, running: true, kind: .chat, session: "grok-sample", tool: .grok)
         grokActivity.measurements["grok-sample"] = RateMeasurement(turn: "grok-sample", date: now, duration: 2, output: 96, model: "sample-grok")
@@ -77,7 +82,7 @@ enum ProductPreview {
         grokQuota.used = 49
         grokQuota.reset = now.addingTimeInterval(86400 * 5)
         var grokFirst = grokQuota; grokFirst.used = 47; grokFirst.date = now.addingTimeInterval(-300)
-        model.grokQuota.quota = ToolQuotaState(readings: [grokQuota], samples: [grokFirst, grokQuota], accountLabel: "X Premium+")
+        model.grokQuota.quota = ToolQuotaState(readings: [grokQuota], samples: [grokFirst, grokQuota], accountLabel: "X Premium+", guardAccountID: grokQuota.accountID, guardAuthenticated: true)
         precondition(LiveTool.allCases.allSatisfy { model.meter(for: $0).hasRate }, "Hero requires healthy synthetic rates")
         precondition(LiveTool.allCases.allSatisfy { tool in
             let state = model.quota(for: tool)
@@ -163,6 +168,7 @@ enum ProductPreview {
             print("PASS: shipping Codex model rejects old allowance under a switched account")
         }
         if CommandLine.arguments.contains("--sample-working-no-rate") {
+            model.tachometer.activity.measurements = [:]
             model.tachometer.tick(now: now)
             precondition(model.tachometer.runningCount > 0 && !model.tachometer.hasRate)
             precondition(model.tachometer.rate == 0 && model.tachometer.rawRate == 0)
@@ -193,6 +199,13 @@ enum ProductPreview {
         let view = AppearanceHost(preferences: model.appearance) {
             VStack(spacing: 0) {
                 if destination == nil {
+                    if instruments {
+                        HStack {
+                            Toggle("Show tool names", isOn: Binding(get: { model.menuBarPreferences.configuration.showsNames }, set: { model.menuBarPreferences.configuration.showsNames = $0 }))
+                            Toggle("Roll active tools", isOn: Binding(get: { model.menuBarPreferences.configuration.rollsTools }, set: { model.menuBarPreferences.configuration.rollsTools = $0 }))
+                            Button("Next instrument") { model.referenceDate = (model.referenceDate ?? now).addingTimeInterval(MenuBarPresentation.rollInterval) }
+                        }.padding(8)
+                    }
                     HStack {
                         Text("Synthetic allowance fixture").font(.caption)
                         Button("Stop all tools") {
@@ -222,14 +235,22 @@ enum ProductPreview {
                     }.padding(8)
                 }
                 Group {
-                    if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer, initiallyExpanded: initiallyExpanded) }
+                    if instruments {
+                        let face = MenuBarPresentation.face(model.menuBarPreferences.configuration,
+                            codex: model.tachometer, claude: model.claudeMeter, grok: model.grokMeter,
+                            monitor: model.live, now: model.referenceDate ?? now, palette: model.appearance.toolPalette,
+                            claudeQuota: model.claudeQuota.quota, grokQuota: model.grokQuota.quota)
+                        MenuBarPreview(value: face).padding(16)
+                            .accessibilityLabel(MenuBarDial.spokenLabel(face))
+                    }
+                    else if compact { QuickLiveView(model: model, monitor: model.live, meter: model.tachometer, initiallyExpanded: initiallyExpanded) }
                     else { DashboardRoot(model: model, initialDestination: .now) }
-                }.frame(width: compact ? 440 : previewWidth, height: compact ? nil : previewHeight)
+                }.frame(width: instruments ? 720 : compact ? 440 : previewWidth, height: instruments || compact ? nil : previewHeight)
                     .appCanvas()
             }
         }.transaction { if destination != nil { $0.animation = nil; $0.disablesAnimations = true } }
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: compact ? 440 : previewWidth, height: compact ? host.fittingSize.height : previewHeight + (destination == nil ? 44 : 0))
+        host.frame = NSRect(x: 0, y: 0, width: instruments ? 720 : compact ? 440 : previewWidth, height: instruments || compact ? host.fittingSize.height : previewHeight + (destination == nil ? 44 : 0))
         if compact { print("Compact native fitting size: \(host.frame.size)") }
         let window = NSWindow(contentRect: host.frame, styleMask: destination == nil ? [.titled, .closable] : [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -244,6 +265,24 @@ enum ProductPreview {
             // AppDelegate as NSApp.delegate or start its monitoring lifecycle.
             let delegate = AppDelegate()
             delegate.model = model; delegate.configureNavigationActions()
+            if instruments {
+                delegate.item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                delegate.item.button?.target = delegate
+                delegate.item.button?.action = #selector(AppDelegate.toggle)
+                let live = NSHostingController(rootView: AppearanceHost(preferences: model.appearance, clock: model.clock) {
+                    QuickLiveView(model: model, monitor: model.live, meter: model.tachometer)
+                }.environment(\.nativeCommands, delegate.commands))
+                live.sizingOptions = [.preferredContentSize]
+                delegate.popover.behavior = .transient
+                delegate.popover.contentViewController = live
+                delegate.observeStatusItem()
+            }
+            defer {
+                if instruments {
+                    delegate.popover.performClose(nil)
+                    NSStatusBar.system.removeStatusItem(delegate.item)
+                }
+            }
             let controller = NSHostingController(rootView: view.environment(\.nativeCommands, delegate.commands))
             controller.sizingOptions = [.preferredContentSize]
             window.contentViewController = controller

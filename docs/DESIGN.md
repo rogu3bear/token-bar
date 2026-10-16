@@ -1,7 +1,5 @@
 # Design direction
 
-Reference: [Linear on Refero Styles](https://styles.refero.design/style/90ce5883-bb24-4466-93f7-801cd617b0d1), inspected September 8, 2026.
-
 Use the approved charcoal canvas, crisp system typography, thin structural
 borders, and the adaptive native accent. Marketing uses Frost. This is Token Bar's own
 design, not a copy of another product's branding or paid fonts.
@@ -82,7 +80,7 @@ transitions. `CompactToolRate` gives every module a named output-speed field and
 an explicit remaining label, plus one expansion affordance. Expansion exposes
 units, allowance window, reset, read age, projection and task detail. Module
 occupancy never creates a token, quota or speed value. The status item's existing
-one-hour remaining rule is separate from module retention.
+active-instrument rule is separate from module retention.
 
 `Snapshot.readHealth` and `ReadPresentation` keep result availability, coverage and freshness independent
 of numeric values. History, Cost and prompt sampling use the same status row.
@@ -91,6 +89,15 @@ coverage stays visible. A completed scan with continuity gaps says “Read compl
 · coverage incomplete” and uses a warning, not the refresh-failure state. Structured
 details distinguish sources, scan scopes, failures and retained historical gaps. A successful empty result and a measured zero remain
 valid values. No presentation type changes provider horizons or Guard eligibility.
+
+Diagnostic details name read failures, historical coverage gaps and incomplete
+counter evidence separately, then explain the applicable recovery limit. The
+live Data sources sheet opens History through the existing Reports command.
+History and Cost both offer Refresh history to retry local reads while retaining
+available results. A successful retry may leave historical gaps; dismissal keeps
+the source-coverage qualification and diagnostic route. Unavailable allowance
+details identify remaining as unknown, keep recorded usage separate, and direct
+the user to the tool's sign-in/source status while provider reads retry.
 
 Synthetic native previews render shipping views and use disposable roots and
 preferences. The website uses those native captures, names any preview ahead of
@@ -114,6 +121,9 @@ then the time series, then model/reasoning attribution and diagnostics/recovery.
 Unpriced rows have no quantitative track. A measured zero cost remains $0.00.
 Rebuild pricing details names the existing local-log enrichment action; it does
 not contact a pricing service or change its reconciliation/rollback rules.
+Its nearby guidance distinguishes rereading logs for pricing metadata from
+supplying an unsupported rate. Unpriced usage remains in token totals and is
+excluded from dollar estimates; rebuilding cannot promise complete pricing.
 
 Source coverage and pricing coverage are independent. Routine continuity gaps
 use compact neutral copy with a warning icon and a details link; a source read
@@ -175,47 +185,40 @@ visible inside its retained module and through Sources need attention.
 
 ## Glance grammar
 
-The status item is a closed instrument. A new tool, quota scheme, or menu-bar
-field has to pass these rules; a true-for-one-provider exception is not a
-pattern. Quiet means no fake speed: idle Auto does not show rate, dial, or
-activity. Remaining you still have is the instrument.
+The status item shows separate output-speed instruments for confirmed active
+CLIs. Allowance and its detailed evidence live in the provider modules.
 
-1. Auto is quiet about speed unless a tool is working (fresh rate or currently
-   observed running task). Idle Auto does not mint a speed line.
-2. Auto's remaining line names only tools with dated activity (a lifecycle
-   event or counter sample) in the last 60 minutes, most recent first, each by
-   its full name, with “remaining” once at the end:
-   `Claude 45% Grok 80% Codex 12% remaining`. A measured zero is named;
-   unavailable readings do not mint a name. A tool idle for an hour drops off.
-   When no tool was used within the hour, idle Auto is the clean idle face
-   (icon, plus any Quota Guard warning), never stale remaining. Idle Auto does
-   not use Total.
-3. When Auto has working tools, speed occupancy follows activity and measured
-   rate only. A lone working tool's title already names it, so its remaining
-   stays unlabeled unless another tool used within the hour joins; then the
-   remaining field is the named line from rule 2. Remaining of a tool unused
-   for an hour never sits beside a working neighbor. Exhausted remaining may
-   still appear in the popover.
-4. Total adds available output rates in one displayed unit and labels partial
-   reporting. It never adds remaining percents or a combined exhaustion time.
-5. Fable quota and Fable time left remain opt-in fields, off by default. They
-   cannot un-quiet Auto. A measured Fable zero or missing budget is omitted
-   rather than shown as “Fable 0%” or unavailable copy. Time-left still says
-   learning pace, no recent use, or resets first rather than a guessed time.
-   An enabled Quota Guard warning may appear on idle Auto as warning text; it
-   is not tool occupancy. Rate, dial, Fable, and projected zero stay off. It
-   must not restore an idle Codex speed line.
-6. The default line stays dial, output rate, and quota. Restore defaults does
-   not grow that set. Existing visibility, order, compactness and unit
-   preferences survive.
+1. Auto shows every confirmed active tool together, each with its own dial and
+   rate. Rates are never combined into a Total. Optional Roll shows one active
+   tool every five seconds using the app-owned clock. A stopped tool cannot
+   remain in the roll selection.
+2. Dated lifecycle or same-turn counter evidence admits an instrument. A retained
+   `hasRate`, CLI discovery, an open terminal, a recent poll or file mtime does
+   not. Quiet work becomes unconfirmed after five minutes and leaves the bar;
+   its known popover module may remain. Completed work leaves immediately.
+3. A fresh speed sample is qualified independently. Working without a usable
+   rate shows an em dash with no invented unit-bearing value. Idle, unconfirmed,
+   and never-observed tools do not get bar instruments, even when explicitly
+   selected. With no confirmed active tools in the selection, one quiet mark
+   remains.
+4. Names can be hidden visually without combining instruments or losing spoken
+   provider identity. Follow each tool preserves its live-module unit. A menu
+   unit override applies to every displayed instrument without changing the
+   stored per-tool units.
+5. Each warned active instrument uses warning color for that provider. Warnings
+   for inactive providers and remaining values stay in their popover modules.
+   Warning evidence cannot create activity or a speed reading.
+6. Default fields are dial and output rate. Existing icon/activity/rate/dial
+   choices, order, separators and density remain configurable. Legacy allowance,
+   forecast, Fable and warning fields remain stored for compatibility but do not
+   render on the status item. Settings exposes only fields that affect this face.
+   With all fields disabled, each active tool retains an icon.
 
-`MenuBarPresentation.combined` is the single occupancy owner for the status item
-and the settings preview. `LiveTool.recent` owns the one-hour remaining-line occupancy;
-`CompactLiveCopy.remainingLine` owns its wording.
-`LiveTool.modules` owns the canonical live module list.
-Legacy `compact` and `nowOccupied` predicates remain only for compatibility tests. `AccountAllowancePresentation.measuredZero` is the remaining-zero predicate for
-any CLI's idle name. Changing idle remaining occupancy requires changing this section
-and a MenuBar test that names the tool.
+`MenuBarPresentation.face` is the presentation owner for the real status item,
+settings preview and synthetic captures. `LiveTool.confirmed` qualifies dated
+activity at the supplied clock; `CompactLiveCopy` owns numeric and spoken copy.
+`LiveTool.modules` independently owns the retained live module list. The legacy
+`recent`, `compact` and `nowOccupied` helpers do not decide bar membership.
 
 `AccountAllowancePresentation` owns current allowance qualification: matching
 account, finite measured utilization, source failure, observation time, reset and
@@ -247,9 +250,9 @@ secondary status area beneath the modules.
 
 Claude allowance comes from the account-matched cache refreshed by installed
 Claude Code. Missing reset clocks do not discard a valid remaining value. Fable
-quota and pace remain optional status-item fields with their established burn
-window and missing-input behavior; this redesign does not change measurement.
-The optional Fable quota names the binding limit among current 5-hour, weekly
+quota and pace keep their established burn window and missing-input behavior;
+legacy status-item preferences do not change measurement or bar occupancy.
+The Fable quota model names the binding limit among current 5-hour, weekly
 and Fable weekly readings without adding percentages. Pace uses a time-weighted
 average of up to four hours of readings with a one-hour half-life, restarts at a
 reset, and needs 30 minutes of history. Unsupported forecasts say learning pace,
@@ -332,10 +335,11 @@ unavailable, not 0%.
 Each tool's dashboard unit is owned by its Tachometer and saved independently
 under `dashboard.rateUnit.<tool>` using the app's injected preferences store.
 Absent or invalid values use seconds. The quick popover follows that tool's
-unit. Menu bar “Follow selected tool” uses the selected tool's dashboard unit;
+unit. Menu bar “Follow each tool” uses each instrument's own dashboard unit;
 explicit seconds/minutes/hours remain menu-only overrides in the existing
-`menuBarConfiguration.v1` record. Auto changes the selected tool, not its unit
-preference. Restore menu defaults does not reset dashboard units or Appearance.
+`menuBarConfiguration.v1` record. Auto shows confirmed active tools together;
+Roll selects one instrument at a time without changing any tool's saved unit.
+Restore menu defaults does not reset dashboard units or Appearance.
 Raw measurements remain output tokens per second; conversion is presentation only.
 
 AppearanceHost owns the rendered accent, native tint, and color scheme for every
@@ -367,19 +371,17 @@ legible native surfaces. The website uses translucent navigation and buttons,
 with opaque surfaces under reduced transparency; it does not imitate native
 glass on data panels. `Assets/TokenBar.png` owns the icon; the ICNS and website
 PNG are size conversions, while the SVG favicon is a simplified gauge.
-The icon was generated with the built-in image tool, then converted with sips
-and iconutil. Prompt: a finished macOS rounded-square graphite glass icon with
-a 270-degree frosted-silver speedometer arc, five scale marks, a polished needle
-pointing upper-right, Frost edge highlights and a transparent 8% margin; no
-text, numbers, lime, green, yellow, purple or rainbow accents.
 Tool charts distinguish series through line styles, symbols and bar positions,
-not competing hues. MenuBarPresentation.combined is shared by the status item,
+not competing hues. MenuBarPresentation.face is shared by the status item,
 Settings and marketing recordings.
+Current numeric allowance uses `AllowanceQualification` as defined in
+[Architecture](../ARCHITECTURE.md#quota-read); historical cards do not authenticate
+a current number.
 Accounts & plans omits the Spark allowance bucket (`codex_bengalfox`)
 from its quota cards, retaining all stored observations and account/plan history.
 Allowances leads with current remaining for Codex, Claude, and Grok using the same
 `AccountAllowanceDisclosure` owner as Now. Codex account identity, plan history and
-Spark-omitted quota cards follow. Claude remaining is no longer only on Now.
+Spark-omitted quota cards follow.
 Synthetic previews inject disposable preferences and never
 write the production defaults or change the measurement calculation.
 
@@ -389,7 +391,7 @@ Scope precedes results; results precede supporting evidence. Now puts activity,
 estimated speed and account allowance together, with one visible speed-unavailable
 label per tool; missing allowance remains a separate claim. History places the
 selected usage's contributions before its time series. Cost places valuation and
-coverage, then model/effort comparisons, then the time series. Account comparison,
+coverage, then composition, time series and model/effort attribution. Account comparison,
 USD-per-output, published rate history and evidence completeness remain in Report
 details; recovery, CSV and calculation method remain in the header.
 
@@ -648,8 +650,9 @@ Glass remains on live commands, with the existing native fallbacks.
 Native controls retain system behavior and focus. Current System/Light/Dark and
 saved accent choices remain intact. Orange identifies an affected tool or an
 undismissed warning; it is not a global accent. Dismissing an allowance notice
-removes its module warning chrome while the actual remaining reading, allowance
-details, notification policy and menu-bar assessment remain unchanged.
+removes its module and active-instrument warning color while the actual remaining
+reading, allowance details, underlying assessment and notification policy remain
+unchanged. A higher warning level or a new reset period restores the warning.
 
 ### Integrity evidence and acknowledgement
 
@@ -661,25 +664,11 @@ deleted. Done/Escape closes the sheet. A changed report warning returns; clean
 reports render none. The ledger gate, exclusions and repaired totals do not
 change when a warning is acknowledged.
 
-### Control cardinality audit — 2026-09-12
+### Native control selection
 
-| Surface | Old → new | Reason |
-|---|---|---|
-| DashboardNavigation | Restrained selection capsule → retained | Persistent destination identity and arrow-key navigation already fit |
-| ChoiceRow | Custom button flow → native Picker with explicit caller-selected style | Native keyboard/selection semantics; option identity keyed by value |
-| History Measure | Four custom choices → segmented Picker | Four stable mutually exclusive measures |
-| History Compare | Six custom choices → menu Picker | Larger stable list, explicit Compare label |
-| Cost Compare | Two custom choices → segmented Picker | Models versus reasoning levels |
-| Shared period | Seven custom choices → menu Picker | Larger list; custom-date fields stay native and conditional |
-| Tool/model/account/reasoning filters | Dynamic button grids → menu Pickers | Data-dependent cardinality; missing selected values remain represented |
-| Search | Rounded TextField → NSSearchField | Native search and clear behavior, live binding retained |
-| Active filter removal | Bordered buttons → plain labeled actions | Commands, not additional choices |
-| Rate dates/service | Two/three custom choices → segmented Pickers | Stable valuation alternatives, no query change |
-| Appearance mode | Segmented Picker → retained | Three stable modes |
-| Accent presets | Four separate buttons → menu Picker with current Custom value | Includes custom selection without falsely selecting a preset |
-| Custom accent | ColorPicker → retained | Native color editing and saved custom values |
-| Contribution rows | Drill-down buttons → retained | Actually disclose selected record details; focus and chevrons remain |
-| Timeline and cost bars | Noninteractive chart/progress marks → retained | Magnitude, not navigation |
+Native picker style is explicit at the caller: small stable alternatives use
+segments; larger or dynamic alternatives use menus. Contribution rows remain
+disclosures and chart marks remain noninteractive.
 
 ChoiceRow never switches style merely because a refreshed option count changes.
 Stable segments are explicitly opted into by their callers. Dynamic options use
@@ -697,19 +686,15 @@ usage, model/reasoning contribution and pricing evidence. Accounts owns current
 identity and allowance, supported by explicitly historical account/plan readings.
 Insights owns derived changes and evidence conditions, not another usage browser.
 
-| Repeated element and owner | Decision | Reason |
-| --- | --- | --- |
-| Insights usage timeline vs History timeline (`UsageInsightsView`) | REMOVE from Insights | History already supports period, measure and tool scope; the second chart added no inference. |
-| Insights top working directories vs History project comparison (`UsageInsightsView`) | REMOVE from Insights | Project attribution is a distribution question; History retains it with unattributed usage. |
-| Insights two weekly output totals (`UsageInsightsSummary`, `UsageInsightsView`) | DERIVE | Show recorded percentage change across complete seven-day periods; supporting totals remain evidence for the calculation. `UsageInsightsSummary` owns the claim: no percentage for missing periods, unknown output counters or a zero baseline; the view only renders it. |
-| Insights active days and busiest day (`UsageInsightsView`) | REMOVE | Descriptive summaries of the same History series, without evidence of an unusual condition. |
-| Insights peak context in counting details (`UsageInsightsView`) | MOVE to main evidence section | Known request context and its measurable-record count help interpret coverage. A maximum does not establish anomaly or predict exhaustion. |
-| Insights cached-input share (`UsageInsightsView`) | MOVE to counting details | Mechanism/context, not a primary insight or a savings claim. |
-| Cost time chart and model/reasoning contributions (`CostView`) vs History | KEEP | Dollar valuation excludes unpriced usage visibly; token distribution cannot answer the pricing question. |
-| Accounts quota remaining/reset and slope (`QuotaTrendCard`) vs Now | KEEP | Now gives a current operational summary. Accounts binds readings to identity and shows historical quota evidence, with saved readings labeled. |
-| History account attribution vs Accounts observations (`HistoryView`, `AccountsView`) | KEEP | Recorded token attribution and current sign-in/allowance are different claims; historical unknowns must not inherit current identity. |
-| Shared integrity/freshness disclosures | KEEP | Each independently viewed result needs its evidence limitations. Compact status and native details avoid dominant repeated warning surfaces. |
-| Prompt sample (`PromptInsightsSection`) | KEEP | Sampled repeated instructions and time patterns do not appear in token History; sample limits and read failures remain explicit. |
+Insights derives recorded output change across complete seven-day periods,
+with no percentage for missing periods, unknown counters or a zero baseline.
+It does not duplicate History's timeline, project distribution, active-day or
+busiest-day summaries. Peak request context and its measurable-record count
+belong to main evidence; cache share belongs to counting details. Neither implies
+anomaly or savings. Cost retains its dollar time series and contribution rows
+with unpriced coverage visible. Historical account attribution remains distinct
+from current allowance, and each independently viewed result retains its own
+integrity/freshness disclosure. Prompt patterns keep their sample limitations.
 
 Insights compares recorded output, not productivity or subscription burn. Missing
 logs and changed source coverage can affect it. No new dominance, anomaly, or
@@ -735,24 +720,24 @@ single product image. Cost's default synthetic sample is fully priced; pricing
 assumptions and coverage remain visible. Defects belong only in explicitly named
 evidence demonstrations.
 
-| Path | Owner and role | Audit outcome |
+| Path | Owner and role | Contract |
 | --- | --- | --- |
 | `--render-preview` | ProductPreview → AppearanceHost → DashboardRoot / Now | Large live diagnostic; fixed fixture/activity/report clock; no live reads. |
-| `--render-cost-preview` | CostPreview → AppearanceHost → DashboardRoot / Cost | Replaced bare CostView capture with shipping shell; clean priced fixture. |
+| `--render-cost-preview` | CostPreview → AppearanceHost → DashboardRoot / Cost | Shipping shell with a clean priced fixture. |
 | `--preview-cost`, `--preview-cost-navigation` | CostPreview → shipping Cost or Now shell | Interactive isolated counterparts; clean defaults and native controls. |
 | `--render-cost-preview --sample-history` | Same fixture → DashboardRoot / History | Separate secondary image; no startup/import claim. |
 | `--render-compact-preview`, `--preview-tools` | ProductPreview → QuickLiveView or DashboardRoot | Shipping compact/dashboard views; disposable preferences; explicit interactive variant. |
-| `--render-motion-preview` | ProductMotionPreview → QuickLiveView and MenuBarPresentation.combined | Two separate output streams, not a composite; fixed frame-indexed sample times. Real native animation scheduling may differ between hosts. |
+| `--render-motion-preview` | ProductMotionPreview → QuickLiveView and MenuBarPresentation.face | Two separate output streams, not a composite; fixed frame-indexed sample times. Real native animation scheduling may differ between hosts. |
 | `--render-compact-preview --sample-update` | ProductPreview → QuickLiveView with a seeded 9.9.9 manifest | Explicit update-notice demonstration; no network; never a marketing still. |
-| `--render-motion-preview --sample-idle` | Same owners, one idle frame | Status-item remaining without a speed line; Dark/Frost marketing still. |
+| `--render-motion-preview --sample-idle` | Same owners, one idle frame | Quiet idle status mark; Dark/Frost marketing still. |
 | `--render-pages-preview` | CostPreview → one DashboardRoot destination per PNG | Default populated, fixed report clock; explicit partial/failed demonstrations. |
 | `--layout-matrix`, `--sample-light` | Native layout diagnostics | Explicit Light/Dark alternatives, each in its own image; never a mixed-theme hero. |
 | `--render-history-preview` | HistoryPreview → shipping History | Synthetic saved/import-in-progress behavior diagnostic; distinct from marketing History still. |
-| `--render-data-states` | DataStatePreview → native CostSummary or PromptInsightsSection | Split previous two-surface composition into sixteen separate diagnostic PNGs. Named states intentionally show warnings/loading; live read-age/progress text is not a marketing determinism guarantee. |
+| `--render-data-states` | DataStatePreview → native CostSummary or PromptInsightsSection | Sixteen separate diagnostic PNGs. Named states intentionally show warnings/loading; live read-age/progress text is not a marketing determinism guarantee. |
 | `--render-welcome`, `--preview-welcome` | FirstRunWelcome with AppearanceHost | Isolated onboarding diagnostic, not a dashboard product image. |
 | `scripts/encode-motion-preview.sh` | Native frame encoding only | No redraw or montage; Codex-working/Claude-idle native frame 105 is the poster and frame 1359 anchors the settled loop. |
 | `site/public/live-modules.png` | Canonical compact live still | Regenerate through ProductPreview with `--render-compact-preview`; no image-editing pass. |
-| `site/public/menu-bar-idle.png` | Idle status-item remaining | `--render-motion-preview --sample-idle`; Dark/Frost; does not replace the working poster. |
+| `site/public/menu-bar-idle.png` | Quiet idle status mark | `--render-motion-preview --sample-idle`; Dark/Frost; does not replace the working poster. |
 | `site/public/*-demo.png/mp4` | Native motion frames and encodes | Synthetic recordings only; no site-specific dashboard recreation. |
 
 Website motion uses one pause/resume control and a sample-data disclosure.
@@ -798,22 +783,41 @@ evidence. `ForEach` uses stable tool identity. A known idle or unavailable provi
 keeps its module; a never-seen provider has no placeholder. One module expands
 at a time. Name, activity, speed and remaining use the same compact header in
 every live host. Expansion adds controls and evidence below that header.
-`QuickLiveView` constrains this shared tree to 440 points. `NSHostingController.preferredContentSize` follows its unconstrained, vertically
-fixed content height so expansion and status changes grow the popover.
+`QuickLiveView` constrains this shared tree to 440 points. Its unconstrained,
+vertically fixed content and `NSHostingController`'s `.preferredContentSize`
+sizing option request intrinsic popover height as content changes. Actual
+expansion, footer reachability and screen fit require native NSPopover
+observation; compact stills and separate window hosts establish only their own
+content layout. Qualification belongs in `docs/VERIFICATION.md`.
 
 ### Quota Guard
 
 A live provider module shows the highest-priority warning for that provider,
-using the coordinator's existing decision order and freshness rules. Its border
+using the coordinator's display decisions, priority order and session dismissals. Its border
 and instrument adopt warning color. Warning copy names observed exhaustion or
 the approximated exhaustion clock when supported; missing projections never
 invent a time. Other allowance windows remain available in Reports.
+
+Display warnings follow the provider's display horizon: Claude thirty minutes,
+Codex and Grok two minutes. They retain account, authentication, failure and reset
+checks. Reading age appears after two minutes. The forecast keeps the average
+allowance burn measured at the reading's source time throughout its valid display
+window; passing the projected time never proves actual exhaustion. A missing reset
+does not erase measured remaining or a measured warning, and supplies no forecast.
+
+Notification eligibility is evaluated separately with the existing two-minute
+freshness ceiling, stricter sample continuity, confirmations, snooze and duplicate
+suppression. UI clock ticks cannot notify. Details explicitly label a reading
+that remains valid for display but is too old to trigger a new notification.
 
 Expand the warned module for View allowance and Snooze. View allowance opens
 Reports at Allowances and presents that exact decision. The detail updates
 within a verified account and period and labels old-account or old-period
 snapshots as historical. Snooze applies only to that allowance and period.
 Settings owns notification opt-in, sound, low-remaining threshold and forecast
-lead. The optional menu-bar warning field preserves existing field order and
-enabled choices. Notifications remain subject to macOS; in-app evidence remains
+lead. Warning color belongs only to each warned active status instrument; inactive
+warnings stay in the provider module. Notices fade with opacity. Notifications remain subject to macOS; in-app evidence remains
 the fallback. Forecasts describe allowance burn, never output speed.
+
+Historical control replacements, icon production and surface consolidation
+rationale live in [the archive note](archive/admission-repair-history.md).

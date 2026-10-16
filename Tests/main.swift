@@ -848,8 +848,9 @@ for historical in [false, true] {
     continuityCheck(restored.ledger.sourceErrors?.isEmpty == false, "unrecoverable interval warning survives restart and successful read")
 }
 
-// An observed counter filtered out of this cursor's date scope is not an
-// admitted boundary. Live and historical readers must both retain their share.
+// Scan scope cannot make an already admitted counter interval new. A later
+// historical record inside a covered live range must not increase the total or
+// retroactively rewrite the original admission's date/account attribution.
 do {
     let home = temp.appendingPathComponent("continuity-mixed-scope")
     let file = home.appendingPathComponent("sessions/mixed.jsonl")
@@ -862,8 +863,8 @@ do {
         continuityRecord("historical-missing", 150, at: oldDate.addingTimeInterval(1), last: 50) +
         continuityRecord("live-B", 200, at: now) + continuityRecord("live-C", 300, at: now.addingTimeInterval(1))).write(to: file, options: .atomic)
     _ = owner.scan(historical: true, changedPaths: [file]); _ = owner.scan(changedPaths: [file])
-    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 350, "scope-local historical increment is not hidden by live observed boundary")
-    continuityCheck(owner.ledger.entries.filter { $0.date < Calendar.current.startOfDay(for: owner.ledger.started) }.reduce(0) { $0 + $1.tokens.input } == 150, "historical scope retains its own admitted interval")
+    continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "historical 100→150 inside admitted live 100→200 cannot count twice")
+    continuityCheck(owner.ledger.entries.filter { $0.date < Calendar.current.startOfDay(for: owner.ledger.started) }.reduce(0) { $0 + $1.tokens.input } == 100, "covered historical evidence does not rewrite prior admission timing")
 }
 
 // Legacy migration without replacement and alias/archive moves retain identities.

@@ -1,7 +1,8 @@
 # ARCHITECTURE.md
 
-> Describes the 0.2.2 release-candidate source. Known limitations are listed separately;
-> a future scene or navigation migration is not current implementation.
+> Describes the current source, including unreleased changes. Known limitations
+> are listed separately; local qualification is recorded in `docs/VERIFICATION.md`.
+> A future scene or navigation migration is not current implementation.
 
 ## Runtime shape
 
@@ -20,11 +21,11 @@ not application state or UI code.
 | `AppDelegate`, `UsageModel` (`App.swift`) | AppDelegate owns native surfaces, commands and clocks; UsageModel connects process stores and services | host lifetime and orchestration |
 | `UsageReadHealth`, `UsageDiagnostic` | Structured source failure and coverage evidence; completed read clock, scope and recovery | Derived snapshot evidence; first-recorded diagnostic dates in ledger metadata |
 | `ReportScheduler`, `ReportState` | Utility-queue report work, latest-request publication and retained report choices | Derived reports and query state |
-| `UsageScanner` (`Usage.swift`) with `EventIndex`, `RequestArchive`, `UsageMetadata` | tail Codex logs from byte cursors, deduplicate, admit, compact | `ledger.json`, `ledger.events.sqlite`, `ledger.requests.sqlite` |
+| `UsageScanner` (`Usage.swift`, `UsageAdmission.swift`) with `EventIndex`, `RequestArchive`, `UsageMetadata` | qualify source intervals, admit once, retain and compact | `ledger.json`, `ledger.events.sqlite`, `ledger.requests.sqlite` |
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
 | `ActivityFeed`, `Activity`, `ClaudeActivityReader`, `Tachometer` | tool-scoped tasks, counter deltas, independent dials | in-memory |
-| `ClaudeQuotaMonitor`, `ClaudeUsageRefresh`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon, refreshed by the installed Claude Code every 15 minutes; model-scoped weekly rows (Fable) kept apart for the menu-bar roll-up; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; Token Bar reads no credential and makes no Claude network request itself | In-memory quota samples; empty private `claude-usage-refresh/` working directory; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
+| `ClaudeQuotaMonitor`, `ClaudeUsageRefresh`, `ClaudeStatuslineConnection` | Account-matched Claude Code usage cache with a 30-minute horizon, refreshed by the installed Claude Code every 15 minutes; model-scoped weekly rows (Fable) kept apart in the allowance model; identity-free relay is connection evidence only; Connect/Disconnect edits only `statusLine` in Claude Code's user settings; Token Bar reads no credential and makes no Claude network request itself | In-memory quota samples; empty private `claude-usage-refresh/` working directory; `claude-statusline-relay.sh` stable copy; `claude-statusline.json` is written by the relay, not the app; `settings.json.token-bar-backup-*` beside Claude Code settings |
 | `GrokQuotaMonitor` | JSON-RPC to `grok agent --no-leader stdio`, `_x.ai/billing` | In-memory quota samples only |
 | `LiveMonitor`, `LiveStateStore`, `ProviderUsage`, `CodexInstallation` | JSON-RPC to `codex app-server --stdio` for quota, plan, account usage | `live-accounts.sqlite`; legacy JSON retained for migration/rollback |
 | `QuotaGuardEvaluator`, `QuotaGuardCoordinator`, `QuotaGuardNotifications` | Typed quota assessment, process-owned confirmation/suppression, opt-in native notifications; no transcript parsing or second burn formula | Private `quota-guard.json` suppression/settings and exact notification target; no copied quota history |
@@ -41,6 +42,7 @@ not application state or UI code.
 | Concern | Canonical owner | Derived views | Proof |
 |---|---|---|---|
 | Admitted usage | `~/Library/Application Support/CodexTokenBar/ledger.json` | reports, charts, CSV | `Tests/main.swift`, `Tests/Accuracy` |
+| Admitted counter coverage | Optional `ledger.usageCoverage`, keyed by logical source and established epoch | New / Covered / Unresolved decisions; coverage diagnostics | `Tests/main.swift`, `Tests/Harnesses`, `Tests/Grok` |
 | Event identity | `ledger.events.sqlite` plus in-flight ledger IDs | duplicate counts | `Tests/main.swift` |
 | Request detail | `ledger.requests.sqlite` | request CSV, evidence panel | `Tests/Accuracy` |
 | Quota and accounts | app-server responses, incrementally persisted in `live-accounts.sqlite` | runway, account cards | `Tests/main.swift`, `Tests/MenuBar` |
@@ -58,49 +60,105 @@ not application state or UI code.
 
 ### Log to ledger
 
-1. FSEvents dispatch changed paths only to the owning provider, including OpenCode database/WAL and Codex catalog changes. Launch, Refresh history, dropped-event recovery and a 30-minute timer discover missed files. Full history discovery also rebinds newly present or changed Claude/OpenCode roots, retaining path-scoped history cursors and replacing obsolete live readers/watchers; no extra polling loop or restart is required. Catalog database events bypass the ordinary metadata throttle. Provider warnings persist across unrelated successful paths and clear only when the failed scope or a full provider scan succeeds; the failed scope survives restart. Grok child metadata remains available when its event precedes the child summary.
-2. Codex validates the opened file's device/inode, metadata, prefix and cursor
-   boundary before an unchanged-size skip or tail read. Validation and parsing
-   use the same descriptor; a post-read identity/mutation check precedes admission.
-   Only complete `token_count`, `turn_context` and `session_meta` records from
-   the affected tail are retained until that check; prompt bytes are skipped.
-   Unchanged validation reads at most 768 digest bytes per file. Prefix/boundary
-   witnesses do not claim to detect arbitrary interior edits that preserve both
-   witnesses and evade the metadata checks.
-   A discontinuity replays only that file into fresh source context. Persisted
-   observed counters and admitted interval boundaries remain separate: a new
-   fingerprint alone cannot prove new usage. Reconciliation admits only a stated
-   last-request interval disjoint from retained coverage, or resumes ordinary
-   deltas after recovering the exact old boundary. Legacy cursors lack verified
-   continuity and acquire it by re-reading; missing anchors or overlaps remain
-   explicit file/scope warnings. When an old anchor cannot be recovered, a later
-   request dated after the initial verified scan, on a continuous append with
-   matching session and disjoint counters, can establish a new baseline. Held
-   delayed records advance observed counters without moving that time fence;
-   a new file discontinuity establishes a new fence. The old gap stays
-   visible. Session changes reset counter, turn, model and attribution context;
-   replacement replay is unattributed, while a new chat retains stable-poll rules.
-   Live/history alias lookup is namespace-specific. Multiple legacy aliases are
-   retained as evidence and reconciled against a conservative counter bound;
-   neither a stale alias nor a cursor from the other scope starts blind replay.
-3. Claude uses persisted transcript byte cursors with boundary/inode checks, separate from live rate cursors. Only complete lines advance; counter baselines admit verified increases. OpenCode pages by a persisted `(time_created, id)` watermark and rereads unfinished messages by ID. Grok rereads only the changed session. Missing legacy baselines remain an explicit gap.
-   OpenCode retains one read-only SQLite connection across scanner refreshes while the resolved database path and inode match. Missing or replaced files and failed scans release it; scanner teardown releases the final connection. Every page finalizes its statement so new WAL commits remain visible and checkpoints are not pinned between reads. Standalone full reads still scope their connection to that call; admission and cursor authority are unchanged.
-4. Delta from previous totals; a first report or fork admits only
-   `last_token_usage`; the identity hash is checked against the index.
-5. Write pending to the archive, append to the ledger or a day bucket, save a dirty ledger atomically, index its captured IDs, then acknowledge archive rows. Indexed IDs retire from memory; JSON retains only the last recovery batch until the next genuine save. Failed index/ack phases retry without re-encoding. Delayed saves and normal termination flush outstanding work; storage-load failures preserve the original ledger. Cost recovery uses the same checkpoint owner.
-   Cursor/provider-metadata-only changes atomically write `ledger.checkpoint.json` with no entries, bound by UUID to the full `ledger.json` baseline. Entry mutations still save the full ledger with a new UUID before indexing and acknowledgement. Restart overlays only matching metadata; stale checkpoints cannot replace newer totals. Invalid checkpoints fail closed. Legacy ledgers acquire a UUID on their next full save; older apps ignore the sidecar and may replay from older cursors, with the durable identity index retaining deduplication.
-   The request archive calculates its admitted-row count once per connection, then updates it only for successful admissions. Rollback or another connection's committed database change invalidates that baseline; refreshes reuse the exact count without traversing all retained rows.
-6. Publish saved usage before scanning, then admission snapshots at most twice
-   per second and a final result before cost/catalog work. Reports rebuild on
-   background queues, coalescing pending updates while retaining visible results.
-   History and Cost share query state and publish together only for the current
-   query generation; completed results may publish while newer usage queues,
-   preventing continuous activity from starving the visible report; their shared filter controls expose the scope on both pages. ReportEngine restores its private date/context index from `report-index.json`,
-   bound to the ledger content UUID. Appended entries extend the index; enrichment
-   or replacement rebuilds it from saved usage. History is reused when only pricing assumptions change. Metadata revisions and minute/future-entry boundaries invalidate the cache.
-   Single-day charts use minute timestamps; display-only archive expansion must
-   reconcile with daily aggregates before it can supply their timing.
-   The usage store prepares the compact timeline per entry revision. Clock ticks only check for local midnight, a future record becoming current, clock rollback, or a calendar/time-zone change; SwiftUI body evaluation never aggregates history.
+`UsageScanner.assessUsage` in `UsageAdmission.swift` is the single authority for
+new usage. Readers supply normalized counters, a provider-scoped logical source,
+an established counter epoch, the unchanged event fingerprint, and evidence of
+an interval or an independently identified request. The decision is:
+
+| Result | Admission behavior |
+|---|---|
+| New | Admit the exact positive supported increment. |
+| Covered | Add nothing: a durable/in-flight receipt or admitted extent already represents it. |
+| Unresolved | Retain the observation and coverage limitation; do not guess an increment. |
+
+`ledger.usageCoverage` distinguishes observed counters, admitted extents and
+unresolved overlap. Its optional admitted counter baseline supports Claude
+message revisions. A high endpoint never implies admission of its prefix.
+Contained extents are covered even under another receipt, path or date scope;
+partial overlaps and incomparable vectors are unresolved rather than subtracted
+into a guessed remainder. Adjacent admitted extents coalesce. Coverage advances
+only with successful integrity/archive/ledger admission, never with a reader
+checkpoint alone. Repeated observations, ordinary cumulative growth, supported
+revisions, replay, copied paths and delayed records therefore use the same decision.
+
+The surrounding pipeline preserves these responsibilities:
+
+1. **Discovery selects evidence.** FSEvents routes changes to the owning provider,
+   including OpenCode database/WAL and Codex catalog changes. Launch, Refresh
+   history, dropped events and a 30-minute discovery timer recover missed files
+   and changed Claude/OpenCode roots. Catalog events bypass the metadata throttle.
+   Source failures clear only after their failed scope or full provider scan
+   succeeds; unrelated successful paths do not clear them. Grok child metadata
+   remains available when its event precedes the child summary.
+2. **Readers establish coherence and comparability.** Codex validates descriptor
+   device/inode, metadata, prefix, cursor boundary and final pathname before
+   buffered records reach admission. Only complete counter/context records advance
+   the cursor; prompt bytes are skipped. Unchanged validation reads at most 768
+   digest bytes. These witnesses do not detect arbitrary interior changes that
+   preserve both digests and evade metadata checks. Claude retains separate
+   transcript and activity cursors, clean-read checkpoints and complete-line
+   boundaries. OpenCode pages by `(time_created, id)` and rereads unfinished IDs.
+   Its read-only connection is reused only for a matching resolved path/inode;
+   replacement, failure and teardown release it. Statements finalize each page
+   so WAL commits remain visible and checkpoints are not pinned. Grok rereads the
+   changed session. Byte positions, modification dates, turn watermarks and
+   live/history date partitions select observations; they do not establish novelty.
+3. **Admission validates and persists.** Fatal integrity failures are counted and
+   excluded; permitted subordinate-counter reductions preserve core totals.
+   Write request detail pending, add the ledger entry/day bucket and coverage,
+   save atomically, index captured IDs, then acknowledge archive rows. Index/ack
+   failures retry the captured checkpoint without re-encoding. Indexed IDs retire
+   from memory; JSON retains the last recovery batch until the next genuine save.
+   Normal termination flushes outstanding work; storage-load failure preserves
+   saved data. Metadata-only changes write an entry-free UUID-bound sidecar;
+   only a matching full-ledger baseline accepts it. Legacy ledgers acquire a UUID
+   on full save; older apps may replay older cursors against the durable ID index.
+   Archive admitted-row counts update only on successful admissions and invalidate
+   after rollback or another connection's committed change.
+4. **Reports derive from admitted usage.** Publish saved results before scanning,
+   intermediate admissions at most twice per second and a final result before
+   cost/catalog work. Background reports coalesce work and publish only the current
+   shared History/Cost query generation. A completed current report can publish
+   while newer usage queues. The private report index binds to the ledger content
+   UUID; append extends it and enrichment/replacement rebuilds it. Pricing-only
+   changes reuse History. Metadata, minute/future-entry and calendar boundaries
+   invalidate applicable caches. Archive details supply minute timing only after
+   exact reconciliation with daily aggregates. SwiftUI body evaluation never
+   aggregates history; clock ticks check midnight, future-entry admission, clock
+   rollback and calendar/time-zone changes.
+
+#### Residual source and compatibility rules
+
+- **Observation grain:** provider canonicalization remains explicit. Claude uses
+  `message.usage`, never an additional sum of `iterations`; monotone revisions add
+  counters without another request. OpenCode retains once-per-message admission,
+  without inventing revision/finality semantics. Grok turns share session coverage
+  when their endpoints can be located; independently identified turns without
+  those endpoints retain receipt admission.
+- **Lineage and epochs:** first Codex reports/forks admit only stated
+  `last_token_usage`. Unproved inherited prefixes and counter resets cannot supply
+  a cumulative prefix. Grok's first-fork adapter holds a turn equal to inherited
+  session totals and admits a smaller independently stated last turn. These are
+  source witnesses, not inferred host or account identity.
+- **Legacy gaps, aliases and resumption:** old ledgers lack uniform interval
+  history. Migration uses only verified admitted evidence: retained Claude
+  baselines/exact archive rows and Codex admitted-boundary witnesses. It never
+  promotes arbitrary saved `previous`, offsets or watermarks to admitted coverage.
+  Fingerprints and totals remain compatible. Codex replacement reconciliation
+  retains exact-anchor recovery, disjoint last-request proof, conservative legacy
+  floors and namespace-specific alias evidence. An absent anchor can resume only
+  on a continuous append, matching session and disjoint counters with source time
+  after the initial verified scan. Delayed records advance observation without
+  moving that fixed fence; a discontinuity establishes a new fence. Gaps remain
+  disclosed after supported usage resumes. Session changes reset source context;
+  replacement replay remains unattributed.
+- **Unavailable evidence and attribution:** missing identity/storage evidence
+  fails closed. Account assignment independently requires the stable 45-second
+  sign-in/poll boundary; proving usage does not prove an account.
+
+Historical repair rationale and superseded design descriptions are kept in
+[the archive note](docs/archive/admission-repair-history.md). They do not define
+additional admission paths.
 
 ### Quota Guard
 
@@ -108,12 +166,29 @@ not application state or UI code.
 quota changes. The existing one-second meter timer ages in-app evidence only.
 Notifications require distinct source timestamps and never come from UI ticks.
 The pure evaluator receives explicit identity, authentication, failure, time,
-policy and tool-scoped samples, then calls canonical `Runway.estimate` after
-qualification. A cached Codex account is ineligible until a successful quota
+policy and tool-scoped samples. It uses the allowance qualification boundary
+below, then calls canonical `Runway.estimate`; that owner already refuses a
+forecast reaching or passing reset. A cached Codex account is ineligible until a successful quota
 refresh; rereading an unchanged Claude cache does not confirm a forecast.
 
-Action freshness is the smaller of the provider horizon and 120 seconds,
-without changing display horizons. Positive burn needs at least 120 seconds;
+`QuotaGuardEvaluator.evaluate` supplies only action decisions; `display` supplies
+separate `displayDecisions` to live modules, the status item, summaries and detail.
+Display uses the provider horizon (Claude 30 minutes, Codex/Grok two minutes),
+while preserving identity, authentication, failure and reset validation. Source
+age remains visible after two minutes. Expired display evidence removes warning
+chrome; an aged but display-valid reading cannot trigger a new notification.
+The selected detail presents both display and action freshness for the exact
+account/window/reset. Missing resets retain measured display warnings without
+inventing a forecast or qualifying a notification.
+
+Display forecasts use canonical `Runway.estimate` at the reading's source time,
+with the provider horizon bounding sample gaps. This preserves the measured burn
+window while the reading remains valid. Invalid values, decreases, reset changes,
+duplicate conflicts and out-of-order samples still discard the affected slope.
+Elapsed projection is never promoted to observed exhaustion.
+
+Action freshness is the smaller of the provider horizon and 120 seconds.
+Positive burn for notifications needs at least 120 seconds;
 gaps over 120 seconds, counter decreases, reset changes, invalid values and
 conflicting or out-of-order timestamps discard the affected slope. Observed
 exhaustion requires the provider to report 100% used. Forecast elapsed time
@@ -146,6 +221,20 @@ fake adapter for permission, submission, delivery and action routing.
 
 ### Quota read
 
+`AllowanceQualification.assess` is the single eligibility boundary for a current
+numeric allowance in Live, Settings, Fable and Quota Guard. Adapters supply account
+and successful-process/cache authentication witnesses. A reading requires finite
+0–100 utilization, positive window duration, nonempty bucket/window, exact current
+account match, no provider failure, a nonfuture source date and age strictly below
+the provider horizon (Codex/Grok 120 seconds, Claude 1,800 seconds). A supplied
+reset must be finite and future. A missing Claude reset retains measured remaining,
+including zero, while supplying no reset clock, forecast, notification or Fable
+roll-up. Guard uses the same qualification with its stricter action horizon.
+Raw arithmetic and persisted observations supply no authentication. Refused
+readings can explain an unconfirmed module or explicitly historical account card;
+they cannot supply a current remaining number. The relay is connection transport
+only, and an undated refresh reply is completion evidence only.
+
 1. Every 30 seconds, or on `auth.json` change, spawn the Codex app-server.
 2. `account/read`, `account/rateLimits/read`; re-read identity and reject the
    result on change.
@@ -175,10 +264,10 @@ fake adapter for permission, submission, delivery and action routing.
    is rate limited, so it is ignored; only the rewritten cache's account and
    `fetchedAtMs` date a reading. Model-scoped weekly rows in the cache's
    `limits[]` (`weekly_scoped`, such as Fable) stay out of the prioritized Claude
-   allowance and Quota Guard. The opt-in Fable quota menu-bar field shows the
+   allowance and Quota Guard. The Fable quota model retains the
    lowest remaining among the current 5-hour, weekly and Fable weekly readings,
    named by the binding limit; any missing, stale or other-account input makes it
-   unavailable. The opt-in time-left field keeps up to four hours of the signed-in
+   unavailable. The time-left model keeps up to four hours of the signed-in
    account's readings in process memory and projects each limit at its
    time-weighted average burn (one-hour half-life, restarting at a reset, at least
    30 minutes of readings); it shows the earliest exhaustion that precedes that
@@ -226,8 +315,8 @@ fake adapter for permission, submission, delivery and action routing.
   sign-ins. Website report drafting requires no feedback secrets or provider
   bindings. Drafts are public-intended user text, never copied agent logs.
 - Preview and audit modes never cross into the real support directory.
-- The site never becomes a control plane; deployment stays with the Cloudflare
-  Authority.
+- The site never becomes a control plane. Deployment follows the operator-approved,
+  hash-bound local plan in `docs/DEPLOYMENT.md`; source changes grant no deployment authority.
 
 ## Known divergence
 
@@ -243,13 +332,16 @@ pin this choice.
   `Tokens.canonical` before admission.
 - Claude and OpenCode counters are read locally with tool-scoped identities.
   Claude streams into live activity; OpenCode remains history-only.
-- Pricing covers OpenAI models only. Anthropic, local, and free models stay
-  unpriced by design until a dated rate card exists.
+- Pricing covers verified OpenAI, Anthropic and xAI API model IDs. Claude cache
+  lifetimes and optional thinking subsets travel with the retained counters;
+  unsplit output remains combined. Grok Build recorded USD is separate from
+  API estimates. Exact model/rate, request-size and date evidence gates leave
+  unsupported records unpriced; local and free names do not imply zero cost.
 - Codex quota uses the app-server. Claude quota reads only Claude Code's
   account-matched usage cache, which the installed Claude Code rewrites after
   Token Bar's quarter-hour `get_usage` request. That request, its reply and the
-  cache's `limits[]` rows are undocumented, experimental Claude Code interfaces
-  (verified with 2.1.272); a changed shape leaves Claude quota and the Fable
+  cache's `limits[]` rows are undocumented, experimental Claude Code interfaces;
+  a changed shape leaves Claude quota and the Fable
   roll-up unavailable. The status-line relay only proves connection transport;
   its quota observations have no identity.
   Grok remaining uses the installed Grok
@@ -269,16 +361,19 @@ pin this choice.
 
 Grok live speed retains its cumulative session-counter baseline across turn
 boundaries. A first snapshot is still only a baseline; decreases and long gaps
-do not create an estimated rate. `MenuBarPresentation.combined` owns automatic
-multi-tool presentation for both the status item and settings preview. It sums
-available output rates, never provider allowances, and keeps idle Auto quiet
-about speed. Its remaining line names each tool with dated activity in the last
-hour (`LiveTool.recent`), full names, “remaining” once; with none recent, idle
-Auto is the clean idle face. Unavailable remaining stays off. Opt-in Fable fields cannot restore
-an idle Codex speed line. An enabled Quota Guard warning is risk text, not
-occupancy. `LiveTool.modules` owns the live provider modules: known providers,
-working providers and retained allowance evidence. Module identity persists
-through idle or unavailable states; missing values never become zero.
+do not create an estimated rate. `MenuBarPresentation.face` owns automatic multi-tool presentation for both the
+status item and settings preview. It renders one dial/rate per confirmed active
+CLI, follows each tool's unit unless explicitly overridden, and keeps names-off
+instruments and spoken identities separate. Optional five-second roll selects
+only from current active tools using the app-owned clock. `LiveTool.confirmed`
+derives membership from dated lifecycle/counter evidence at evaluation time;
+retained meter flags, file mtime and discovery cannot admit an instrument.
+A disposable presentation projection never changes the process meter. Idle is
+one quiet mark; remaining and inactive warnings stay in the popover. Legacy menu
+fields remain stored for compatibility, while settings exposes active fields.
+`LiveTool.modules` owns the live provider modules: known providers, working
+providers and retained allowance evidence. Module identity persists through idle
+or unavailable states; missing values never become zero.
 `QuickLiveView` and the hostable Now route use the same `LiveOverview` tree.
 Reports defaults to History and exposes History, Cost and Allowances; Settings
 reuses one dedicated window. `MethodSheet` and `ReadPresentation` share method
@@ -341,21 +436,20 @@ usage; the old gap remains disclosed. Counts distinguish occurrences from unique
 source files. Optional `diagnosticObservations` metadata records when this version
 first reported each issue, without inventing the historical gap's onset. The
 completed-read clock survives restart through the existing checkpoint. Repeated
-poll timestamps alone do not force a save. No counter, admission, cursor reset,
-ledger replacement or historical backfill is part of this migration.
+poll timestamps alone do not force a save. Coverage diagnostics do not change
+counters, cursor boundaries or historical attribution.
 
 ### Native host and geometry owners
 
-The adopted host is AppDelegate with NSStatusItem, an intrinsic-height NSPopover,
-a retained Reports NSWindow and a retained Settings NSWindow. The earlier local
-MenuBarExtra/sidebar/NavigationSplitView/Settings-scene proposal is retired.
+The host is AppDelegate with NSStatusItem, an intrinsic-height NSPopover,
+a retained Reports NSWindow and a retained Settings NSWindow.
 
 | Owner | Geometry and identity |
 |---|---|
 | ReportWindowGeometry | Reports default 1120×800 and minimum 900×700; shared by AppKit and DashboardRoot |
 | DashboardRoot / DestinationHost | Stable navigation and host; only the selected report changes |
 | Feature scroll region / PageStyle | One document scroll and shared gutter; no second destination inset |
-| QuickLiveView / PanelFit | 440-point width and unconstrained live content height; expanded modules retain the footer |
+| QuickLiveView / NSHostingController | 440-point width, vertical `fixedSize`, and `.preferredContentSize` request intrinsic popover height; actual expansion and screen fit require native host verification |
 | SettingsPage | One settings scroll and bounded content width |
 | ReportState | History measure/breakdown and Cost breakdown survive navigation and window reopening within the process |
 

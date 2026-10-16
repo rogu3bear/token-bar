@@ -101,6 +101,104 @@ final class Fixture {
     func update(_ r: QuotaReading, samples: [QuotaReading] = []) { now = r.date; guardModel.update([input(r, samples: samples)]) }
 }
 do {
+    let f = Fixture(); f.enable()
+    var source = input(reading(), tool: .claude); source.horizon = ClaudeQuotaSource.horizon
+    f.now = base.addingTimeInterval(121)
+    f.guardModel.update([source])
+    check(f.guardModel.decisions[0].evidence == .stale && f.adapter.requests.isEmpty,
+          "aged Claude reading cannot notify")
+    check(f.guardModel.menuText(selection: .auto)?.contains("8%") == true,
+          "Claude warning remains visible after action freshness expires")
+}
+do {
+    let f = Fixture(); f.enable()
+    let notices = NoticeDismissals()
+    var source = input(reading(), tool: .claude); source.horizon = ClaudeQuotaSource.horizon
+    f.guardModel.update([source])
+    f.guardModel.view(f.guardModel.displayDecisions[0])
+    for seconds in [119.0, 120, 121, 899, 900, 1799, 1800] {
+        f.now = base.addingTimeInterval(seconds); f.guardModel.tick(); f.guardModel.update([source])
+        let display = f.guardModel.displayDecisions[0], action = f.guardModel.decisions[0]
+        let valid = seconds < ClaudeQuotaSource.horizon
+        check((display.risk == .low) == valid && (display.remaining == 8) == valid, "Claude warning follows display horizon at \(seconds)")
+        check((action.evidence == .stale) == (seconds >= 120), "notification horizon is unchanged at \(seconds)")
+        check(MenuBarPresentation.warnedTools(f.guardModel, notices: notices) == (valid ? [.claude] : []), "bar warning follows display at \(seconds)")
+        check(f.guardModel.selectedIsCurrent == valid, "detail follows the selected display window at \(seconds)")
+        check(f.guardModel.selectedNotificationEvidence?.evidence == action.evidence, "detail retains separate notification evidence")
+        let quota = ToolQuotaState(readings: source.readings, samples: source.samples, horizon: source.horizon, guardAccountID: source.accountID, guardAuthenticated: source.authenticated)
+        check((AccountAllowancePresentation(quota: quota, now: f.now).estimate != nil) == valid, "remaining and warning expire together")
+        check(f.adapter.requests.count == 1, "ticks and unchanged cache never send another alert")
+    }
+    check(Runway.ageLabel(source.readings[0], now: base.addingTimeInterval(120)).contains("2 min ago"), "display retains source age after two minutes")
+    for tool in [LiveTool.codex, .grok] {
+        let source = input(reading(), tool: tool)
+        check(QuotaGuardEvaluator.display(source, now: base.addingTimeInterval(119), policy: QuotaGuardPolicy())[0].risk == .low, "short provider display valid before boundary")
+        check(QuotaGuardEvaluator.display(source, now: base.addingTimeInterval(120), policy: QuotaGuardPolicy())[0].risk == .none, "Codex and Grok keep their own horizons")
+    }
+}
+do {
+    // The display estimate uses the provider's observed cadence. Notifications
+    // retain the stricter continuity requirement and never consume this forecast.
+    let samples = [reading(-900, used: 60), reading(used: 80)]
+    var source = input(samples[1], samples: samples, tool: .claude); source.horizon = ClaudeQuotaSource.horizon
+    let expected = Runway.estimate(samples[1], samples: samples, now: base, horizon: source.horizon).exhaustion
+    check(expected == base.addingTimeInterval(900), "forecast is the canonical average allowance burn")
+    for seconds in [0.0, 119, 120, 121, 899, 900, 1799] {
+        let display = QuotaGuardEvaluator.display(source, now: base.addingTimeInterval(seconds), policy: QuotaGuardPolicy())[0]
+        check(display.forecast == expected && display.risk == .projectedExhaustion, "valid display keeps the source-bound estimate at \(seconds)")
+        check(display.risk != .observedExhaustion, "elapsed forecast never becomes measured exhaustion")
+    }
+    check(decision(source).reason == .gap && decision(source).forecast == nil, "display cadence cannot relax notification continuity")
+    let f = Fixture(); f.enable(); f.guardModel.update([source])
+    f.now = base.addingTimeInterval(121); f.guardModel.update([source])
+    check(f.adapter.requests.isEmpty, "display-only projection cannot submit notifications")
+    var adjusted = source; adjusted.samples = [reading(-900, used: 90), samples[1]]
+    check(QuotaGuardEvaluator.display(adjusted, now: base, policy: QuotaGuardPolicy())[0].forecast == nil, "quota decrease clears display slope")
+    var conflict = source; conflict.samples = [reading(-900, used: 60), reading(-900, used: 61), samples[1]]
+    check(QuotaGuardEvaluator.display(conflict, now: base, policy: QuotaGuardPolicy())[0].forecast == nil, "conflicting samples cannot create a display forecast")
+    var noReset = source; noReset.readings[0].reset = nil; noReset.readings[0].used = 92
+    let withoutClock = QuotaGuardEvaluator.display(noReset, now: base.addingTimeInterval(121), policy: QuotaGuardPolicy())[0]
+    check(withoutClock.risk == .low && withoutClock.remaining == 8 && withoutClock.forecast == nil, "missing reset keeps measured warning without invented forecast")
+    f.guardModel.update([noReset]); f.guardModel.view(f.guardModel.displayDecisions[0])
+    check(f.guardModel.selectedIsCurrent && f.guardModel.selectedEvidence?.reading?.reset == nil, "no-reset warning detail stays current")
+    var exhausted = noReset; exhausted.readings[0].used = 100
+    check(QuotaGuardEvaluator.display(exhausted, now: base, policy: QuotaGuardPolicy())[0].risk == .observedExhaustion, "only measured zero means exhausted")
+}
+do {
+    let f = Fixture(); f.enable(); let notices = NoticeDismissals()
+    var source = input(reading(), tool: .claude); source.horizon = ClaudeQuotaSource.horizon
+    f.guardModel.update([source]); let target = f.guardModel.displayDecisions[0]
+    notices.dismissAllowance(target.id, reset: target.reading?.reset, level: target.level)
+    f.now = base.addingTimeInterval(900); f.guardModel.tick()
+    check(MenuBarPresentation.warnedTools(f.guardModel, notices: notices).isEmpty, "age cannot undo dismissal")
+    f.guardModel.snooze(f.guardModel.displayDecisions[0])
+    check(f.guardModel.isSnoozed(target) && f.guardModel.displayDecisions[0].risk == .low, "snooze changes notification suppression without hiding display evidence")
+    source.readings[0] = reading(900, used: 96)
+    f.guardModel.update([source])
+    check(MenuBarPresentation.warnedTools(f.guardModel, notices: notices) == [.claude], "fresh escalation restores warning chrome")
+    check(f.adapter.requests.count == 1, "snoozed escalation cannot notify")
+    var switched = source; switched.accountID = "synthetic-other"
+    var signedOut = source; signedOut.accountID = nil; signedOut.authenticated = false
+    var failed = source; failed.failed = true
+    var reset = source; reset.readings[0].reset = f.now
+    var future = source; future.readings[0].date = f.now.addingTimeInterval(1)
+    var unauthenticated = source; unauthenticated.authenticated = false
+    var relay = source; relay.relay = true
+    for invalid in [switched, signedOut, failed, reset, future, unauthenticated, relay] {
+        f.guardModel.update([invalid])
+        check(f.guardModel.displayDecisions[0].risk == .none && f.guardModel.displayDecisions[0].remaining == nil,
+              "invalidated identity, failure, reset or source removes display warning immediately")
+        check(MenuBarPresentation.warnedTools(f.guardModel, notices: NoticeDismissals()).isEmpty, "invalid input cannot color an instrument")
+        check(f.adapter.requests.count == 1, "invalid input cannot notify")
+    }
+    f.guardModel.view(target)
+    var nextPeriod = source; nextPeriod.readings[0].reset = base.addingTimeInterval(14400)
+    f.guardModel.update([nextPeriod])
+    check(f.guardModel.selectedEvidence == nil, "old detail cannot redirect to a new period")
+    check(MenuBarPresentation.warnedTools(f.guardModel, notices: notices) == [.claude], "new reset is not suppressed by old dismissal")
+}
+print("PASS: provider display windows, independent notification freshness, stable averaged forecasts, boundaries and dismissal")
+do {
     let f = Fixture(); check(f.adapter.permissionRequests == 0 && !f.guardModel.settings.sound, "no launch permission and default silent")
     f.update(reading()); check(f.adapter.requests.isEmpty, "opt-in off")
     f.enable(); check(f.adapter.permissionRequests == 1 && f.adapter.requests.isEmpty, "enable not a fresh source event")

@@ -295,6 +295,7 @@ extension UsageScanner {
             next.continuityGap = cursor.continuityGap
             next.aliasWitness = cursor.aliasWitness
             next.admittedBoundary = cursor.admittedBoundary
+            next.usageEpoch = cursor.usageEpoch
             if cursor.offset > 0 || cursor.previous != nil {
                 let covered = cursor.admittedBoundary ?? (cursor.continuity == nil ? nil :
                     CodexCounterBoundary(session: cursor.sourceSession, total: Tokens(), date: .distantPast, fingerprint: ""))

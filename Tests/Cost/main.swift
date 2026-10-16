@@ -31,6 +31,58 @@ var unknown = entry(); unknown.provider = nil
 check(CostPricing.estimate(unknown).amounts == nil, "A model name does not establish a provider")
 print("PASS: decimal pricing, five disjoint contributions, long context, Fast scenario, effort independence and unavailable evidence")
 
+// Expected amounts are computed from the published disjoint tariff columns.
+for (model, expected) in [("gpt-6.1-sol", "1.91"), ("gpt-6-sol", "1.97"), ("gpt-6-luna", "0.0985"), ("gpt-daybreak-blue-latest", "3.94")] {
+    let estimate = CostPricing.estimate(entry(model: model))
+    check(estimate.amounts?.total == Decimal(string: expected)!, "Verified model uses its own cache-read rate: " + model)
+    check(estimate.rateSource == CostRateCard.modelSource(model).absoluteString && estimate.verifiedOn == "2026-10-02",
+          "Reference exports retain the exact model source and observation date")
+    check(CostPricing.estimate(entry(model: model, band: "long"), service: .fast).amounts!.total
+          == CostPricing.estimate(entry(model: model, band: "long")).amounts!.total * 2,
+          "New request-wide models apply Fast after the long-context tariff")
+}
+check(CostPricing.estimate(entry(model: "gpt-5.4", tokens: usage(writes: 0)), sessionBand: "short").amounts?.total == Decimal(string: "2.65")!,
+      "GPT-5.4 uses its verified standard rate")
+check(CostPricing.estimate(entry(model: "gpt-5.4", tokens: usage(writes: 0)), sessionBand: "long").amounts?.total == Decimal(string: "4.55")!,
+      "GPT-5.4 retains session-wide context pricing")
+check(CostPricing.estimate(entry(model: "gpt-5.4-mini", band: nil, tokens: usage(writes: nil))).amounts?.total == Decimal(string: "0.795")!,
+      "GPT-5.4 Mini has no verified context surcharge or separately priced cache writes")
+check(CostPricing.estimate(entry(model: "gpt-5.4-mini", tokens: usage(writes: 1))).amounts == nil
+      && CostPricing.estimate(entry(model: "gpt-5.4-mini", tokens: usage(writes: 0)), service: .fast).amounts == nil,
+      "An unsupported Mini write or Fast tariff stays unpriced")
+for model in ["codex-auto-review", "gpt-5.3-codex-spark", "grok-4.7-build", "gpt-6.1-sol-custom"] {
+    check(CostPricing.estimate(entry(model: model)).amounts == nil, "Unverified models are never aliased: " + model)
+}
+var foreignSol = entry(model: "gpt-6.1-sol"); foreignSol.provider = "anthropic"
+check(CostPricing.estimate(foreignSol).amounts == nil, "New rates remain provider-scoped")
+
+func historical(_ model: String, _ day: String, band: String = "short", writes: Int? = 0, service: CostService = .standard) -> CostEstimate {
+    var row = entry(model: model, band: band, tokens: usage(writes: writes)); row.pricingDay = day
+    return CostRateHistory.estimate(row, service: service, sessionBand: band)
+}
+for (model, launch, next) in [("gpt-6-sol", "2026-09-22", "2026-09-23"), ("gpt-6-luna", "2026-09-22", "2026-09-23"), ("gpt-6.1-sol", "2026-09-29", "2026-09-30")] {
+    check(historical(model, "2026-09-21").amounts == nil && historical(model, launch).amounts == nil,
+          "Pre-launch and ambiguous launch-day records stay unpriced")
+    check(historical(model, next).amounts != nil && historical(model, next).verifiedOn == "2026-10-02",
+          "Published launch evidence prices later short-context records")
+    check(historical(model, "2026-10-01", band: "long").amounts == nil
+          && historical(model, "2026-10-02", band: "long").amounts != nil,
+          "Current long-context rates are not backdated")
+    check(historical(model, "2026-10-01", service: .fast).amounts == nil
+          && historical(model, "2026-10-02", service: .fast).amounts != nil,
+          "Current Fast rates are not backdated")
+}
+check(historical("gpt-6-sol", "2026-09-23", writes: 1).amounts == nil
+      && historical("gpt-6.1-sol", "2026-09-30", writes: 1).amounts != nil,
+      "Only GPT-6.1 Sol's launch establishes a dated cache-write price")
+check(historical("gpt-5.4", "2026-04-20").amounts?.total == Decimal(string: "2.65")!,
+      "GPT-5.4's dated launch supports old short-context usage")
+for model in ["gpt-5.4-mini", "gpt-daybreak-blue-latest"] {
+    check(historical(model, "2026-10-01").amounts == nil && historical(model, "2026-10-02").amounts != nil,
+          "Observation-only prices do not manufacture an older tariff or alias binding")
+}
+print("PASS: October pricing, distinct Sol cache rates, model provenance, older standard rates, historical cutovers and unsupported scenarios")
+
 let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
 let rows = [entry(yesterday, effort: "low"), entry(effort: "high"), entry(effort: nil), unknown]
 let report = CostReport.build(source: rows, query: UsageQuery(period: 1), catalog: [:], now: now)
@@ -75,7 +127,7 @@ check(uncertainReport.pricedTokens == 0, "Unattributed older session context mus
 var malicious = entry(); malicious.session = "=1+1,\"line\"\nnext"
 let csv = CostReport.build(source: [malicious, unknown], query: UsageQuery(period: 1), catalog: [:]).csv()
 check(csv.contains("\"'=1+1,"), "CSV neutralizes formula-leading labels")
-check(csv.contains("\"Provider not recorded\"") && csv.contains("\"openai-text-2026-09-09\""), "CSV carries missing-price reasons and dated reference basis")
+check(csv.contains("\"Provider not recorded\"") && csv.contains("\"provider-text-2026-10-02\""), "CSV carries missing-price reasons and dated reference basis")
 print("PASS: time/model/effort reports, coverage, unknown bins, session-wide tariff outside filters and safe CSV")
 
 let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -539,3 +591,67 @@ do {
           "An uncalculated comparison has no calculated-at caption")
 }
 print("PASS: account-total and allowance-window comparisons share one calculated-at caption")
+
+// Provider tariffs use their own counter and context contracts.
+func claudeEntry(_ model: String, five: Int? = 60_000, hour: Int? = 40_000) -> Entry {
+    var e = entry(model: model, band: nil)
+    e.provider = "anthropic"; e.harness = "Claude Code"
+    e.tokenFields = ClaudeCodeUsage.recordedFields
+    e.tokens.cacheWrite5m = five; e.tokens.cacheWrite1h = hour
+    return e
+}
+for (model, total) in [("claude-fable-5-1", "9.7"), ("claude-opus-5-5", "3.94"), ("claude-sonnet-5-5", "2.03"), ("claude-haiku-4-5-20251001", "1.015"), ("claude-fable-5", "10.15"), ("claude-opus-5", "5.075"), ("claude-opus-4-8", "5.075"), ("claude-sonnet-5", "2.03")] {
+    let result = CostPricing.estimate(claudeEntry(model))
+    check(result.amounts?.total == Decimal(string: total)!, "Claude exact tariff/duration arithmetic: " + model)
+    check(result.amounts?.reasoning == 0 && result.amounts?.answer == 0 && result.amounts!.unsplitOutput > 0,
+          "Missing thinking split stays combined, never measured answer")
+    check(result.rateSource == ProviderCostRates.anthropicSource.absoluteString, "Claude source survives into estimates")
+}
+var claude = claudeEntry("claude-opus-5-5")
+check(CostPricing.estimate(claude, service: .fast).amounts!.total == Decimal(string: "7.88")!, "Claude Fast stacks with cache lifetimes")
+check(CostPricing.estimate(claudeEntry("claude-sonnet-5-5"), service: .fast).amounts == nil, "Unsupported Claude Fast remains unavailable")
+check(CostPricing.estimate(claudeEntry("claude-opus-5", five: nil, hour: nil)).amounts == nil, "Aggregate writes cannot select a TTL")
+claude.tokens.cacheWrite = 0; claude.tokens.cacheWrite5m = nil; claude.tokens.cacheWrite1h = nil
+check(CostPricing.estimate(claude).amounts != nil, "Measured zero writes need no duration assumption")
+claude = claudeEntry("claude-opus-5-5"); claude.tokens.cacheWrite1h = 40_001
+check(CostPricing.estimate(claude).amounts == nil, "Duration counters must sum exactly to writes")
+claude = claudeEntry("claude-opus-5-5"); claude.tokens.thinking = 80_000
+check(CostPricing.estimate(claude).amounts?.reasoning == Decimal(string: "1.6")! && CostPricing.estimate(claude).amounts?.unsplitOutput == 0,
+      "Recorded thinking is a subset, not an additional charge")
+claude.observedService = "standard"; claude.observedSpeed = "fast"
+check(CostPricing.appliedService(.observed, entry: claude) == .fast, "Claude speed selects Fast even when service tier says standard")
+claude.observedSpeed = nil
+check(CostPricing.estimate(claude, service: .observed).amounts == nil, "Unrecorded speed is not observed Standard")
+claude.pricingDay = "2026-09-30"
+check(CostRateHistory.estimate(claude, service: .standard, sessionBand: nil).amounts == nil, "Current Claude tariff is not backdated")
+claude.pricingDay = "2026-10-02"
+check(CostRateHistory.estimate(claude, service: .standard, sessionBand: nil).amounts != nil, "Dated Claude observation prices current records")
+
+var grok = entry(model: "grok-4.7", tokens: usage(input: 199_999, cached: 100_000, writes: 0, output: 10_000, reasoning: 5_000))
+grok.provider = "xai"; grok.harness = Harness.grok; grok.contextBand = "long"; grok.requestInputTokens = 199_999
+check(CostPricing.estimate(grok).amounts?.total == Decimal(string: "0.309998")!, "Grok ignores OpenAI context band and uses its own 200k threshold")
+grok.requestInputTokens = 200_000
+check(CostPricing.estimate(grok).amounts?.total == Decimal(string: "0.619996")!, "Grok long context doubles output as well as input")
+grok.requestInputTokens = nil
+check(CostPricing.estimate(grok).amounts == nil, "Multi-call Grok turn is not one long request")
+grok.model = "grok-4.7-build"; grok.costUsdTicks = 25_000_000_000; grok.modelCalls = 4
+let providerReport = CostReport.build(source: [claudeEntry("claude-opus-5-5"), grok], query: UsageQuery(period: 1), catalog: [:])
+check(providerReport.reportedGrokUsd == Decimal(string: "2.5")! && providerReport.amounts.total == Decimal(string: "3.94")!,
+      "Recorded Grok cost stays separate from API-equivalent estimates")
+let providerCSV = providerReport.csv()
+check(providerCSV.contains("provider_reported_usd") && providerCSV.contains("unsplit_output_usd") && providerCSV.contains("unverified"), "Export retains provider costs and combined-output provenance")
+var originalClaude = claudeEntry("claude-opus-5-5", five: nil, hour: nil)
+var recoveredClaude = claudeEntry("claude-opus-5-5")
+recoveredClaude.tokens.thinking = 80_000
+check(CostRecovery.reconcile(original: [originalClaude], reconstructed: [recoveredClaude]).groups == 1, "Exact Claude totals admit duration/thinking enrichment")
+originalClaude.tokens.cacheWrite5m = 61_000; originalClaude.tokens.cacheWrite1h = 39_000
+check(CostRecovery.reconcile(original: [originalClaude], reconstructed: [recoveredClaude]).groups == 0, "Known duration conflicts cannot overwrite history")
+check((recoveredClaude.tokens + recoveredClaude.tokens).cacheWrite1h == 80_000 && (recoveredClaude.tokens + Tokens()).cacheWrite1h == nil,
+      "Aggregation sums known durations and preserves unavailable details")
+check(UsageMetadata.aggregationKey(originalClaude) != UsageMetadata.aggregationKey(claudeEntry("claude-opus-5-5", five: nil, hour: nil)), "Compaction separates known and unknown duration cohorts")
+print("PASS: Claude tariffs, cache lifetimes, optional output splits, Fast speed, Grok request threshold, recorded dollars and provider metadata recovery")
+
+check(providerCSV.split(separator: "\n").last!.split(separator: ",", omittingEmptySubsequences: false)[35] == "\"\"", "Unknown Build tariff never exports an OpenAI source binding")
+let unresolvedClaudeCSV = CostReport.build(source: [claudeEntry("claude-opus-5", five: nil, hour: nil)], query: UsageQuery(period: 1), catalog: [:]).csv()
+check(unresolvedClaudeCSV.contains(ProviderCostRates.anthropicSource.absoluteString), "Known Claude tariff retains its own source when counter metadata is unavailable")
+print("PASS: mixed-provider export provenance never assigns OpenAI sources to unsupported Grok IDs")

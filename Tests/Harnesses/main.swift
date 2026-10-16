@@ -199,6 +199,7 @@ _ = migrating!.scan(historical: true)
 check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.output } == 10, "Initial snapshot admitted")
 // Reproduce an older installation: immutable base row survives but no counter checkpoint exists.
 migrating!.ledger.claudeCounters = nil
+migrating!.ledger.usageCoverage = nil
 try JSONEncoder().encode(migrating!.ledger).write(to: ledgerURL)
 migrating = nil
 migrating = UsageScanner(home: migration, stateURL: ledgerURL, claudeHome: migrationHome)
@@ -282,6 +283,26 @@ check(ClaudeCodeUsage.turn(from: missingCounter) == nil, "Missing output cannot 
 missingUsage["output_tokens"] = Int.max; missingMessage["usage"] = missingUsage; missingCounter["message"] = missingMessage
 check(ClaudeCodeUsage.turn(from: missingCounter) == nil, "Overflowing counters cannot crash or enter totals")
 print("PASS: Claude missing and overflowing counters remain unavailable")
+// The admitted baseline, rather than a reader checkpoint or compatibility map,
+// owns revisions after a restart.
+do {
+    let state = root.appendingPathComponent("coverage-claude/ledger.json")
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("no-coverage-codex/sessions"), withIntermediateDirectories: true)
+    var scanner: UsageScanner? = UsageScanner(home: root.appendingPathComponent("no-coverage-codex"), stateURL: state, claudeHome: migrationHome)
+    scanner!.readAccount = false
+    try writeClaude([growing[0]])
+    _ = scanner!.scan(historical: true)
+    scanner!.ledger.claudeCounters = nil
+    try scanner!.saveIfNeeded(force: true)
+    scanner = nil
+    scanner = UsageScanner(home: root.appendingPathComponent("no-coverage-codex"), stateURL: state, claudeHome: migrationHome)
+    scanner!.readAccount = false
+    try writeClaude(growing)
+    let result = scanner!.scan(historical: true)
+    check(result.error == nil && result.entries.reduce(0) { $0 + $1.tokens.output } == 100,
+          "Admitted coverage reconciles Claude revisions without the legacy counter map")
+    check(result.entries.reduce(0) { $0 + $1.eventCount } == 1, "A recovered revision adds no request")
+}
 let heldRoot = root.appendingPathComponent("held")
 let heldState = heldRoot.appendingPathComponent("ledger.json")
 var held: UsageScanner? = UsageScanner(home: heldRoot, stateURL: heldState, retainRequests: false, claudeHome: migrationHome)
@@ -289,6 +310,7 @@ held!.readAccount = false
 try writeClaude([growing[0]])
 _ = held!.scan(historical: true)
 held!.ledger.claudeCounters = nil
+held!.ledger.usageCoverage = nil
 try JSONEncoder().encode(held!.ledger).write(to: heldState)
 held = nil
 held = UsageScanner(home: heldRoot, stateURL: heldState, retainRequests: false, claudeHome: migrationHome)
@@ -971,3 +993,140 @@ do {
           "A rate report names relative age, not only a clock")
 }
 print("PASS: Now rate-report age is relative; a missing report stays unavailable")
+
+// Claude pricing detail is optional evidence, with stable usage identities.
+func detailedClaude(_ output: Int, thinking: Int? = nil, five: Int = 300, hour: Int = 200) -> [String: Any] {
+    var row = claudeLine(id: "duration-message", session: "duration-task", output: output, cwd: "/synthetic/project")
+    var message = row["message"] as! [String: Any]
+    var usage = message["usage"] as! [String: Any]
+    usage["cache_creation"] = ["ephemeral_5m_input_tokens": five, "ephemeral_1h_input_tokens": hour]
+    if let thinking { usage["output_tokens_details"] = ["thinking_tokens": thinking] }
+    usage["speed"] = "standard"; message["usage"] = usage; row["message"] = message
+    return row
+}
+let detailFirst = ClaudeCodeUsage.turn(from: detailedClaude(100, thinking: 60))!
+let detailSecond = ClaudeCodeUsage.turn(from: detailedClaude(150, thinking: 90))!
+check(detailFirst.tokens.cacheWrite5m == 300 && detailFirst.tokens.cacheWrite1h == 200 && detailFirst.tokens.thinking == 60,
+      "Claude pricing details retain validated source subsets")
+let detailIncrement = ClaudeCodeUsage.increment(detailSecond.tokens, over: detailFirst.tokens)
+check(detailIncrement.output == 50 && detailIncrement.thinking == 30 && detailIncrement.cacheWrite5m == 0 && detailIncrement.cacheWrite1h == 0,
+      "Revised messages retain duration and thinking increments without duplicating writes")
+let legacy = ClaudeCodeUsage.turn(from: claudeLine(id: "legacy-detail", session: "duration-task", output: 100, cwd: "/synthetic/project"))!
+let unknownIncrement = ClaudeCodeUsage.increment(detailSecond.tokens, over: legacy.tokens)
+check(unknownIncrement.thinking == nil && unknownIncrement.cacheWrite1h == nil, "A missing baseline split cannot manufacture delta evidence")
+check(ClaudeCodeUsage.turn(from: detailedClaude(100, thinking: 101))!.tokens.thinking == nil,
+      "An invalid optional thinking subset does not corrupt measured output")
+check(ClaudeCodeUsage.turn(from: detailedClaude(100, five: 301))!.tokens.cacheWrite5m == nil,
+      "Invalid duration totals stay unavailable")
+let detailURL = root.appendingPathComponent("duration-profile/ledger.json")
+let detailHome = root.appendingPathComponent("duration-claude")
+let detailTranscript = detailHome.appendingPathComponent("projects/synthetic/usage.jsonl")
+try FileManager.default.createDirectory(at: detailTranscript.deletingLastPathComponent(), withIntermediateDirectories: true)
+var detailData = try JSONSerialization.data(withJSONObject: detailedClaude(100, thinking: 60)); detailData.append(10)
+try detailData.write(to: detailTranscript)
+try FileManager.default.createDirectory(at: root.appendingPathComponent("no-detail-codex/sessions"), withIntermediateDirectories: true)
+let detailScanner = UsageScanner(home: root.appendingPathComponent("no-detail-codex"), stateURL: detailURL, claudeHome: detailHome)
+detailScanner.ledger.started = Date(timeIntervalSince1970: 2_000_000_000)
+detailScanner.rebuilding = true
+_ = detailScanner.scan(historical: true)
+var secondData = try JSONSerialization.data(withJSONObject: detailedClaude(150, thinking: 90)); secondData.append(10)
+let detailHandle = try FileHandle(forWritingTo: detailTranscript); try detailHandle.seekToEnd(); try detailHandle.write(contentsOf: secondData); try detailHandle.close()
+_ = detailScanner.scan(historical: true)
+try detailScanner.saveIfNeeded(force: true)
+let detailRetained = detailScanner.currentSnapshot().entries
+check(detailRetained.reduce(0) { $0 + $1.tokens.output } == 150 && detailRetained.compactMap { $0.tokens.thinking }.reduce(0,+) == 90,
+      "Persisted Claude history preserves original totals and optional thinking subsets")
+check(detailRetained.compactMap { $0.tokens.cacheWrite1h }.reduce(0,+) == 200 && detailScanner.currentSnapshot().error == nil,
+      "Historical compaction counts each cache-write duration once")
+let detailRestart = UsageScanner(home: root.appendingPathComponent("no-detail-codex"), stateURL: detailURL)
+check(detailRestart.ledger.claudeCounters?.values.first?.thinking == 90, "Claude counter baseline details survive restart")
+let freshArchive = try RequestArchive(url: root.appendingPathComponent("detail-fresh.sqlite"))
+let oldArchive = try RequestArchive(url: root.appendingPathComponent("detail-old.sqlite"))
+var detailEntry = detailRetained.first!; detailEntry.recordID = "fixed-detail-identity"; detailEntry.sampleCount = 1
+var oldEntry = detailEntry; oldEntry.tokens.cacheWrite5m = nil; oldEntry.tokens.cacheWrite1h = nil; oldEntry.tokens.thinking = nil; oldEntry.observedSpeed = nil
+try oldArchive.record(oldEntry, admitted: true); try freshArchive.record(detailEntry, admitted: true)
+let rejected = try oldArchive.importAccepted(from: freshArchive, groups: [CostRecovery.groupKey(detailEntry)], accounts: [:])
+let enrichedDetail = try oldArchive.entry(id: "fixed-detail-identity")!
+check(rejected == 0 && enrichedDetail.tokens.thinking == detailEntry.tokens.thinking,
+      "Explicit archive recovery enriches matching missing details")
+var altered = detailEntry; altered.tokens.output += 1
+try oldArchive.record(altered, admitted: true)
+let immutableDetail = try oldArchive.entry(id: "fixed-detail-identity")!
+check(immutableDetail.tokens.output == detailEntry.tokens.output,
+      "Normal ingestion still cannot mutate an admitted archive row")
+print("PASS: Claude duration/thinking parsing, incremental admission, compaction, restart and exact archive enrichment")
+
+// A known ambiguous session must not hold unrelated, exactly matching groups.
+var cleanLine = detailedClaude(100, thinking: 60)
+cleanLine["sessionId"] = "clean-pricing-task"
+var cleanMessage = cleanLine["message"] as! [String: Any]; cleanMessage["id"] = "clean-pricing-message"; cleanLine["message"] = cleanMessage
+let cleanTranscript = detailHome.appendingPathComponent("projects/synthetic/clean.jsonl")
+var cleanData = try JSONSerialization.data(withJSONObject: cleanLine); cleanData.append(10); try cleanData.write(to: cleanTranscript)
+var conflictLine = detailedClaude(50, thinking: 30)
+var conflictMessage = conflictLine["message"] as! [String: Any]
+var conflictUsage = conflictMessage["usage"] as! [String: Any]; conflictUsage["input_tokens"] = 3
+conflictMessage["usage"] = conflictUsage; conflictLine["message"] = conflictMessage
+var conflictData = try JSONSerialization.data(withJSONObject: conflictLine); conflictData.append(10)
+let conflictHandle = try FileHandle(forWritingTo: detailTranscript); try conflictHandle.seekToEnd(); try conflictHandle.write(contentsOf: conflictData); try conflictHandle.close()
+_ = detailScanner.scan(historical: true)
+for index in detailScanner.ledger.entries.indices {
+    detailScanner.ledger.entries[index].tokens.cacheWrite5m = nil
+    detailScanner.ledger.entries[index].tokens.cacheWrite1h = nil
+    detailScanner.ledger.entries[index].tokens.thinking = nil
+}
+let preservedConflict = detailScanner.ledger.entries.filter { $0.session == "duration-task" }
+let recoveredSummary = try detailScanner.recoverCostDetails()
+check(detailScanner.ledger.entries.filter { $0.session == "duration-task" } == preservedConflict,
+      "Conflicting source sessions remain byte-for-byte equivalent in usage history")
+check(detailScanner.ledger.entries.first { $0.session == "clean-pricing-task" }?.tokens.cacheWrite1h == 200 && recoveredSummary.contains("conflicting source sessions"),
+      "Readable matching sessions enrich independently with the conflict disclosed")
+check(detailScanner.currentSnapshot().error != nil, "Metadata recovery does not hide source coverage warnings")
+print("PASS: provider recovery excludes known ambiguous sessions, enriches independent groups and preserves source warnings")
+
+// One coverage authority across readers, paths, scopes and restart. A retained
+// upper endpoint does not claim that an unobserved prefix was admitted.
+do {
+    let home = root.appendingPathComponent("coverage-authority")
+    let state = home.appendingPathComponent("ledger.json")
+    var scanner: UsageScanner? = UsageScanner(home: home, stateURL: state)
+    scanner!.readAccount = false
+    func candidate(_ lower: Int, _ upper: Int, _ label: String, epoch: String = "initial") -> UsageEvidence {
+        var a = Tokens(); a.input = lower
+        var b = Tokens(); b.input = upper
+        return UsageEvidence(source: "synthetic-source", epoch: epoch, provider: "Codex", counters: b,
+            delta: b.delta(from: a), extent: UsageExtent(lower: a, upper: b), fingerprint: EventIdentity.hash(label))
+    }
+    func admit(_ evidence: UsageEvidence) {
+        guard scanner!.assessUsage(evidence).evidence != nil else { preconditionFailure("Expected a new interval") }
+        var entry = Entry(date: Date(), session: "coverage", model: "synthetic", tokens: evidence.delta, account: nil)
+        entry.recordID = evidence.fingerprint
+        scanner!.persistAdmitted(entry, fingerprint: evidence.fingerprint, date: entry.date, admission: evidence)
+    }
+    admit(candidate(50, 100, "first-tail"))
+    admit(candidate(100, 200, "ordinary-growth"))
+    check(scanner!.assessUsage(candidate(100, 150, "different-receipt-covered")).evidence == nil, "An unseen identity cannot reopen covered counters")
+    admit(candidate(0, 50, "earlier-uncovered-prefix"))
+    check(scanner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "An admitted high endpoint does not hide a genuinely uncovered prefix")
+    if case .unresolved = scanner!.assessUsage(candidate(150, 250, "partial-overlap")) {} else { preconditionFailure("Partial overlaps must remain unresolved") }
+    admit(candidate(250, 300, "supported-tail-after-gap"))
+    let invalid = candidate(300, 350, "failed-admission")
+    _ = scanner!.assessUsage(invalid)
+    var bad = Entry(date: Date(), session: "coverage", model: "synthetic", tokens: invalid.delta, account: nil)
+    bad.recordID = "not-the-admission-id"
+    scanner!.persistAdmitted(bad, fingerprint: invalid.fingerprint, date: bad.date, admission: invalid)
+    check(scanner!.assessUsage(invalid).evidence != nil, "Rejected records cannot advance admitted coverage")
+    try scanner!.saveIfNeeded(force: true)
+    scanner = nil
+    scanner = UsageScanner(home: home, stateURL: state)
+    scanner!.readAccount = false
+    check(scanner!.assessUsage(candidate(50, 100, "copied-after-restart")).evidence == nil, "Coverage survives restart and copied receipt changes")
+    check(scanner!.currentSnapshot().readHealth.diagnostics.contains { $0.kind == .counterOverlap }, "An unresolved gap remains disclosed after later admissions and restart")
+    check(scanner!.currentSnapshot().readHealth.affectedFiles == 0, "A logical coverage identity must not invent a source filename")
+    admit(candidate(0, 100, "proved-new-epoch", epoch: EventIdentity.hash("reset")))
+    check(scanner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 350, "An established new epoch is not subtracted from an old one")
+    let corrupt = Data("{\"provider\":\"Codex\",\"admitted\":[{\"lowerInput\":-1,\"lowerOutput\":0,\"upperInput\":100,\"upperOutput\":0}],\"unresolved\":false}".utf8)
+    check((try? JSONDecoder().decode(AdmittedUsageCoverage.self, from: corrupt)) == nil, "Invalid saved coverage fails closed")
+    let overlapping = Data("{\"provider\":\"Codex\",\"admitted\":[{\"lowerInput\":0,\"lowerOutput\":0,\"upperInput\":100,\"upperOutput\":0},{\"lowerInput\":50,\"lowerOutput\":0,\"upperInput\":150,\"upperOutput\":0}],\"unresolved\":false}".utf8)
+    check((try? JSONDecoder().decode(AdmittedUsageCoverage.self, from: overlapping)) == nil, "Corrupt overlapping saved coverage cannot authenticate an interval")
+}
+print("PASS: common admitted coverage, scope-independent novelty, unknown prefix, overlap, rejected admission, epochs, restart and corruption")

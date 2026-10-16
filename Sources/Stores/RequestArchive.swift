@@ -41,7 +41,8 @@ final class RequestArchive {
     private func bind(_ value: String, to statement: OpaquePointer, at index: Int32) {
         _ = value.withCString { sqlite3_bind_text(statement, index, $0, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
     }
-    /// Exact immutable baseline, including pending rows whose ID the caller verifies.
+    /// Exact retained usage baseline, including pending rows whose ID the caller verifies.
+    /// Only explicitly reconciled metadata recovery can enrich admitted details.
     func entry(id: String) throws -> Entry? {
         let statement = try prepare("SELECT payload FROM requests WHERE id=?")
         defer { sqlite3_finalize(statement) }
@@ -154,7 +155,19 @@ final class RequestArchive {
             // The reconstructed source has no independent account authority. Preserve the
             // uniformly reconciled account, and require every other retained detail to agree.
             guard old.account == accounts[group] else { return false }
+            guard old.tokens.cacheWrite5m == nil || old.tokens.cacheWrite5m == fresh.tokens.cacheWrite5m,
+                  old.tokens.cacheWrite1h == nil || old.tokens.cacheWrite1h == fresh.tokens.cacheWrite1h,
+                  old.tokens.thinking == nil || old.tokens.thinking == fresh.tokens.thinking,
+                  old.observedSpeed == nil || old.observedSpeed == fresh.observedSpeed,
+                  old.modelCalls == nil || old.modelCalls == fresh.modelCalls,
+                  old.costIsPartial == nil || old.costIsPartial == fresh.costIsPartial else { return false }
             var normalized = fresh; normalized.account = old.account
+            normalized.tokens.cacheWrite5m = old.tokens.cacheWrite5m; normalized.tokens.cacheWrite1h = old.tokens.cacheWrite1h
+            normalized.tokens.thinking = old.tokens.thinking; normalized.observedSpeed = old.observedSpeed
+            normalized.modelCalls = old.modelCalls; normalized.costIsPartial = old.costIsPartial
+            // Older Grok turns incorrectly carried their aggregate as a request size.
+            // Removing that false metadata does not alter their retained counters.
+            if old.provider == "xai", fresh.modelCalls != 1, fresh.requestInputTokens == nil { normalized.requestInputTokens = old.requestInputTokens }
             let canonical = JSONEncoder(); canonical.outputFormatting = [.sortedKeys]
             return try canonical.encode(old) == canonical.encode(normalized)
         }
@@ -189,11 +202,21 @@ final class RequestArchive {
         sqlite3_reset(destinationLookup)
         try begin(); var completed = false
         defer { if !completed { rollback() } }
+        let enrich = try prepare("UPDATE requests SET payload=? WHERE id=? AND admitted=1")
+        defer { sqlite3_finalize(enrich) }
         try source.forEach { value in
             let key = CostRecovery.groupKey(value)
             guard allowed.contains(key) else { return }
             var entry = value; entry.account = accounts[key]
             try record(entry, admitted: true)
+            // record() keeps admitted rows immutable during ingestion. This
+            // explicit recovery has compared identities, counters and known
+            // metadata above, and may add only the validated missing details.
+            let payload = try encoder.encode(entry)
+            sqlite3_reset(enrich); sqlite3_clear_bindings(enrich)
+            _ = payload.withUnsafeBytes { sqlite3_bind_blob(enrich, 1, $0.baseAddress, Int32($0.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
+            bind(entry.recordID!, to: enrich, at: 2)
+            guard sqlite3_step(enrich) == SQLITE_DONE else { throw Self.failure("Recovered request metadata could not be saved") }
         }
         try commit(); completed = true
         return groups.count - allowed.count
