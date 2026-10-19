@@ -45,6 +45,7 @@ not application state or UI code.
 | Admitted counter coverage | Optional `ledger.usageCoverage`, keyed by logical source and established epoch | New / Covered / Unresolved decisions; coverage diagnostics | `Tests/main.swift`, `Tests/Harnesses`, `Tests/Grok` |
 | Event identity | `ledger.events.sqlite` plus in-flight ledger IDs | duplicate counts | `Tests/main.swift` |
 | Request detail | `ledger.requests.sqlite` | request CSV, evidence panel | `Tests/Accuracy` |
+| Cost reconstruction scratch | `CostRecoveryWorkspace`: one exclusively owned `cost-recovery-workspace` per ledger, reset on a new recovery and removed on normal return | Metadata reconciliation only; never admitted usage | `Tests/Cost`, `docs/COST.md` |
 | Quota and accounts | app-server responses, incrementally persisted in `live-accounts.sqlite` | runway, account cards | `Tests/main.swift`, `Tests/MenuBar` |
 | Pricing | `CostRateCard` and `CostRateHistory` in source | cost report, CSV | `Tests/Cost`, `docs/COST.md` |
 | Preferences | `UserDefaults` keys `appearance.*`, `menuBarConfiguration.v1`, `dashboard.rateUnit.<tool>`, `updateCheck.enabled.v1` | tool units, menu bar title, theme, update check | `Tests/Appearance`, `Tests/MenuBar`, `Tests/UpdateCheck` |
@@ -227,9 +228,11 @@ and successful-process/cache authentication witnesses. A reading requires finite
 0–100 utilization, positive window duration, nonempty bucket/window, exact current
 account match, no provider failure, a nonfuture source date and age strictly below
 the provider horizon (Codex/Grok 120 seconds, Claude 1,800 seconds). A supplied
-reset must be finite and future. A missing Claude reset retains measured remaining,
-including zero, while supplying no reset clock, forecast, notification or Fable
-roll-up. Guard uses the same qualification with its stricter action horizon.
+reset must be finite and future. The Claude cache adapter refuses a supplied
+reset string that cannot be parsed, isolating that window in ordinary and model-scoped
+rows. A missing Claude reset retains measured remaining, including zero, while
+supplying no reset clock, forecast, notification or Fable roll-up. Guard uses the
+same qualification with its stricter action horizon.
 Raw arithmetic and persisted observations supply no authentication. Refused
 readings can explain an unconfirmed module or explicitly historical account card;
 they cannot supply a current remaining number. The relay is connection transport

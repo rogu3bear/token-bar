@@ -226,8 +226,11 @@ let changedExcluded = try movedDestination.importAccepted(from: changedSource, g
 check(changedExcluded == 1, "Same ID and day cannot hide a conflicting precise timestamp")
 let sameSource = try RequestArchive(url: root.appendingPathComponent("same-payload.sqlite"))
 try sameSource.record(retainedA, admitted: true)
+let archiveBeforeSame = try Data(contentsOf: root.appendingPathComponent("moved-destination.sqlite"))
 let sameExcluded = try movedDestination.importAccepted(from: sameSource, groups: [CostRecovery.groupKey(retainedA)], accounts: [:])
 check(sameExcluded == 0, "Compatible same-group payload must still reconcile")
+let archiveAfterSame = try Data(contentsOf: root.appendingPathComponent("moved-destination.sqlite"))
+check(archiveBeforeSame == archiveAfterSame, "Identical recovered rows must not rewrite archive pages")
 print("PASS: moved-day identity, reverse cross-group conflict, changed payload and compatible retained record")
 
 let exportArchive = try RequestArchive(url: root.appendingPathComponent("missing-export.sqlite"))
@@ -484,6 +487,11 @@ do {
     check(count == 1 && scanner.ledger.entries.reduce(0) { $0 + $1.tokens.total } == original.tokens.total,
           "Cost recovery settles admitted detail and preserves original counters")
     check(!scanner.needsSave && scanner.ledger.eventIDs?.isEmpty == true, "Recovery publishes through checkpoint owner")
+    // A fully recovered repeat is a no-op. Exercise the write-failure path on
+    // a genuine legacy qualification upgrade instead of demanding a no-op write.
+    scanner.ledger.costMetadataVersion = 1
+    scanner.markDirty()
+    try scanner.saveIfNeeded(force: true)
     scanner.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic recovery index failure") } }
     do { _ = try scanner.recoverCostDetails(); preconditionFailure("Expected recovered-ledger checkpoint failure") } catch {}
     let recoveryWrites = scanner.persistenceCount

@@ -157,6 +157,13 @@ for user control. These inform tactics, not borrowed visual branding.
 
 ## Native history and Insights
 
+Token timelines (including compact Today) and Cost over time use a symmetric
+logarithmic vertical scale: linear near zero, logarithmic for larger values.
+Keep exact values in labels, totals, exports and accessibility. Measured zero
+remains drawable; unavailable data is never replaced by a positive floor.
+History and Cost captions name the log scale. Anthropic's current comparison
+rates are visible in the existing Cost Pricing basis disclosure.
+
 Publish the saved usage snapshot before the startup scan. Keep it visible during
 history import, cost recovery, and catalog refresh; publish admitted additions
 while the scan continues. Usage summaries live with the app model so switching
@@ -220,9 +227,9 @@ activity at the supplied clock; `CompactLiveCopy` owns numeric and spoken copy.
 `LiveTool.modules` independently owns the retained live module list. The legacy
 `recent`, `compact` and `nowOccupied` helpers do not decide bar membership.
 
-`AccountAllowancePresentation` owns current allowance qualification: matching
-account, finite measured utilization, source failure, observation time, reset and
-provider display horizon. The menu bar, popover and Now consume that same result.
+`AllowanceQualification.assess` owns current allowance qualification, as specified
+in `ARCHITECTURE.md`. `AccountAllowancePresentation` supplies its shared result to
+the menu bar, popover and Now.
 A missing reset leaves measured remaining available; projected time remains
 unavailable. Guard action freshness and historical Accounts observations retain
 their separate authority. Speed is qualified independently of allowance.

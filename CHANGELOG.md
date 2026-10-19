@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+- Use a zero-safe logarithmic scale for token and cost timelines, and show current Anthropic rates under Pricing basis. Add Haiku 5.5 and Claude 4.6/4.7 comparison rates, update Sonnet 5.5 cache reads, and retain dated historical tariffs.
+- Reuse one owned cost-recovery workspace after interruption, and avoid rewriting unchanged recovered details or creating duplicate rollback copies.
 - Decide log usage once through admitted counter coverage across Codex, Claude, Grok and OpenCode. Preserve unknown legacy coverage and recovery witnesses; covered intervals cannot add usage under another receipt or scan scope.
 - Qualify current allowance numbers through one account, source-date and authentication boundary shared by Live, Settings, Fable and Quota Guard. Keep relay and undated refresh replies as transport/completion evidence.
+- Refuse malformed Claude reset clocks without treating them as legitimate null resets; preserve independent allowance windows and measured remaining when a reset is absent.
 
 - Clarify historical coverage gaps, current read failures, unknown allowance and unpriced usage. Add Refresh history to Cost and a History route from live source details; explain recovery limits while preserving retained usage and diagnostics.
 

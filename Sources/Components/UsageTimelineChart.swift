@@ -32,6 +32,7 @@ struct UsageTimelineChart: View {
                     }
                 }
             }.chartForegroundStyleScale(domain: series.map(\.id), range: series.map { color($0.tool) })
+            .chartYScale(type: .symmetricLog)
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) { value in
                     AxisGridLine()
@@ -49,7 +50,7 @@ struct UsageTimelineChart: View {
                 }
             }.frame(height: 200)
                 .overlay { if timeline.points.isEmpty { Text("No timestamped usage available in this selection.").foregroundStyle(.secondary) } }
-            Text(timeline.minuteResolution ? "Cumulative recorded tokens · minute resolution · local time" : "Daily recorded tokens · local time")
+            Text(timeline.minuteResolution ? "Cumulative recorded tokens · minute resolution · local time · log scale" : "Daily recorded tokens · local time · log scale")
                 .font(.caption).foregroundStyle(.secondary)
             if timeline.dailyOnly.total > 0 {
                 Text(UsageTimeline.dailyOnlyCaption(compact(metric.amount(timeline.dailyOnly)), additionalTokens: true))

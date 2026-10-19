@@ -14,8 +14,8 @@ final class RequestArchive {
     private(set) var countQueryCount = 0
     private(set) var decodedRowCount = 0
     private(set) var readVMSteps = 0
-    init(url: URL, readOnly: Bool = false) throws {
-        let flags = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+    init(url: URL, readOnly: Bool = false, refuseAliases: Bool = false) throws {
+        let flags = (readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE) | (refuseAliases ? SQLITE_OPEN_NOFOLLOW : 0)
         guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK else { sqlite3_close(db); db = nil; throw Self.failure("Request details could not be opened") }
         do {
             sqlite3_busy_timeout(db, 3000)
@@ -59,6 +59,11 @@ final class RequestArchive {
             sqlite3_exec(db, "ROLLBACK", nil, nil, nil); inTransaction = false
             cachedCount = nil
         }
+    }
+    /// Called only for an exclusively owned, derived cost reconstruction store.
+    func resetReconstruction() throws {
+        try execute("DELETE FROM requests")
+        cachedCount = nil; countDataVersion = nil
     }
     func record(_ entry: Entry, admitted: Bool = false) throws {
         guard let id = entry.recordID else { throw Self.failure("Request detail identity is missing") }
@@ -141,7 +146,8 @@ final class RequestArchive {
         }
     }
     @discardableResult
-    func importAccepted(from source: RequestArchive, groups: Set<String>, accounts: [String: Account]) throws -> Int {
+    func importAccepted(from source: RequestArchive, groups: Set<String>, accounts: [String: Account],
+                        beforeChange: (() throws -> Void)? = nil) throws -> Int {
         var allowed = groups
         let existing = try prepare("SELECT id,group_key,payload FROM requests WHERE admitted=1")
         let lookup = try source.prepare("SELECT payload FROM requests WHERE id=? AND group_key=? AND admitted=1")
@@ -204,18 +210,29 @@ final class RequestArchive {
         defer { if !completed { rollback() } }
         let enrich = try prepare("UPDATE requests SET payload=? WHERE id=? AND admitted=1")
         defer { sqlite3_finalize(enrich) }
+        var changed = false
         try source.forEach { value in
             let key = CostRecovery.groupKey(value)
             guard allowed.contains(key) else { return }
-            var entry = value; entry.account = accounts[key]
-            try record(entry, admitted: true)
+            var recovered = value; recovered.account = accounts[key]
+            sqlite3_reset(destinationLookup); bind(recovered.recordID!, to: destinationLookup, at: 1)
+            let found = sqlite3_step(destinationLookup)
+            var unchanged = false
+            if found == SQLITE_ROW { unchanged = try entry(destinationLookup, column: 1) == recovered }
+            sqlite3_reset(destinationLookup)
+            guard found == SQLITE_ROW || found == SQLITE_DONE else { throw Self.failure("Retained request details could not be compared") }
+            if unchanged { return }
+            // Let the caller preserve its rollback before the first actual
+            // mutation. Successful return from this method commits those changes.
+            if !changed { try beforeChange?(); changed = true }
+            try record(recovered, admitted: true)
             // record() keeps admitted rows immutable during ingestion. This
             // explicit recovery has compared identities, counters and known
             // metadata above, and may add only the validated missing details.
-            let payload = try encoder.encode(entry)
+            let payload = try encoder.encode(recovered)
             sqlite3_reset(enrich); sqlite3_clear_bindings(enrich)
             _ = payload.withUnsafeBytes { sqlite3_bind_blob(enrich, 1, $0.baseAddress, Int32($0.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
-            bind(entry.recordID!, to: enrich, at: 2)
+            bind(recovered.recordID!, to: enrich, at: 2)
             guard sqlite3_step(enrich) == SQLITE_DONE else { throw Self.failure("Recovered request metadata could not be saved") }
         }
         try commit(); completed = true

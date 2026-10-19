@@ -167,6 +167,14 @@ func cacheUtilization(fiveHour: [String: Any]?, sevenDay: [String: Any]?, accoun
     ])
 }
 let weekStamp = ISO8601DateFormatter().string(from: cacheNow.addingTimeInterval(6 * 86400))
+for malformedReset in ["", "not-a-date"] {
+    let malformed = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(
+        fiveHour: ["utilization": 40.0, "resets_at": malformedReset],
+        sevenDay: ["utilization": 20.0, "resets_at": weekStamp]
+    )).readings(now: cacheNow)
+    assert(malformed.count == 1 && malformed[0].window == "seven_day",
+           "A malformed supplied reset must refuse only its window; it is not a legitimate null reset")
+}
 let siblingSpent = try JSONDecoder().decode(ClaudeQuotaCache.self, from: try cacheUtilization(
     fiveHour: ["utilization": 40.0, "resets_at": NSNull()],
     sevenDay: ["utilization": 100.0, "resets_at": weekStamp]
@@ -916,6 +924,22 @@ do {
     assert(ClaudeQuotaSource.fableBudget(failedRead, now: cacheNow) == nil)
     let malformed = try claudeState(try claudeLimitsCache(rawLimits: [["kind": "weekly_scoped", "percent": "high"]]))
     assert(malformed.readings.count == 2 && malformed.scoped.isEmpty, "A malformed limits list drops only scoped readings")
+    for reset in ["", "not-a-date"] {
+        let invalidClock = try claudeState(try claudeLimitsCache(rawLimits: [
+            ["kind": "weekly_scoped", "percent": 75.0, "resets_at": reset, "scope": ["model": ["display_name": "Fable"]]],
+            ["kind": "weekly_scoped", "percent": 20.0, "resets_at": weekStamp, "scope": ["model": ["display_name": "Sonnet"]]]
+        ]))
+        assert(invalidClock.readings.count == 2 && invalidClock.scoped.map(\.window) == [ClaudeQuotaSource.scopedWindow("Sonnet")],
+               "A malformed scoped reset refuses only that reading and preserves independent windows")
+        assert(ClaudeQuotaSource.fableBudget(invalidClock, now: cacheNow) == nil)
+    }
+    let nullScopedClock = try claudeState(try claudeLimitsCache(rawLimits: [
+        ["kind": "weekly_scoped", "percent": 75.0, "resets_at": NSNull(), "scope": ["model": ["display_name": "Fable"]]]
+    ]))
+    assert(nullScopedClock.scoped.count == 1 && nullScopedClock.scoped[0].reset == nil,
+           "A legitimate null scoped reset retains its measured reading")
+    assert(ClaudeQuotaSource.fableBudget(nullScopedClock, now: cacheNow) == nil,
+           "A null scoped reset cannot supply a Fable roll-up")
     // The field names Fable rather than a tool, so single-tool identity and the one-accent rule still hold.
     var fableMenu = MenuBarConfiguration(); fableMenu.enabled = [.rate, .fable]
     assert(!MenuBarConfiguration().enabled.contains(.fable), "Fable quota is opt-in; default and saved selections are unchanged")

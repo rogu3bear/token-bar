@@ -15,11 +15,12 @@ enum PrivateFile {
 final class EventIndex {
     private var db: OpaquePointer?
     private var lookup: OpaquePointer?
-    init(url: URL, required: Bool) throws {
+    init(url: URL, required: Bool, refuseAliases: Bool = false) throws {
         if required && !FileManager.default.fileExists(atPath: url.path) { throw Self.error("The historical event index is missing; usage history has been preserved") }
         var ready = false
         defer { if !ready { sqlite3_finalize(lookup); sqlite3_close(db); lookup = nil; db = nil } }
-        guard sqlite3_open(url.path, &db) == SQLITE_OK else { throw Self.error("Could not open the historical event index") }
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | (refuseAliases ? SQLITE_OPEN_NOFOLLOW : 0)
+        guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK else { throw Self.error("Could not open the historical event index") }
         guard sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS event_ids (id TEXT PRIMARY KEY) WITHOUT ROWID", nil, nil, nil) == SQLITE_OK,
               sqlite3_prepare_v2(db, "SELECT 1 FROM event_ids WHERE id = ?", -1, &lookup, nil) == SQLITE_OK else { throw Self.error("Could not initialize the historical event index") }
         try PrivateFile.protect(url)
@@ -36,6 +37,12 @@ final class EventIndex {
             case SQLITE_DONE: return false
             default: return nil
             }
+        }
+    }
+    /// Called only for an exclusively owned, derived cost reconstruction store.
+    func resetReconstruction() throws {
+        guard sqlite3_exec(db, "DELETE FROM event_ids", nil, nil, nil) == SQLITE_OK else {
+            throw Self.error("Could not reset the derived cost event index")
         }
     }
     func commit(_ ids: Set<String>) throws {
