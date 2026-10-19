@@ -39,6 +39,7 @@ struct CompactUsageBar: View {
                     }
                 }
                 .chartXScale(domain: domain)
+                .chartYScale(type: .symmetricLog)
                 .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
                 .chartPlotStyle { $0.padding(.vertical, 2) }
                 .frame(height: 56)

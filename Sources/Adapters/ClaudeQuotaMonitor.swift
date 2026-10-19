@@ -112,12 +112,21 @@ struct ClaudeQuotaCache: Decodable {
         if date == nil { parser.formatOptions = [.withInternetDateTime]; date = parser.date(from: text) }
         return date.map { Date(timeIntervalSince1970: $0.timeIntervalSince1970.rounded(.down)) }
     }
+    /// Preserve an absent reset without turning a malformed supplied clock into
+    /// absence. Both ordinary and model-scoped windows use this decode boundary.
+    private static func reading(accountID: String, window: String, minutes: Int, used: Double,
+                                resetText: String?, observed: Date, now: Date) -> QuotaReading? {
+        let reset = date(resetText)
+        guard resetText == nil || reset != nil else { return nil }
+        return ClaudeQuotaSource.reading(accountID: accountID, window: window, minutes: minutes,
+            used: used, reset: reset, date: observed, now: now)
+    }
     func readings(now: Date) -> [QuotaReading] {
         guard let bound else { return [] }
         return ClaudeQuotaSource.windows.compactMap { key, minutes in
             guard let value = key == "five_hour" ? bound.utilization.five_hour : bound.utilization.seven_day else { return nil }
-            return ClaudeQuotaSource.reading(accountID: bound.id, window: key, minutes: minutes, used: value.utilization,
-                                             reset: Self.date(value.resets_at), date: bound.date, now: now)
+            return Self.reading(accountID: bound.id, window: key, minutes: minutes, used: value.utilization,
+                                resetText: value.resets_at, observed: bound.date, now: now)
         }
     }
     /// Model-scoped weekly rows, such as `weekly_scoped` with model display name "Fable".
@@ -126,8 +135,8 @@ struct ClaudeQuotaCache: Decodable {
         return (bound.utilization.limits ?? []).compactMap { limit in
             guard limit.kind == "weekly_scoped", let model = limit.scope?.model?.display_name, !model.isEmpty,
                   let used = limit.percent else { return nil }
-            return ClaudeQuotaSource.reading(accountID: bound.id, window: ClaudeQuotaSource.scopedWindow(model), minutes: ClaudeQuotaSource.sevenDayMinutes,
-                                             used: used, reset: Self.date(limit.resets_at), date: bound.date, now: now)
+            return Self.reading(accountID: bound.id, window: ClaudeQuotaSource.scopedWindow(model), minutes: ClaudeQuotaSource.sevenDayMinutes,
+                                used: used, resetText: limit.resets_at, observed: bound.date, now: now)
         }
     }
 }

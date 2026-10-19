@@ -89,6 +89,8 @@ struct CostView: View {
                 Text("Change valuation, not which usage records are selected.").font(.caption).foregroundStyle(.secondary)
                 ChoiceRow(title: "Rate dates", selection: $model.costBasis, choices: CostPriceBasis.allCases.map { ($0, $0.rawValue) }, segmented: true)
                 ChoiceRow(title: "Service · Standard/Fast are comparisons", selection: $model.costService, choices: CostService.allCases.map { ($0, $0.rawValue) }, segmented: true)
+                Divider()
+                AnthropicRatesView()
             }
         }
     }
@@ -107,7 +109,7 @@ struct CostView: View {
                     BarMark(x: .value("Day", point.date, unit: .day), y: .value("USD", NSDecimalNumber(decimal: point.amounts.total).doubleValue))
                         .foregroundStyle(accent)
                 }
-            }.chartXAxis {
+            }.chartYScale(type: .symmetricLog).chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) { value in
                     AxisGridLine()
                     AxisValueLabel {
@@ -119,7 +121,7 @@ struct CostView: View {
                 }
             }.frame(height: 190)
                 .overlay { if report.timeline.isEmpty { Text("No timestamped priceable usage in this period").foregroundStyle(.secondary) } }
-            Text(report.minuteResolution ? "Cumulative API-equivalent estimate · minute resolution · local time. Unpriced usage is excluded." : "Daily totals. Unpriced usage is excluded from dollar bars and retained in the selected report and coverage.").font(.caption).foregroundStyle(.secondary)
+            Text(report.minuteResolution ? "Cumulative API-equivalent estimate · minute resolution · local time · log scale. Unpriced usage is excluded." : "Daily totals · log scale. Unpriced usage is excluded from dollar bars and retained in the selected report and coverage.").font(.caption).foregroundStyle(.secondary)
             if report.dailyOnlyAmount.total > 0 {
                 Text(UsageTimeline.dailyOnlyCaption(CostPricing.dollars(report.dailyOnlyAmount.total), additionalTokens: false)).font(.caption).foregroundStyle(.secondary)
             }

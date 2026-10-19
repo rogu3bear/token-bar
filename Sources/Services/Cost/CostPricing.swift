@@ -6,7 +6,7 @@ struct CostRateCard {
     let observedOn: String
     let source: URL
     let rules: [CostRateRule]
-    static let reference = CostRateCard(id: "provider-text-2026-10-02", observedOn: "2026-10-02",
+    static let reference = CostRateCard(id: "provider-text-2026-10-19", observedOn: "2026-10-19",
         source: URL(string: "https://developers.openai.com/api/docs/pricing")!, rules: [
             .modern("gpt-6-astra", input: "10", cached: "1", output: "50"),
             .modern("gpt-6.1-sol", input: "2", cached: "0.1", output: "10", source: modelSource("gpt-6.1-sol")),
@@ -25,7 +25,9 @@ struct CostRateCard {
                          cacheWriteMultiplier: nil, contextScope: .session, fastMultiplier: nil),
             CostRateRule(provider: "openai", model: "gpt-5.3-codex", input: Decimal(string: "1.75")!, cached: Decimal(string: "0.175")!, output: 14,
                          cacheWriteMultiplier: nil, contextScope: .none, fastMultiplier: nil)
-        ] + ProviderCostRates.rules)
+        ].map { (rule: CostRateRule) in
+            var retained = rule; retained.verifiedOn = "2026-10-02"; return retained
+        } + ProviderCostRates.rules)
     static func modelSource(_ model: String) -> URL {
         URL(string: "https://developers.openai.com/api/docs/models/" + model)!
     }
@@ -44,6 +46,10 @@ struct CostRateRule {
     var cacheWrite1hMultiplier: Decimal? = nil
     var requiresOutputSplit = true
     var longOutputMultiplier: Decimal = Decimal(string: "1.5")!
+    var longInputMultiplier: Decimal = 2
+    var requestContextThreshold = 200_000
+    var contextThresholdInclusive = true
+    var verifiedOn: String? = nil
     static func modern(_ model: String, input: String, cached: String, output: String, source: URL? = nil) -> Self {
         Self(provider: "openai", model: model, input: Decimal(string: input)!, cached: Decimal(string: cached)!, output: Decimal(string: output)!,
              cacheWriteMultiplier: Decimal(string: "1.25")!, contextScope: .request, fastMultiplier: 2, source: source)
@@ -127,7 +133,10 @@ enum CostPricing {
         case .none: band = "short"
         case .request: band = entry.contextBand
         case .session: band = sessionBand
-        case .providerRequest: band = entry.requestInputTokens.map { $0 >= 200_000 ? "long" : "short" }
+        case .providerRequest:
+            band = entry.requestInputTokens.map {
+                (rate.contextThresholdInclusive ? $0 >= rate.requestContextThreshold : $0 > rate.requestContextThreshold) ? "long" : "short"
+            }
         }
         guard band == "short" || band == "long" else { return .missing("Request context size not recoverable") }
         let serviceMultiplier: Decimal
@@ -135,15 +144,15 @@ enum CostPricing {
         if applied == .standard { serviceMultiplier = 1 }
         else if let fast = rate.fastMultiplier { serviceMultiplier = fast }
         else { return .missing("Fast reference rate not verified") }
-        let inputRate = rate.input * (band == "long" ? 2 : 1) * serviceMultiplier / 1_000_000
-        let cacheRate = rate.cached * (band == "long" ? 2 : 1) * serviceMultiplier / 1_000_000
+        let inputRate = rate.input * (band == "long" ? rate.longInputMultiplier : 1) * serviceMultiplier / 1_000_000
+        let cacheRate = rate.cached * (band == "long" ? rate.longInputMultiplier : 1) * serviceMultiplier / 1_000_000
         let outputRate = rate.output * (band == "long" ? rate.longOutputMultiplier : 1) * serviceMultiplier / 1_000_000
         return CostEstimate(amounts: CostAmounts(input: Decimal(t.input - t.cached - writes) * inputRate,
             cached: Decimal(t.cached) * cacheRate, cacheWrite: weightedWrites * inputRate,
             reasoning: split ? Decimal(reasoning) * outputRate : 0, answer: split ? Decimal(t.output - reasoning) * outputRate : 0,
             unsplitOutput: split ? 0 : Decimal(t.output) * outputRate),
             effectiveContextBand: band, contextScope: rate.contextScope.rawValue,
-            rateCardID: card.id, rateSource: (rate.source ?? card.source).absoluteString, verifiedOn: card.observedOn,
+            rateCardID: card.id, rateSource: (rate.source ?? card.source).absoluteString, verifiedOn: rate.verifiedOn ?? card.observedOn,
             appliedService: applied.rawValue, priceBasis: CostPriceBasis.reference.rawValue)
     }
     static func decimal(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }

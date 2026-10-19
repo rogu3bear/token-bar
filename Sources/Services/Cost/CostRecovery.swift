@@ -84,14 +84,14 @@ extension UsageScanner {
         if let loadError { throw NSError(domain: "TokenBar", code: 1, userInfo: [NSLocalizedDescriptionKey: loadError]) }
         // Recovery must not bypass an unsettled durable usage checkpoint.
         try saveIfNeeded(force: true)
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-cost-" + UUID().uuidString)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = try CostRecoveryWorkspace(stateURL: stateURL)
+        defer { workspace.finish() }
+        let rebuiltState = try workspace.prepare()
         var rebuiltCursors: [String: Cursor] = [:]
         var rebuiltArchive: RequestArchive?
         var rebuiltClaudeCounters: [String: Tokens] = [:]
         var rebuilt: Snapshot = {
-            let scratch = UsageScanner(home: home, stateURL: root.appendingPathComponent("ledger.json"), grokHome: grokHome, claudeHome: claudeHome, openCodeHome: openCodeHome)
+            let scratch = UsageScanner(home: home, stateURL: rebuiltState, grokHome: grokHome, claudeHome: claudeHome, openCodeHome: openCodeHome)
             scratch.ledger.started = ledger.started
             scratch.rebuilding = true
             let result = scratch.scan(historical: true, otherTools: { phase?("Checking other tool cost details") }, progress: progress)
@@ -106,11 +106,11 @@ extension UsageScanner {
         var partialRecovery = false
         var excludedSessions = Set<String>()
         if rebuilt.error != nil, claudeHome != nil || grokHome != nil {
-            let isolated = root.appendingPathComponent("provider-recovery")
-            try FileManager.default.createDirectory(at: isolated, withIntermediateDirectories: true)
+            let isolatedState = try workspace.prepare(providerOnly: true)
+            let isolated = isolatedState.deletingLastPathComponent()
             let emptyHome = isolated.appendingPathComponent("no-codex-source")
             try FileManager.default.createDirectory(at: emptyHome.appendingPathComponent("sessions"), withIntermediateDirectories: true)
-            let scratch = UsageScanner(home: emptyHome, stateURL: isolated.appendingPathComponent("ledger.json"),
+            let scratch = UsageScanner(home: emptyHome, stateURL: isolatedState,
                 grokHome: grokHome, claudeHome: claudeHome)
             scratch.ledger.started = ledger.started; scratch.rebuilding = true
             let providers = scratch.scan(historical: true, progress: progress)
@@ -170,15 +170,34 @@ extension UsageScanner {
         next.costRecoverySummary = summary
         // Materialize the durable baseline plus matching metadata into one
         // self-contained rollback ledger; copying only the base loses cursors.
-        if FileManager.default.fileExists(atPath: stateURL.path) {
-            let backup = stateURL.deletingLastPathComponent().appendingPathComponent("ledger-before-cost-" + UUID().uuidString + ".json")
-            try PrivateCache.write(Self.loadLedger(from: stateURL), to: backup)
+        func preserveRollback() throws {
+            if FileManager.default.fileExists(atPath: stateURL.path) {
+                let backup = stateURL.deletingLastPathComponent().appendingPathComponent("ledger-before-cost-" + UUID().uuidString + ".json")
+                try PrivateCache.write(Self.loadLedger(from: stateURL), to: backup)
+            }
         }
+        let contentChanged = next.entries != ledger.entries || next.cursors != ledger.cursors ||
+            next.historyCursors != ledger.historyCursors || next.claudeCounters != ledger.claudeCounters ||
+            next.usageCoverage != ledger.usageCoverage || next.costMetadataVersion != ledger.costMetadataVersion
+        if contentChanged { try preserveRollback() }
+        var archiveChanged = false
         if let rebuiltArchive, let requestArchive {
             let accounts = Dictionary(next.entries.compactMap { e in e.account.map { (CostRecovery.groupKey(e), $0) } }, uniquingKeysWith: { a, _ in a })
-            let excluded = try requestArchive.importAccepted(from: rebuiltArchive, groups: recovered.acceptedKeys, accounts: accounts)
+            let excluded = try requestArchive.importAccepted(from: rebuiltArchive, groups: recovered.acceptedKeys, accounts: accounts) {
+                if !contentChanged { try preserveRollback() }
+                archiveChanged = true
+            }
             if excluded > 0 { summary += " Request archive kept \(excluded) groups unchanged because their event identities or retained details differ." }
             next.costRecoverySummary = summary
+        }
+        // Archive recovery still runs when only details are missing. A fully
+        // unchanged rebuild must not create another backup or ledger revision.
+        guard contentChanged || archiveChanged || next.costRecoverySummary != ledger.costRecoverySummary else { return summary }
+        if !contentChanged && !archiveChanged {
+            ledger.costRecoverySummary = next.costRecoverySummary
+            markMetadataDirty()
+            try saveIfNeeded(force: true)
+            return summary
         }
         ledger = next
         rebuildHistoricalIndex()

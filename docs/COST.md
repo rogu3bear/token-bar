@@ -5,12 +5,14 @@
 The Cost view estimates API-equivalent cost by period, model and recorded
 reasoning level using the shipped, dated rules below. It preserves unknown
 fields, token accounting and fork deduplication. Filters, contribution details,
-source recovery and CSV export use the same evidence boundaries. Provider comparison rules were checked October 2, 2026. Original historical
-verification dates remain attached to their own versions.
+source recovery and CSV export use the same evidence boundaries. Anthropic
+comparison rules were checked October 19, 2026; OpenAI/xAI retain their October
+2 observations. Original verification dates remain attached to their rules
+and historical versions.
 
 ## Meaning of the estimate
 
-Cost defaults to **Historical rates**: a dated USD API-equivalent estimate where a verified schedule exists. **Reference rates** instead applies the 2026-10-02 card to any selected period. Neither is an invoice, subscription charge or reconstruction of amounts paid. Standard and Fast are explicit comparison scenarios. Recorded tier uses observed provider metadata; Claude additionally requires
+Cost defaults to **Historical rates**: a dated USD API-equivalent estimate where a verified schedule exists. **Reference rates** instead applies the 2026-10-19 comparison card to any selected period. Neither is an invoice, subscription charge or reconstruction of amounts paid. Standard and Fast are explicit comparison scenarios. Recorded tier uses observed provider metadata; Claude additionally requires
 `message.usage.speed` to distinguish Fast from Standard. Codex uses `token_count.info.service_tier`; a turn's requested `service_tier` is retained separately and never substituted for observed usage metadata. Missing or unsupported tiers remain unpriced. Pricing is shipped as sourced, versioned data; there are no network pricing requests or uploads.
 
 Historical base rates (USD per million input / cached input / output tokens):
@@ -154,8 +156,41 @@ is source-reported cost, not a subscription payment or a complete invoice.
 
 These complete provider comparison tariffs are observations from October 2.
 Historical versions start on that date; earlier full schedules are not established.
-Select **Reference rates** to compare older Claude usage at the October 2 tariff.
+Select **Reference rates** to compare older Claude usage at the current comparison tariff.
 Recovery enriches only exactly matching groups and cannot supply absent logs.
+
+### Anthropic refresh — October 19, 2026
+
+The current comparison card is `provider-text-2026-10-19`. Anthropic tariffs
+were checked against the [official pricing table](https://platform.claude.com/docs/en/about-claude/pricing)
+and [model ID owner](https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions)
+on October 19. The existing October 2 OpenAI/xAI observations keep their own
+verification dates. The native Pricing basis disclosure shows the current Claude
+lineup's input, cache-read and output rates, with cache-write multipliers.
+
+Sonnet 5.5 cache reads are $0.10 per million tokens. Newly supported exact IDs
+`claude-opus-4-6` and `claude-opus-4-7` use $5 input / $0.50 cache read / $25
+output; `claude-sonnet-4-6` uses $3 / $0.30 / $15. These models use standard
+prices across their full context window. No unverified Fast tariff is added.
+
+`claude-haiku-5-5` uses $0.10 input / $0.01 cache read / $0.50 output per
+million tokens through 100,000 prompt tokens, inclusive. Above that threshold,
+all rates are 5×, including cache writes. Prompt length includes cache reads
+and writes and requires an exact single-request observation. Cumulative and
+daily records without that evidence remain unpriced. Five-minute writes are
+1.25× input; one-hour writes are 2× input. Their existing duration requirements
+remain in force.
+
+Historical Claude intervals retain the October 2 observation through October
+18; October 19 begins the newly verified observation. This is an observation
+date, not a proven price-change instant. Newly supported models are not priced
+retroactively. Reference rates can value older usage at the current comparison
+tariff. Existing historical outputs are not rewritten with the new cache price.
+
+Token and USD timelines use the native symmetric logarithmic scale, which is
+linear near zero and logarithmic for larger values. Recorded zero stays zero;
+missing and unpriced values stay absent. Scale changes do not change source
+values, totals, prices, exports or accessibility amounts.
 
 ### Calculation rules
 
@@ -269,7 +304,18 @@ can retain source-coverage gaps, and retained tokens can remain unpriced and
 excluded from dollar estimates. Allowance refresh follows the installed provider
 tools independently of these local usage actions.
 
-Before saving enrichment, retain a private `ledger-before-cost-<UUID>.json` next to the original ledger. Cursor offsets and the event index are not replaced. The admitted Claude counter baseline in `usageCoverage` (with the legacy
+`CostRecoveryWorkspace` owns one `cost-recovery-workspace` beside each ledger,
+with a private exclusive `cost-recovery-owner.lock`. Its owner marker is checked
+under that lock. Each new reconstruction resets only its declared derived main
+and provider stores, ledger and checkpoint. Interrupted work reuses that slot;
+it does not allocate another full-history UUID directory. Normal return/throw
+keeps the existing app-owned temporary cleanup. Symlinks, hardlinks, special or
+non-private files in the mutable store/sidecar paths are refused before reset,
+and refused workspaces are preserved. Original ledgers and retained old UUID
+scratch are never reset, scanned for cleanup or deleted by this owner. The slot
+count is bounded; bytes still depend on the source history being reconstructed.
+
+Before saving changed enrichment, retain a private `ledger-before-cost-<UUID>.json` next to the original ledger. An unchanged rebuild still checks for missing archive details, but it does not create another rollback copy or ledger revision. Newly recovered archive details invalidate derived reports even when ledger entries already match. A recovery-status-only change uses the existing metadata checkpoint. Exact already-retained archive rows are compared as decoded entries and are not rewritten; JSON key ordering does not make identical metadata new. Existing rollback files are retained. Cursor offsets and the event index are not replaced. The admitted Claude counter baseline in `usageCoverage` (with the legacy
 `claudeCounters` compatibility mirror) may gain missing duration/thinking details
 only at an exactly matching counter boundary with all known details preserved.
 This enriches metadata without adding coverage, usage or requests. The admission

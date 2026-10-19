@@ -1,5 +1,21 @@
 import Foundation
 
+// Deliberate process exit proves that a stopped producer leaves one reusable slot.
+if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--abandon-cost-workspace" {
+    do {
+        let workspace = try CostRecoveryWorkspace(stateURL: URL(fileURLWithPath: CommandLine.arguments[2]))
+        let state = try workspace.prepare()
+        let ids = try EventIndex(url: state.deletingPathExtension().appendingPathExtension("events.sqlite"), required: false)
+        try ids.commit(["synthetic-interrupted-event"])
+        let archive = try RequestArchive(url: state.deletingPathExtension().appendingPathExtension("requests.sqlite"))
+        var row = Entry(date: Date(), session: "synthetic", model: "synthetic", tokens: Tokens(["input_tokens": 1, "output_tokens": 1]), account: nil)
+        row.recordID = "synthetic-interrupted-event"
+        try archive.record(row, admitted: true)
+        try Data("interrupted-derived-checkpoint".utf8).write(to: UsageScanner.metadataURL(for: state))
+        withExtendedLifetime(workspace) { _exit(0) }
+    } catch { _exit(9) }
+}
+
 func check(_ condition: @autoclosure () -> Bool, _ message: String) { precondition(condition(), message) }
 let now = Date()
 func usage(input: Int = 1_000_000, cached: Int = 600_000, writes: Int? = 100_000, output: Int = 100_000, reasoning: Int = 80_000) -> Tokens {
@@ -127,7 +143,7 @@ check(uncertainReport.pricedTokens == 0, "Unattributed older session context mus
 var malicious = entry(); malicious.session = "=1+1,\"line\"\nnext"
 let csv = CostReport.build(source: [malicious, unknown], query: UsageQuery(period: 1), catalog: [:]).csv()
 check(csv.contains("\"'=1+1,"), "CSV neutralizes formula-leading labels")
-check(csv.contains("\"Provider not recorded\"") && csv.contains("\"provider-text-2026-10-02\""), "CSV carries missing-price reasons and dated reference basis")
+check(csv.contains("\"Provider not recorded\"") && csv.contains("\"provider-text-2026-10-19\""), "CSV carries missing-price reasons and dated reference basis")
 print("PASS: time/model/effort reports, coverage, unknown bins, session-wide tariff outside filters and safe CSV")
 
 let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -203,8 +219,30 @@ check(recovery.ledger.entries.first { $0.session == "missing-source" }?.costMeta
 let again = UsageScanner(home: home, stateURL: ledgerURL)
 check(again.ledger.entries.count == 3, "Effort bins survive restart and compaction")
 check(again.ledger.entries.filter { $0.session == id }.reduce(0) { $0 + ($1.tokens.cacheWrite ?? 0) } == 30, "Cache writes survive historical reduction")
+try again.saveIfNeeded(force: true)
+let rollbackBeforeRepeat = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
+let ledgerBeforeRepeat = try Data(contentsOf: ledgerURL)
+let repeatWrites = again.persistenceCount
 _ = try again.recoverCostDetails()
 check(again.ledger.entries.reduce(0) { $0 + $1.tokens.total } == before, "Repeated recovery is idempotent")
+let rollbackAfterRepeat = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
+let ledgerAfterRepeat = try Data(contentsOf: ledgerURL)
+check(rollbackAfterRepeat == rollbackBeforeRepeat,
+      "Unchanged recovery cannot accumulate another full-history rollback copy")
+check(ledgerAfterRepeat == ledgerBeforeRepeat && again.persistenceCount == repeatWrites,
+      "Unchanged recovery does not replace the durable ledger")
+again.ledger.costRecoverySummary = "Earlier recovery status"
+again.markMetadataDirty()
+try again.saveIfNeeded(force: true)
+let statusRevision = again.ledger.reportRevision
+_ = try again.recoverCostDetails()
+let statusOnlyLedger = try Data(contentsOf: ledgerURL)
+let statusOnlyBackups = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
+let statusOnlyRestored = try UsageScanner.loadLedger(from: ledgerURL)
+check(statusOnlyLedger == ledgerBeforeRepeat && statusOnlyBackups == rollbackBeforeRepeat && again.ledger.reportRevision == statusRevision,
+      "A recovery-status-only change uses the metadata checkpoint, without another history copy or report revision")
+check(statusOnlyRestored.costRecoverySummary == again.ledger.costRecoverySummary && statusOnlyRestored.costRecoverySummary != "Earlier recovery status",
+      "The recovery status remains durable through its UUID-bound metadata checkpoint")
 var mismatch = retained; mismatch.tokens.input += 1
 check(CostRecovery.reconcile(original: [mismatch], reconstructed: recovery.ledger.entries).groups == 0, "Changed source totals cannot replace history")
 let preservedFiles = try FileManager.default.contentsOfDirectory(atPath: home.path)
@@ -215,6 +253,71 @@ let rollbackLedgers = try preservedFiles.filter { $0.hasPrefix("ledger-before-co
 check(rollbackLedgers.allSatisfy { $0.plans?.values.contains { $0.plan == "Synthetic checkpoint plan" } == true },
       "Self-contained rollback includes metadata stored outside the full history baseline")
 check(again.scan(historical: true).entries.reduce(0) { $0 + $1.tokens.total } == before, "Recovery preserves cursors and committed event identities")
+// Exercise the same scanner history/live/rebuild sequence as the native model.
+// The history read time may replace its one metadata sidecar; admitted stores
+// and rollback artifacts must remain byte-identical without new source usage.
+_ = again.scan()
+try again.saveIfNeeded(force: true)
+func durableFiles() throws -> [String: Data] {
+    var result: [String: Data] = [:]
+    for name in try FileManager.default.contentsOfDirectory(atPath: home.path)
+        where name.hasPrefix("state.") || name.hasPrefix("ledger-before-cost-") {
+        result[name] = try Data(contentsOf: home.appendingPathComponent(name))
+    }
+    return result
+}
+let warmFiles = try durableFiles()
+let warmRows = try again.requestArchive!.count
+let checkpointName = UsageScanner.metadataURL(for: ledgerURL).lastPathComponent
+var metadataSizes = [warmFiles[checkpointName]?.count ?? 0]
+for iteration in 0..<20 {
+    check(again.scan(historical: true).error == nil && again.scan().error == nil, "Normal unchanged refresh remains readable")
+    if iteration % 4 == 0 { _ = try again.recoverCostDetails() }
+    try again.saveIfNeeded(force: true)
+    let files = try durableFiles()
+    check(Set(files.keys) == Set(warmFiles.keys), "Repeated normal workflow creates no additional persistent artifacts")
+    for (name, bytes) in warmFiles where name != checkpointName {
+        check(files[name] == bytes, "Unchanged history, archive, index and rollback bytes stay stable: " + name)
+    }
+    metadataSizes.append(files[checkpointName]?.count ?? 0)
+}
+check((metadataSizes.max() ?? 0) - (metadataSizes.min() ?? 0) < 256,
+      "The replaced metadata sidecar stays bounded while its read timestamp changes")
+check(try! again.requestArchive!.count == warmRows, "Unchanged refreshes do not append archive rows")
+let newUsage = [data("turn_context", ["model": "gpt-6-astra", "effort": "high", "turn_id": "r3"], date: yesterday),
+                event(counts(350, output: 35, write: 35), counts(50, output: 5, write: 5), date: yesterday)]
+let appendHandle = try FileHandle(forWritingTo: sessions.appendingPathComponent("rollout-" + id + ".jsonl"))
+try appendHandle.seekToEnd()
+try appendHandle.write(contentsOf: newUsage.reduce(Data()) { $0 + $1 + Data([10]) })
+try appendHandle.close()
+_ = again.scan(historical: true); _ = again.scan(); try again.saveIfNeeded(force: true)
+check(again.ledger.entries.reduce(0) { $0 + $1.tokens.total } == before + 55 && (try! again.requestArchive!.count) == warmRows + 1,
+      "A genuine append admits exactly its own tokens and one detail row")
+let appendedArchive = try Data(contentsOf: again.requestArchiveURL)
+for _ in 0..<5 { _ = again.scan(historical: true); _ = again.scan(); try again.saveIfNeeded(force: true) }
+let replayedArchive = try Data(contentsOf: again.requestArchiveURL)
+check(replayedArchive == appendedArchive && again.ledger.entries.reduce(0) { $0 + $1.tokens.total } == before + 55,
+      "Warm refresh after real growth does not append the same usage again")
+// A retained ledger can need archive backfill without any summary enrichment.
+// Copy only synthetic ledger/index evidence into a fresh archive namespace.
+let archiveOnlyURL = home.appendingPathComponent("archive-only.json")
+try PrivateCache.write(UsageScanner.loadLedger(from: ledgerURL), to: archiveOnlyURL)
+try FileManager.default.copyItem(at: ledgerURL.deletingPathExtension().appendingPathExtension("events.sqlite"),
+                                to: archiveOnlyURL.deletingPathExtension().appendingPathExtension("events.sqlite"))
+let archiveOnly = UsageScanner(home: home, stateURL: archiveOnlyURL)
+let archiveOnlyEntries = archiveOnly.ledger.entries
+let archiveOnlyRevision = archiveOnly.ledger.reportRevision
+check(try! archiveOnly.requestArchive!.count == 0, "Archive-only fixture starts without retained details")
+_ = try archiveOnly.recoverCostDetails()
+check(archiveOnly.ledger.entries == archiveOnlyEntries && (try! archiveOnly.requestArchive!.count) == warmRows + 1,
+      "Missing archive details still materialize without replacing matching ledger entries")
+check(archiveOnly.ledger.reportRevision != archiveOnlyRevision,
+      "Committed archive-only enrichment invalidates derived report caches")
+let archiveOnlyRecoveredRevision = archiveOnly.ledger.reportRevision
+_ = try archiveOnly.recoverCostDetails()
+check(archiveOnly.ledger.reportRevision == archiveOnlyRecoveredRevision,
+      "Repeating archive-only backfill becomes a no-op once its details are retained")
+print("PASS: 20 native scanner refreshes and five rebuilds keep admitted stores/rollback artifacts byte-stable; metadata sidecar spans \(metadataSizes.min() ?? 0)...\(metadataSizes.max() ?? 0) bytes; one real append adds exactly one row")
 print("PASS: end-to-end raw-log backfill, exact totals, missing-source retention, restart, cache-write bins, idempotence and rollback")
 
 var freshCursor = Cursor(); freshCursor.offset = 100; freshCursor.model = "gpt-6-astra"; freshCursor.turnID = "t"; freshCursor.previous = usage(); freshCursor.provider = "openai"; freshCursor.effort = "high"
@@ -600,7 +703,7 @@ func claudeEntry(_ model: String, five: Int? = 60_000, hour: Int? = 40_000) -> E
     e.tokens.cacheWrite5m = five; e.tokens.cacheWrite1h = hour
     return e
 }
-for (model, total) in [("claude-fable-5-1", "9.7"), ("claude-opus-5-5", "3.94"), ("claude-sonnet-5-5", "2.03"), ("claude-haiku-4-5-20251001", "1.015"), ("claude-fable-5", "10.15"), ("claude-opus-5", "5.075"), ("claude-opus-4-8", "5.075"), ("claude-sonnet-5", "2.03")] {
+for (model, total) in [("claude-fable-5-1", "9.7"), ("claude-opus-5-5", "3.94"), ("claude-sonnet-5-5", "1.97"), ("claude-haiku-4-5-20251001", "1.015"), ("claude-fable-5", "10.15"), ("claude-opus-5", "5.075"), ("claude-opus-4-8", "5.075"), ("claude-sonnet-5", "2.03"), ("claude-opus-4-6", "5.075"), ("claude-opus-4-7", "5.075"), ("claude-sonnet-4-6", "3.045")] {
     let result = CostPricing.estimate(claudeEntry(model))
     check(result.amounts?.total == Decimal(string: total)!, "Claude exact tariff/duration arithmetic: " + model)
     check(result.amounts?.reasoning == 0 && result.amounts?.answer == 0 && result.amounts!.unsplitOutput > 0,
@@ -655,3 +758,148 @@ check(providerCSV.split(separator: "\n").last!.split(separator: ",", omittingEmp
 let unresolvedClaudeCSV = CostReport.build(source: [claudeEntry("claude-opus-5", five: nil, hour: nil)], query: UsageQuery(period: 1), catalog: [:]).csv()
 check(unresolvedClaudeCSV.contains(ProviderCostRates.anthropicSource.absoluteString), "Known Claude tariff retains its own source when counter metadata is unavailable")
 print("PASS: mixed-provider export provenance never assigns OpenAI sources to unsupported Grok IDs")
+
+var sonnetObservation = claudeEntry("claude-sonnet-5-5")
+sonnetObservation.pricingDay = "2026-10-18"
+check(CostRateHistory.estimate(sonnetObservation, service: .standard, sessionBand: nil).amounts?.total == Decimal(string: "2.03")!,
+      "Updated Claude reference rate does not rewrite the retained October2 historical observation")
+sonnetObservation.pricingDay = "2026-10-19"
+check(CostRateHistory.estimate(sonnetObservation, service: .standard, sessionBand: nil).amounts?.total == Decimal(string: "1.97")!,
+      "October19 Claude observation uses the verified five-percent Sonnet cache-read tariff")
+check(CostPricing.estimate(sonnetObservation).verifiedOn == "2026-10-19" &&
+      CostPricing.estimate(entry()).verifiedOn == "2026-10-02", "Provider refresh retains each tariff's own verification date")
+var haiku = claudeEntry("claude-haiku-5-5")
+haiku.tokens = usage(input: 100_000, cached: 60_000, writes: 10_000, output: 10_000, reasoning: 0)
+haiku.tokens.cacheWrite5m = 6_000; haiku.tokens.cacheWrite1h = 4_000
+haiku.requestInputTokens = 100_000
+check(CostPricing.estimate(haiku).amounts?.total == Decimal(string: "0.01015")!,
+      "Haiku5.5 keeps its base tariff at exactly100k prompt tokens, including cache reads and writes")
+haiku.requestInputTokens = 100_001
+check(CostPricing.estimate(haiku).amounts?.total == Decimal(string: "0.05075")!,
+      "Haiku5.5 applies fivefold input/cache/output rates only above100k per request")
+haiku.requestInputTokens = nil
+check(CostPricing.estimate(haiku).amounts == nil, "Haiku5.5 cannot infer request length from a cumulative or daily record")
+haiku.pricingDay = "2026-10-18"
+check(CostRateHistory.estimate(haiku, service: .standard, sessionBand: nil).amounts == nil,
+      "New Claude tariff is not copied into unverified historical dates")
+print("PASS: dated Anthropic refresh, preserved historical cache prices and exact Haiku5.5 request threshold")
+
+do {
+    let fixture = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-workspace-test-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: fixture, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: fixture) }
+    let state = fixture.appendingPathComponent("ledger.json")
+    try Data("original-ledger-is-not-scratch".utf8).write(to: state)
+    let retained = fixture.appendingPathComponent("TokenBar-cost-retained-evidence")
+    try Data("keep".utf8).write(to: retained)
+    func abandonedAttempt() throws -> Int32 {
+        let child = Process(); child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+        child.arguments = ["--abandon-cost-workspace", state.path]
+        try child.run(); child.waitUntilExit(); return child.terminationStatus
+    }
+    var fileCounts: [Int] = []
+    for _ in 0..<3 {
+        let status = try abandonedAttempt()
+        check(status == 0, "Interrupted producer can claim its owned derived slot")
+        let root = fixture.appendingPathComponent("cost-recovery-workspace")
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey])!
+            .compactMap { $0 as? URL }.filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+        fileCounts.append(files.count)
+    }
+    check(Set(fileCounts).count == 1, "Repeated interrupted producers reuse one workspace instead of adding per-attempt copies")
+    let workspace = try CostRecoveryWorkspace(stateURL: state)
+    let competing = try abandonedAttempt()
+    check(competing == 9, "A live workspace owner refuses another producer before reset")
+    let fresh = try workspace.prepare()
+    let index = try EventIndex(url: fresh.deletingPathExtension().appendingPathExtension("events.sqlite"), required: true)
+    let archive = try RequestArchive(url: fresh.deletingPathExtension().appendingPathExtension("requests.sqlite"))
+    let count = try archive.count
+    let freshLedger = try UsageScanner.loadLedger(from: fresh)
+    check(index.contains("synthetic-interrupted-event") == false && count == 0 && freshLedger.entries.isEmpty,
+          "Restart resets only derived identities, detail rows and ledger before reconstruction")
+    workspace.finish()
+    check(!FileManager.default.fileExists(atPath: workspace.root.path), "Normal completion removes its own temporary workspace")
+    let retainedBytes = try Data(contentsOf: retained)
+    check(retainedBytes == Data("keep".utf8), "Unrelated retained scratch evidence is untouched")
+    let originalBytes = try Data(contentsOf: state)
+    check(originalBytes == Data("original-ledger-is-not-scratch".utf8), "Reconstruction reset never opens or alters the admitted ledger")
+}
+print("PASS: single-slot cost scratch, process interruption/restart, exclusive ownership and ordinary completion cleanup")
+
+do {
+    let fixture = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-workspace-alias-test-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: fixture, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: fixture) }
+    let admittedURL = fixture.appendingPathComponent("admitted.sqlite")
+    do {
+        let admitted = try RequestArchive(url: admittedURL)
+        var row = entry(); row.recordID = "synthetic-preserved-event"
+        try admitted.record(row, admitted: true)
+    }
+    for kind in ["symlink", "hardlink", "sidecar"] {
+        let parent = fixture.appendingPathComponent(kind)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let state = parent.appendingPathComponent("ledger.json")
+        let ledger: URL
+        do {
+            let abandoned = try CostRecoveryWorkspace(stateURL: state)
+            ledger = try abandoned.prepare()
+            // Leaving the scope releases custody without successful-return cleanup.
+        }
+        let alias = ledger.deletingPathExtension().appendingPathExtension(kind == "sidecar" ? "requests.sqlite-journal" : "requests.sqlite")
+        if kind != "sidecar" { try FileManager.default.removeItem(at: alias) }
+        if kind == "hardlink" { try FileManager.default.linkItem(at: admittedURL, to: alias) }
+        else { try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: admittedURL) }
+        let original = try Data(contentsOf: admittedURL)
+        let restarted = try CostRecoveryWorkspace(stateURL: state)
+        var refused = false
+        do { _ = try restarted.prepare() } catch { refused = true }
+        restarted.finish()
+        let retained = try Data(contentsOf: admittedURL)
+        let admitted = try RequestArchive(url: admittedURL, readOnly: true)
+        let count = try admitted.count
+        check(refused && original == retained && count == 1, "Aliased derived " + kind + " is refused before changing an admitted store")
+        check(FileManager.default.fileExists(atPath: restarted.root.path), "Refused workspace bytes remain available for diagnosis")
+    }
+}
+print("PASS: interrupted workspace rejects symlink, hardlink and SQLite sidecar aliases without changing admitted bytes/rows")
+
+do {
+    let fixture = FileManager.default.temporaryDirectory.appendingPathComponent("tokenbar-workspace-owner-test-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: fixture, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: fixture) }
+    for change in ["missing", "changed", "replacement"] {
+        let parent = fixture.appendingPathComponent(change)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let workspace = try CostRecoveryWorkspace(stateURL: parent.appendingPathComponent("ledger.json"))
+        let ledger = try workspace.prepare()
+        let archiveURL = ledger.deletingPathExtension().appendingPathExtension("requests.sqlite")
+        do {
+            let archive = try RequestArchive(url: archiveURL)
+            var row = entry(); row.recordID = "synthetic-owned-row"
+            try archive.record(row, admitted: true)
+        }
+        let original = try Data(contentsOf: archiveURL)
+        let marker = workspace.root.appendingPathComponent("owner")
+        let binding = try Data(contentsOf: marker)
+        var preservedArchive = archiveURL
+        if change == "missing" { try FileManager.default.removeItem(at: marker) }
+        else if change == "changed" { try Data("changed ownership".utf8).write(to: marker) }
+        else {
+            let displaced = parent.appendingPathComponent("displaced-owned-workspace")
+            try FileManager.default.moveItem(at: workspace.root, to: displaced)
+            preservedArchive = displaced.appendingPathComponent("main/ledger.requests.sqlite")
+            try FileManager.default.createDirectory(at: workspace.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try binding.write(to: marker); try PrivateFile.protect(marker)
+        }
+        workspace.finish()
+        check(FileManager.default.fileExists(atPath: workspace.root.path), "Cleanup refuses changed ownership before any reset: " + change)
+        var refused = false
+        do { _ = try workspace.prepare() } catch { refused = true }
+        workspace.finish()
+        let retained = try Data(contentsOf: preservedArchive)
+        check(refused && retained == original && FileManager.default.fileExists(atPath: workspace.root.path),
+              "Missing/changed ownership or replaced root is preserved before reset and cleanup: " + change)
+    }
+}
+print("PASS: reset and cleanup revalidate current marker binding and the retained root identity under custody")

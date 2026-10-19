@@ -67,11 +67,18 @@ enum CostRateHistory {
         for rule in CostRateCard.reference.rules where ["gpt-5.5", "gpt-5.3-codex"].contains(rule.model) {
             values.append(CostRateVersion(id: "\(rule.model)-observed-2026-09-09", effectiveFrom: "2026-09-09", source: CostRateCard.reference.source, rule: rule))
         }
-        for rule in ProviderCostRates.rules {
-            values.append(CostRateVersion(id: "\(rule.model)-observed-2026-10-02", effectiveFrom: "2026-10-02", verifiedOn: "2026-10-02",
+        for rule in ProviderCostRates.october2Rules {
+            values.append(CostRateVersion(id: "\(rule.model)-observed-2026-10-02", effectiveFrom: "2026-10-02",
+                effectiveUntil: rule.provider == "anthropic" ? "2026-10-19" : nil, verifiedOn: "2026-10-02",
                 source: rule.source!, rule: rule, fastFrom: rule.fastMultiplier == nil ? nil : "2026-10-02",
                 qualification: "Current tariff observed October 2. Earlier complete tariffs are not established; use Reference rates to compare older usage at this tariff.",
                 longContextVerifiedFrom: "2026-10-02", cacheWriteVerifiedFrom: "2026-10-02"))
+        }
+        for rule in ProviderCostRates.rules where rule.provider == "anthropic" {
+            values.append(CostRateVersion(id: "\(rule.model)-observed-2026-10-19", effectiveFrom: "2026-10-19", verifiedOn: "2026-10-19",
+                source: rule.source!, rule: rule, fastFrom: rule.fastMultiplier == nil ? nil : "2026-10-19",
+                qualification: "Tariff observed October 19; this is not a proven price-change date. Earlier retained observations remain separate. Reference rates compare older usage at this tariff.",
+                longContextVerifiedFrom: "2026-10-19", cacheWriteVerifiedFrom: "2026-10-19"))
         }
         return values
     }()
