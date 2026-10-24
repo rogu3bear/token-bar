@@ -21,7 +21,7 @@ enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
     }
 }
 struct MenuBarConfiguration: Codable, Equatable {
-    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .timeLeft, .quota, .fable, .fablePace, .zero, .risk]
+    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .fable, .fablePace, .zero, .risk, .timeLeft]
     var enabled: Set<MenuBarPart> = [.dial, .rate]
     var compact = false
     var unit = "dashboard"
