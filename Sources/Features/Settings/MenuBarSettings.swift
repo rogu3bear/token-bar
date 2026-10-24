@@ -3,7 +3,7 @@ import SwiftUI
 import ServiceManagement
 
 enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
-    case icon, activity, rate, quota, zero, dial, risk, fable, fablePace
+    case icon, activity, rate, quota, zero, dial, risk, fable, fablePace, timeLeft
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -14,13 +14,14 @@ enum MenuBarPart: String, Codable, CaseIterable, Identifiable {
         case .quota: return "Quota remaining (%)"
         case .dial: return "Speed dial"
         case .zero: return "Projected zero"
+        case .timeLeft: return "Estimated time left"
         case .fable: return "Fable quota (tightest Claude limit)"
         case .fablePace: return "Fable time left at recent pace"
         }
     }
 }
 struct MenuBarConfiguration: Codable, Equatable {
-    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .quota, .fable, .fablePace, .zero, .risk]
+    var order: [MenuBarPart] = [.icon, .activity, .dial, .rate, .timeLeft, .quota, .fable, .fablePace, .zero, .risk]
     var enabled: Set<MenuBarPart> = [.dial, .rate]
     var compact = false
     var unit = "dashboard"
@@ -31,7 +32,7 @@ struct MenuBarConfiguration: Codable, Equatable {
     var roll: Bool? = false
     var showsNames: Bool { get { names ?? true } set { names = newValue } }
     var rollsTools: Bool { get { roll ?? false } set { roll = newValue } }
-    static let instrumentParts: Set<MenuBarPart> = [.icon, .activity, .dial, .rate]
+    static let instrumentParts: Set<MenuBarPart> = [.icon, .activity, .dial, .rate, .timeLeft]
     func title(values: [MenuBarPart: String]) -> String {
         let parts = order.filter { enabled.contains($0) }.compactMap { values[$0] }.filter { !$0.isEmpty }
         return parts.isEmpty ? "◈" : parts.joined(separator: separator)
@@ -72,6 +73,47 @@ struct MenuBarConfiguration: Codable, Equatable {
     }
     func reset() { configuration = MenuBarConfiguration() }
 }
+/// A display of Runway's existing allowance-burn forecast, never output-token speed.
+/// Unknown time is distinct from observed exhaustion and from the quota reset.
+struct MenuBarTimeLeft {
+    let text: String
+    let spoken: String
+    init(allowance: AccountAllowancePresentation) {
+        guard let estimate = allowance.estimate else {
+            text = "Time left —"
+            spoken = "Estimated time left unavailable. " + allowance.qualifier
+            return
+        }
+        let age = allowance.reading.map { Runway.ageLabel($0, now: allowance.now) } ?? ""
+        if estimate.remaining == 0 {
+            text = "Exhausted"
+            spoken = "Allowance exhausted" + age
+        } else if let exhaustion = estimate.exhaustion {
+            let seconds = exhaustion.timeIntervalSince(allowance.now)
+            // An old projection passing zero is not a new provider observation.
+            guard seconds.isFinite, seconds > 0, seconds < Double(Int.max / 60) else {
+                text = "Time left —"
+                spoken = "Estimated exhaustion time passed; waiting for a fresh allowance reading" + age
+                return
+            }
+            let minutes = Int(ceil(seconds / 300)) * 5
+            let hours = minutes / 60
+            let duration = hours > 0 ? "\(hours)h " + String(format: "%02dm", minutes % 60) : "\(minutes)m"
+            text = "≈" + duration + " left"
+            spoken = "Estimated time until allowance exhaustion, approximately \(hours) hours \(minutes % 60) minutes at recent allowance burn" + age
+        } else if estimate.percentPerHour == 0 {
+            text = "No burn observed"
+            spoken = "Estimated time left unavailable; no allowance burn observed" + age
+        } else if estimate.percentPerHour != nil {
+            text = "Resets first"
+            spoken = "Quota resets before projected exhaustion at recent allowance burn" + age
+        } else {
+            text = allowance.reading?.reset == nil ? "Time left —" : "Learning burn"
+            spoken = "Estimated time left unavailable. " + estimate.message + age
+        }
+    }
+}
+
 struct MenuBarPresentation {
     static let rollInterval: TimeInterval = 5
     static func warnedTools(_ coordinator: QuotaGuardCoordinator?, notices: NoticeDismissals) -> Set<LiveTool> {
@@ -108,7 +150,7 @@ struct MenuBarPresentation {
         let result = NSMutableAttributedString()
         var spoken: [String] = []
         var fields = settings
-        // Retain old saved fields for compatibility; allowances and forecasts live in the popover.
+        // Retain legacy fields for compatibility; timeLeft reuses the qualified allowance forecast.
         fields.enabled.formIntersection(MenuBarConfiguration.instrumentParts)
         for (tool, reading) in instruments {
             if result.length > 0 { result.append(NSAttributedString(string: "   ")) }
@@ -117,8 +159,11 @@ struct MenuBarPresentation {
                 accent: warning ? .systemOrange : NSColor(tool.color(in: palette)), tool: tool,
                 claudeQuota: claudeQuota, grokQuota: grokQuota, showsName: settings.showsNames))
             let unit = RateUnit(rawValue: settings.unit) ?? reading.unit
+            let timeLeft = MenuBarTimeLeft(allowance: AccountAllowancePresentation(quota: quotaState(for: tool,
+                monitor: monitor, claudeQuota: claudeQuota, grokQuota: grokQuota), now: now))
             spoken.append(tool.label + ", " + CompactLiveCopy.spokenRate(activity: "Working", available: reading.hasRate,
-                amount: reading.rawRate * unit.multiplier, unit: unit) + (warning ? ", allowance warning" : ""))
+                amount: reading.rawRate * unit.multiplier, unit: unit) + (settings.enabled.contains(.timeLeft) ? ", " + timeLeft.spoken : "")
+                + (warning ? ", allowance warning" : ""))
         }
         if result.length == 0 {
             result.append(NSAttributedString(string: "◈", attributes: [.foregroundColor: NSColor(palette.accent),
@@ -165,6 +210,7 @@ struct MenuBarPresentation {
             .rate: rate,
             .quota: estimate == nil ? (quotaName.map { $0 + " quota unavailable" } ?? "Quota unavailable") : (quotaName.map { $0 + " " } ?? "") + remaining + " remaining",
             .zero: "Zero " + zero, .dial: "Speed dial " + rate,
+            .timeLeft: MenuBarTimeLeft(allowance: allowance).text,
             .fable: {
                 guard let fable, fable.remaining > 0 else { return "" }
                 return "Fable " + CompactLiveCopy.percent(fable.remaining) + " · " + fable.binding
@@ -257,6 +303,14 @@ struct MenuBarSettingsView: View {
                 Picker("Show speed for", selection: Binding(get: { preferences.configuration.tool ?? .auto }, set: { preferences.configuration.tool = $0 })) {
                     ForEach(MenuBarTool.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
+                Toggle("Show estimated time left", isOn: Binding(
+                    get: { preferences.configuration.enabled.contains(.timeLeft) },
+                    set: { enabled in
+                        if enabled { preferences.configuration.enabled.insert(.timeLeft) }
+                        else { preferences.configuration.enabled.remove(.timeLeft) }
+                    }))
+                Text("Estimated time until an active tool’s allowance runs out at its recent average allowance burn, rounded up to 5 minutes. This is not the quota reset timer. Unknown estimates show —; no measured burn and a reset before exhaustion are labeled separately.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show tool names", isOn: $preferences.configuration.showsNames)
                 Toggle("Roll active tools every 5 seconds", isOn: $preferences.configuration.rollsTools)
                     .disabled(preferences.configuration.tool != .auto)
@@ -269,7 +323,7 @@ struct MenuBarSettingsView: View {
                         Text("Tokens / hour").tag("h")
                     }.pickerStyle(.segmented).labelsHidden()
                 }
-                Text("Each active tool keeps its own dial and rate. Follow each tool uses its live module unit; explicit units apply only to the menu bar. Allowances stay in the popover.").font(.caption).foregroundStyle(.secondary)
+                Text("Each active tool keeps its own dial and rate. Follow each tool uses its live module unit; explicit units apply only to the menu bar. Allowance details stay in the popover.").font(.caption).foregroundStyle(.secondary)
                 }.moduleSurface()
                 VStack(alignment: .leading, spacing: PageStyle.related) {
                 Label("Appearance", systemImage: "paintpalette")

@@ -33,6 +33,7 @@ enum ProductPreview {
         }
         let now = PreviewFixture.date
         let instruments = CommandLine.arguments.contains("--sample-instruments")
+        if CommandLine.arguments.contains("--sample-time-left") { model.menuBarPreferences.configuration.enabled.insert(.timeLeft) }
         if CommandLine.arguments.contains("--sample-no-names") { model.menuBarPreferences.configuration.showsNames = false }
         if CommandLine.arguments.contains("--sample-roll") { model.menuBarPreferences.configuration.rollsTools = true }
         let initiallyExpanded: LiveTool? = CommandLine.arguments.firstIndex(of: "--sample-expanded").flatMap {

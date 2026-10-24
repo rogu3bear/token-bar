@@ -35,7 +35,7 @@ var older = MenuBarConfiguration()
 older.enabled = [.activity, .rate]
 older.order = [.icon, .activity, .rate, .quota, .zero]
 older.normalize()
-assert(older.order.suffix(4) == [.dial, .risk, .fable, .fablePace] && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
+assert(older.order.suffix(5) == [.dial, .risk, .fable, .fablePace, .timeLeft] && older.enabled == [.activity, .rate], "Add new option without changing saved selections")
 restored.configuration.enabled = [.dial, .quota]
 assert(MenuBarPreferences(defaults: defaults).configuration.enabled == [.dial, .quota])
 assert(MenuBarDial.fraction(value: 150, minimum: 100, maximum: 200) == 0.5)
@@ -627,6 +627,60 @@ do {
 }
 
 
+// The selectable duration consumes the shared provider allowance forecast, not token rate or reset time.
+do {
+    let date = Date(timeIntervalSince1970: 2_000_000_000)
+    var latest = QuotaReading(accountID: "duration-fixture", bucket: "claude", name: "Claude", window: "five_hour",
+        minutes: 300, used: 60, reset: date.addingTimeInterval(7200), date: date)
+    var first = latest; first.used = 40; first.date = date.addingTimeInterval(-600)
+    func state(_ reading: QuotaReading, samples: [QuotaReading]? = nil) -> ToolQuotaState {
+        ToolQuotaState(readings: [reading], samples: samples ?? [first, reading], horizon: ClaudeQuotaSource.horizon,
+            guardAccountID: reading.accountID, guardAuthenticated: true)
+    }
+    func label(_ quota: ToolQuotaState, at now: Date = date) -> MenuBarTimeLeft {
+        MenuBarTimeLeft(allowance: AccountAllowancePresentation(quota: quota, now: now))
+    }
+    let current = state(latest)
+    assert(label(current).text == "≈20m left")
+    assert(label(current, at: date.addingTimeInterval(1)).text == "≈20m left", "Five-minute rounding avoids per-second jitter")
+    assert(label(current).spoken.contains("allowance exhaustion") && !label(current).spoken.contains("resets"))
+    var learning = current; learning.samples = [latest]
+    assert(label(learning).text == "Learning burn")
+    var flat = first; flat.used = latest.used
+    assert(label(state(latest, samples: [flat, latest])).text == "No burn observed")
+    var resetsFirst = latest; resetsFirst.reset = date.addingTimeInterval(60)
+    var earlierReset = first; earlierReset.reset = resetsFirst.reset
+    assert(label(state(resetsFirst, samples: [earlierReset, resetsFirst])).text == "Resets first")
+    var noReset = latest; noReset.reset = nil
+    assert(label(state(noReset)).text == "Time left —")
+    var zero = noReset; zero.used = 100
+    assert(label(state(zero)).text == "Exhausted", "Measured exhaustion does not need a reset or burn slope")
+    var spentSoon = latest; spentSoon.used = 99
+    var spentEarlier = first; spentEarlier.used = 79
+    assert(label(state(spentSoon, samples: [spentEarlier, spentSoon]), at: date.addingTimeInterval(60)).text == "Time left —",
+           "A projection passing zero never becomes observed exhaustion")
+    var failed = current; failed.guardFailed = true
+    var foreign = current; foreign.guardAccountID = "other-fixture"
+    var restored = current; restored.guardAuthenticated = false
+    var future = latest; future.date = date.addingTimeInterval(1)
+    for invalid in [failed, foreign, restored, state(future)] { assert(label(invalid).text == "Time left —") }
+    assert(label(current, at: date.addingTimeInterval(1800)).text == "Time left —")
+    assert(label(current, at: date.addingTimeInterval(180)).spoken.contains("min ago"), "Aged Claude display keeps its read-age qualification")
+    var selection = MenuBarConfiguration(); selection.enabled = [.timeLeft]; selection.tool = .claude
+    let running = instrumentMeter(.claude, rate: 99999, at: date)
+    let face = MenuBarPresentation.face(selection, codex: Tachometer(), claude: running, grok: Tachometer(), monitor: monitor,
+        now: date, palette: ToolPalette(), claudeQuota: current)
+    assert(face.string == "Claude  ≈20m left", "Duration-only mode is rendered by the real status-item owner")
+    assert(MenuBarDial.spokenLabel(face).contains("approximately 0 hours 20 minutes"))
+    selection.showsNames = false
+    let unnamed = MenuBarPresentation.face(selection, codex: Tachometer(), claude: running, grok: Tachometer(), monitor: monitor,
+        now: date, palette: ToolPalette(), claudeQuota: current)
+    assert(unnamed.string == "≈20m left" && MenuBarDial.spokenLabel(unnamed).contains("Claude"))
+    settings.configuration = selection
+    assert(MenuBarPreferences(defaults: defaults).configuration == selection, "The option persists alongside all existing settings")
+    print("PASS: selectable time left uses average allowance burn, preserves identity/settings, and distinguishes reset, learning, no burn, stale, failed, missing and observed zero")
+}
+
 // Auto and explicit menu paths must consume the same single accent, even with
 // legacy blue/orange overrides present. Ordinary labels remain system-colored.
 let oneAccent = AppearancePreferences.color("D5F566")
@@ -734,8 +788,11 @@ do {
         let aligned = NSView(frame: shifting.frame)
         let crossfading = MenuBarValueAnimator()
         crossfading.update(steady, in: aligned, reduceMotion: false) { _ in }
-        crossfading.update(line(0.6, "~97 tok/s" + tail), in: aligned, reduceMotion: false) { _ in }
+        crossfading.update(line(0.4, "~97 tok/s" + tail), in: aligned, reduceMotion: false) { _ in }
         assert(aligned.layer?.animation(forKey: kCATransition) != nil, "Glyph-aligned digit changes keep the designed crossfade")
+        assert(!crossfading.isAnimating, "Text-only crossfades need no repeating timer")
+        crossfading.update(line(0.4, "~97 tok/s" + tail), in: aligned, reduceMotion: true) { _ in }
+        assert(aligned.layer?.animation(forKey: kCATransition) == nil, "Reduce Motion cancels even a text-only crossfade")
         crossfading.cancel()
     }
     print("PASS: menu-bar crossfade only between glyph-aligned lines; width or word changes swap instantly while the dial still moves")
@@ -792,6 +849,23 @@ do {
     assert(MenuBarPresentation.values(compactSettings, meter: meter, monitor: monitor, now: now)[.rate]!.contains(" tok/"))
     meter.hasRate = false
     assert(MenuBarPresentation.values(compactSettings, meter: meter, monitor: monitor, now: now)[.rate] == "—")
+}
+do {
+    let view = NSView()
+    func dial(_ position: Double) -> NSAttributedString {
+        MenuBarDial.attributed(value: position, minimum: 0, maximum: 1, available: true, accent: .labelColor, identity: "codex")
+    }
+    let animator = MenuBarValueAnimator()
+    animator.update(dial(0.1), in: view, reduceMotion: false) { _ in }
+    animator.update(dial(0.9), in: view, reduceMotion: false) { _ in }
+    RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+    let interrupted = animator.displayed!.attribute(MenuBarDial.position, at: 0, effectiveRange: nil) as! Double
+    animator.update(dial(0.3), in: view, reduceMotion: false) { _ in }
+    let retargeted = animator.displayed!.attribute(MenuBarDial.position, at: 0, effectiveRange: nil) as! Double
+    assert(abs(interrupted - retargeted) < 0.0001, "An interrupted needle starts from its on-screen position")
+    assert(view.layer?.animation(forKey: kCATransition) == nil, "Needle changes never crossfade a ghost dial")
+    animator.update(dial(0.3), in: view, reduceMotion: true) { _ in }
+    assert(!animator.isAnimating)
 }
 print("PASS: native menu animation preserves measured text/units, tool identity, missing values, reduced motion, retargeting and timer cleanup")
 

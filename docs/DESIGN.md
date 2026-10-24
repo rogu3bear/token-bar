@@ -215,11 +215,16 @@ CLIs. Allowance and its detailed evidence live in the provider modules.
 5. Each warned active instrument uses warning color for that provider. Warnings
    for inactive providers and remaining values stay in their popover modules.
    Warning evidence cannot create activity or a speed reading.
-6. Default fields are dial and output rate. Existing icon/activity/rate/dial
-   choices, order, separators and density remain configurable. Legacy allowance,
-   forecast, Fable and warning fields remain stored for compatibility but do not
-   render on the status item. Settings exposes only fields that affect this face.
-   With all fields disabled, each active tool retains an icon.
+6. Default fields are dial and output rate. Settings offers an optional Estimated
+   time left field for each confirmed active tool, also available in Customize
+   with the existing field order, separators and density. It reuses the qualified
+   allowance-burn forecast, never output speed, and rounds duration up to five
+   minutes. Reset-before-exhaustion, learning, no measured burn and unavailable
+   readings keep distinct labels. A passed projection is unavailable, never
+   observed exhaustion; only a measured zero says Exhausted. Claude's aged
+   reading remains qualified in spoken copy and the existing popover details.
+   Legacy allowance, projected-zero clock, Fable and warning fields stay stored
+   for compatibility. With all fields disabled, each active tool retains an icon.
 
 `MenuBarPresentation.face` is the presentation owner for the real status item,
 settings preview and synthetic captures. `LiveTool.confirmed` qualifies dated
@@ -752,6 +757,10 @@ It seeks to native frame 105 (3.5 seconds) on first play, repeats the settled
 working section, pauses offscreen and in hidden tabs, preserves explicit pause,
 and stays still under reduced motion. `MenuBarValueAnimator` owns menu-number
 crossfades and dial interpolation; native captures never invent or smooth values.
+Needles settle with a 280 ms ease-out and retarget from their current position.
+Only aligned digit changes with stationary dials crossfade (180 ms); words,
+width changes and moving dials never blend a ghost line. Text-only changes run
+no repeating timer. Reduce Motion settles needles and cancels text fades.
 
 
 `bash scripts/verify-product-previews.sh <new-directory>` renders each canonical

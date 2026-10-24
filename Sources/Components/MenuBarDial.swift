@@ -99,7 +99,7 @@ final class MenuBarValueAnimator {
         to.enumerateAttribute(MenuBarDial.identity, in: NSRange(location: 0, length: to.length)) { value, range, _ in
             guard let id = value as? String, let start = previous[id],
                   to.attribute(MenuBarDial.available, at: range.location, effectiveRange: nil) as? Bool == true,
-                  let end = to.attribute(MenuBarDial.position, at: range.location, effectiveRange: nil) as? Double,
+                  let end = to.attribute(MenuBarDial.position, at: range.location, effectiveRange: nil) as? Double, start != end,
                   let color = to.attribute(MenuBarDial.accent, at: range.location, effectiveRange: nil) as? NSColor else { return }
             let fraction = start + (end - start) * min(1, max(0, progress))
             result.replaceCharacters(in: range, with: MenuBarDial.attributed(value: fraction, minimum: 0, maximum: 1, available: true, accent: color, identity: id))
@@ -124,7 +124,7 @@ final class MenuBarValueAnimator {
     deinit { timer?.invalidate() }
     func update(_ value: NSAttributedString, in view: NSView, reduceMotion: Bool, apply: @escaping (NSAttributedString) -> Void) {
         let changed = target.map { !Self.signature($0).isEqual(to: Self.signature(value)) } ?? true
-        guard changed || (reduceMotion && isAnimating) else { return }
+        guard changed || (reduceMotion && (isAnimating || view.layer?.animation(forKey: kCATransition) != nil)) else { return }
         let from = displayed
         cancel()
         target = value
@@ -135,26 +135,32 @@ final class MenuBarValueAnimator {
             displayed = value; apply(value); return
         }
         view.wantsLayer = true
-        if Self.alignsForCrossfade(from, value) {
+        let firstFrame = Self.frame(from: from, to: value, progress: 0)
+        let movesDial = !Self.signature(firstFrame).isEqual(to: Self.signature(value))
+        // Never blend a second needle over the interpolating dial.
+        if !movesDial && from.string != value.string && Self.alignsForCrossfade(from, value) {
             let fade = CATransition()
-            fade.type = .fade; fade.duration = 0.3
-            fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            fade.type = .fade; fade.duration = 0.18
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
             view.layer?.add(fade, forKey: kCATransition)
         } else {
             // The variable-length status item changes width, so blending would draw the line twice.
             view.layer?.removeAnimation(forKey: kCATransition)
         }
         let start = ProcessInfo.processInfo.systemUptime
-        displayed = Self.frame(from: from, to: value, progress: 0)
-        apply(displayed!)
+        displayed = firstFrame
+        apply(firstFrame)
+        // Text-only, color and occupancy changes need no display-link work.
+        // A dial retargets from its currently displayed position on interruption.
+        guard movesDial else { return }
         isAnimating = true
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self, weak view] timer in
             guard let self else { timer.invalidate(); return }
             guard let view else { self.cancel(); return }
-            let progress = min(1, (ProcessInfo.processInfo.systemUptime - start) / 0.35)
+            let progress = min(1, (ProcessInfo.processInfo.systemUptime - start) / 0.28)
             // Do not re-check NSWorkspace during animation; motion decision was already made
             let finished = progress >= 1
-            let eased = progress * progress * (3 - 2 * progress)
+            let eased = 1 - pow(1 - progress, 3)
             let frame = finished ? value : Self.frame(from: from, to: value, progress: eased)
             self.displayed = frame; apply(frame)
             if finished {
