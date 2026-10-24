@@ -630,7 +630,7 @@ do {
 // The selectable duration consumes the shared provider allowance forecast, not token rate or reset time.
 do {
     let date = Date(timeIntervalSince1970: 2_000_000_000)
-    var latest = QuotaReading(accountID: "duration-fixture", bucket: "claude", name: "Claude", window: "five_hour",
+    let latest = QuotaReading(accountID: "duration-fixture", bucket: "claude", name: "Claude", window: "five_hour",
         minutes: 300, used: 60, reset: date.addingTimeInterval(7200), date: date)
     var first = latest; first.used = 40; first.date = date.addingTimeInterval(-600)
     func state(_ reading: QuotaReading, samples: [QuotaReading]? = nil) -> ToolQuotaState {
@@ -655,6 +655,13 @@ do {
     assert(label(state(noReset)).text == "Time left —")
     var zero = noReset; zero.used = 100
     assert(label(state(zero)).text == "Exhausted", "Measured exhaustion does not need a reset or burn slope")
+    var weekly = latest; weekly.window = "seven_day"; weekly.minutes = 10080
+    var earlierWeek = first; earlierWeek.window = weekly.window; earlierWeek.minutes = weekly.minutes
+    var mixed = state(zero, samples: [zero, earlierWeek, weekly]); mixed.readings = [weekly, zero]
+    assert(AccountAllowancePresentation(quota: mixed, now: date).reading?.window == zero.window)
+    assert(label(mixed).text == "Exhausted", "An exhausted window without a reset binds before a sibling's forecast")
+    mixed.readings.reverse()
+    assert(label(mixed).text == "Exhausted", "Exhaustion priority is independent of provider array order")
     var spentSoon = latest; spentSoon.used = 99
     var spentEarlier = first; spentEarlier.used = 79
     assert(label(state(spentSoon, samples: [spentEarlier, spentSoon]), at: date.addingTimeInterval(60)).text == "Time left —",

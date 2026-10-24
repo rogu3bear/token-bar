@@ -273,6 +273,9 @@ extension Runway {
     static func priority(_ quotas: [QuotaReading], samples: [QuotaReading], now: Date, horizon: TimeInterval = defaultHorizon) -> QuotaReading? {
         let current = quotas.filter { now.timeIntervalSince($0.date) < horizon && ($0.reset.map { $0 > now } ?? true) }
         return current.sorted { a, b in
+            // Observed exhaustion binds before any projection, including when the
+            // exhausted window has no reset clock and therefore no forecast date.
+            if (a.remaining == 0) != (b.remaining == 0) { return a.remaining == 0 }
             let left = estimate(a, samples: samples, now: now, horizon: horizon).exhaustion
             let right = estimate(b, samples: samples, now: now, horizon: horizon).exhaustion
             if left != right { return (left ?? .distantFuture) < (right ?? .distantFuture) }
