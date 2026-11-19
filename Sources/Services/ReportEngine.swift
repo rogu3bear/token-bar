@@ -107,6 +107,10 @@ final class ReportEngine {
     private(set) var indexRestores = 0
     private(set) var indexAppends = 0
     private(set) var storageError: String?
+    /// The index is a restart cache keyed to one content ID. Saving it on every revision
+    /// rewrote megabytes per refresh; at most one save per interval bounds that cost.
+    static let indexSaveInterval: TimeInterval = 300
+    private var lastIndexSave = Date.distantPast
     init(storageURL: URL? = nil) { self.storageURL = storageURL }
     private(set) var indexBuilds = 0
     private(set) var usageBuilds = 0
@@ -128,7 +132,9 @@ final class ReportEngine {
                 else { index = ReportIndex(source); indexBuilds += 1 }
             }
             revision = inputs.entries
-            if !restored, let storageURL, let sourceID {
+            if !restored, let storageURL, let sourceID,
+               Date().timeIntervalSince(lastIndexSave) >= Self.indexSaveInterval {
+                lastIndexSave = Date()
                 do { try ReportIndexStorage.save(index!, to: storageURL, contentID: sourceID); storageError = nil }
                 catch { storageError = "Report index could not be saved; usage history remains available." }
             }

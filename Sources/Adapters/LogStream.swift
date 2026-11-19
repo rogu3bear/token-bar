@@ -70,7 +70,7 @@ final class LogStream {
         if let grokHome { roots.append(grokHome.path) }
         if let claudeHome { roots.append(claudeHome.path) }
         if let openCodeHome { roots.append(openCodeHome.path) }
-        stream = FSEventStreamCreate(nil, callback, &context, roots.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.1,
+        stream = FSEventStreamCreate(nil, callback, &context, roots.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 2.0,
             FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer))
         if let stream { FSEventStreamSetDispatchQueue(stream, queue); FSEventStreamStart(stream) }
     }

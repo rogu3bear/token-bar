@@ -99,7 +99,7 @@ extension UsageScanner {
         // Retrying SQLite phases never re-encodes an identical JSON snapshot.
         try finishCheckpoint()
         guard dirtyGeneration != savedGeneration,
-              force || now.timeIntervalSince(lastSave) >= 15 else { return }
+              force || now.timeIntervalSince(lastSave) >= Self.fullSaveInterval else { return }
         let metadataOnly = ledger.checkpointID != nil && contentGeneration == savedContentGeneration &&
             (ledger.eventIDs ?? []).isEmpty
         let url = metadataOnly ? Self.metadataURL(for: stateURL) : stateURL

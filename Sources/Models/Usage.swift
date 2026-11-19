@@ -231,6 +231,10 @@ final class UsageScanner {
     var loadError: String?
     var historicalIndex: [String: Int] = [:]
     var rebuilding = false
+    /// Minimum seconds between full ledger saves while new usage keeps it dirty. Each save
+    /// re-encodes the whole ledger, so this bounds write volume; crash recovery re-admits
+    /// at most this window from durable cursors. Quit and explicit flushes save at once.
+    static let fullSaveInterval: TimeInterval = 600
     var lastSave = Date.distantPast
     var dirtyGeneration: UInt64 = 0
     var savedGeneration: UInt64 = 0

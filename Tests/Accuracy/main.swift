@@ -319,6 +319,18 @@ do {
     }
     for _ in 0..<5 { try batch.saveIfNeeded(force: true) }
     check(batch.persistenceCount == 5, "Idle and final flush do not rewrite clean JSON")
+    // Unforced saves wait out the full-save floor, so steady admissions cost one rewrite per interval.
+    let floor = makeScanner("save-floor")
+    try floor.saveIfNeeded(force: true)
+    let floorWrites = floor.persistenceCount
+    let saved = floor.lastSave
+    for step in 1...5 {
+        _ = admit(floor, "save-floor-\(step)")
+        try floor.saveIfNeeded(now: saved.addingTimeInterval(Double(step) * 100))
+    }
+    check(floor.persistenceCount == floorWrites && floor.needsSave, "Admissions inside the save floor stay pending without a rewrite")
+    try floor.saveIfNeeded(now: saved.addingTimeInterval(UsageScanner.fullSaveInterval))
+    check(floor.persistenceCount == floorWrites + 1 && !floor.needsSave, "One save at the floor settles every pending admission")
     let reopened = makeScanner("batches")
     check(!reopened.needsSave, "Restart ID retirement alone does not require a JSON rewrite")
     check(reopened.ledger.entries.reduce(0) { $0 + $1.eventCount } == 10000, "Restart preserves all counters")
