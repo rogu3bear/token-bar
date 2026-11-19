@@ -102,7 +102,7 @@ import ServiceManagement
     private func scheduleSave(retrying: Bool = false) {
         guard scanner.needsSave else { return }
         saveWork?.cancel()
-        let delay = retrying ? 15 : max(0, 15 - Date().timeIntervalSince(scanner.lastSave))
+        let delay = retrying ? 15 : max(0, UsageScanner.fullSaveInterval - Date().timeIntervalSince(scanner.lastSave))
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             do { try self.scanner.saveIfNeeded(force: true) }

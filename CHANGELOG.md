@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bound disk writes: save the full ledger at most every 10 minutes instead of every 15 seconds while usage arrives, save the report index at most every 5 minutes, and coalesce file-change scans to 2 seconds. Quit still saves at once; a crash re-reads at most the last 10 minutes from saved positions.
 - Use a zero-safe logarithmic scale for token and cost timelines, and show current Anthropic rates under Pricing basis. Add Haiku 5.5 and Claude 4.6/4.7 comparison rates, update Sonnet 5.5 cache reads, and retain dated historical tariffs.
 - Reuse one owned cost-recovery workspace after interruption, and avoid rewriting unchanged recovered details or creating duplicate rollback copies.
 - Decide log usage once through admitted counter coverage across Codex, Claude, Grok and OpenCode. Preserve unknown legacy coverage and recovery witnesses; covered intervals cannot add usage under another receipt or scan scope.
