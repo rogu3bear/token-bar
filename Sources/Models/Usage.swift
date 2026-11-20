@@ -278,7 +278,10 @@ final class UsageScanner {
             // A readable legacy snapshot can still be displayed if its
             // identity index or the migration is unavailable. The load error
             // blocks all admission and saves.
-            if ledgerStore == nil, let readable = try? Self.loadLedger(from: stateURL) { ledger = readable }
+            if ledgerStore == nil {
+                if let legacy = try? Self.loadLegacyLedger(from: stateURL) { ledger = legacy }
+                else if let readable = try? Self.loadLedger(from: stateURL) { ledger = readable }
+            }
             loadError = "Saved usage history could not be opened; it has been preserved. " + error.localizedDescription
         }
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

@@ -407,8 +407,10 @@ replaying every transcript.
   backup API or quit first and preserve the database and any remaining journal
   files together with the request archive. The migration needs room for the
   new database alongside the predecessor and may leave a private unpublished
-  file if the process is killed during migration. If the upgrade is interrupted,
-  resume it with the SQLite-capable build before opening the profile again.
+  file if the process is killed during migration. When resuming between database
+  publication and marker creation, the app verifies the predecessor files. If
+  an older build saved in the interim, it preserves both stores and stops saves
+  until they are reconciled.
 - Ordinary commits encode and write changed rows. The current scanner still
   loads history into memory and compares it with the last committed snapshot.
   Large imports, entry reordering during compaction or cost recovery, and large

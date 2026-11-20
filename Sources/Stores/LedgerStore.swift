@@ -26,7 +26,7 @@ final class LedgerStore {
         let store = try LedgerStore(destination)
         let ledger = try store.load()
         try PrivateFile.protect(destination)
-        try sealLegacy(legacy)
+        try store.sealLegacy(legacy)
         try store.statement("PRAGMA journal_mode=WAL") { query in
             guard sqlite3_step(query) == SQLITE_ROW, sqlite3_column_text(query, 0).map({ String(cString: $0) }) == "wal" else {
                 throw store.failure("Could not enable the usage transaction journal")
@@ -93,10 +93,17 @@ final class LedgerStore {
 
     /// Older readers fail closed at their original path. Keep the old bytes
     /// available and publish the marker only after the database is durable.
-    private static func sealLegacy(_ legacy: URL) throws {
+    private func sealLegacy(_ legacy: URL) throws {
+        if FileManager.default.fileExists(atPath: legacy.path), try Self.isMigrationMarker(legacy) { return }
+        let captured = try statement("SELECT payload FROM migration_predecessor WHERE id=1") { query in
+            guard sqlite3_step(query) == SQLITE_ROW else { throw failure("Usage migration evidence is missing") }
+            return try decoder.decode([String?].self, from: data(query, at: 0))
+        }
+        guard captured == (try Self.predecessorFiles(for: legacy).map(Self.fileWitness)) else {
+            throw RequestArchive.failure("Legacy usage changed after SQLite migration was staged; both stores have been preserved")
+        }
         let parent = legacy.deletingLastPathComponent()
         if FileManager.default.fileExists(atPath: legacy.path) {
-            if try isMigrationMarker(legacy) { return }
             let backup = legacy.deletingPathExtension().appendingPathExtension("before-sqlite.json")
             var sourceInfo = stat(), backupInfo = stat()
             guard lstat(legacy.path, &sourceInfo) == 0, sourceInfo.st_mode & S_IFMT == S_IFREG else {
@@ -110,9 +117,9 @@ final class LedgerStore {
             }
             try PrivateFile.protect(backup)
         }
-        try syncDirectory(parent)
-        try PrivateCache.write(migrationMarker, to: legacy)
-        try syncDirectory(parent)
+        try Self.syncDirectory(parent)
+        try PrivateCache.write(Self.migrationMarker, to: legacy)
+        try Self.syncDirectory(parent)
     }
 
     private static func syncDirectory(_ url: URL) throws {
@@ -122,15 +129,37 @@ final class LedgerStore {
         guard fsync(descriptor) == 0 else { throw RequestArchive.failure("Could not synchronize the usage directory") }
     }
 
+    private static func predecessorFiles(for legacy: URL) -> [URL] {
+        let index = legacy.deletingPathExtension().appendingPathExtension("events.sqlite")
+        return [legacy, UsageScanner.metadataURL(for: legacy), index, URL(fileURLWithPath: index.path + "-wal")]
+    }
+
+    // Link count and ctime can change when preserving the original JSON. Its
+    // file identity and content modification time remain stable across that step.
+    private static func fileWitness(_ url: URL) throws -> String? {
+        var value = stat()
+        guard lstat(url.path, &value) == 0 else {
+            if errno == ENOENT { return nil }
+            throw RequestArchive.failure("Could not inspect files for usage migration")
+        }
+        guard value.st_mode & S_IFMT == S_IFREG else {
+            throw RequestArchive.failure("Usage migration requires regular predecessor files")
+        }
+        let modified = value.st_mtimespec
+        return "\(value.st_dev):\(value.st_ino):\(value.st_size):\(modified.tv_sec):\(modified.tv_nsec)"
+    }
+
     private static func migrate(_ legacy: URL, to destination: URL) throws {
         let files = FileManager.default
-        let hasLedger = files.fileExists(atPath: legacy.path)
+        let predecessors = predecessorFiles(for: legacy)
+        let initial = try predecessors.map(fileWitness)
+        let hasLedger = initial[0] != nil
         var ledger = hasLedger ? try UsageScanner.loadLegacyLedger(from: legacy) : Ledger()
-        if !hasLedger && files.fileExists(atPath: UsageScanner.metadataURL(for: legacy).path) {
+        if !hasLedger && initial[1] != nil {
             throw RequestArchive.failure("The saved usage ledger is missing; its checkpoint has been preserved")
         }
-        let index = legacy.deletingPathExtension().appendingPathExtension("events.sqlite")
-        let hasIndex = files.fileExists(atPath: index.path)
+        let index = predecessors[2]
+        let hasIndex = initial[2] != nil
         if ledger.eventIndexReady == true && !hasIndex {
             throw RequestArchive.failure("The historical event index is missing; usage history has been preserved")
         }
@@ -157,6 +186,7 @@ final class LedgerStore {
                         CREATE TABLE ledger_metadata (section TEXT NOT NULL, key TEXT NOT NULL, payload BLOB NOT NULL,
                             PRIMARY KEY(section, key)) WITHOUT ROWID;
                         CREATE TABLE event_ids (id TEXT PRIMARY KEY) WITHOUT ROWID;
+                        CREATE TABLE migration_predecessor (id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL);
                         PRAGMA user_version=1;
                         """)
                     if hasIndex {
@@ -170,6 +200,17 @@ final class LedgerStore {
                         try store.execute("INSERT INTO main.event_ids SELECT id FROM legacy.event_ids")
                     }
                     try store.write(ledger)
+                }
+                // Closing the legacy connection can recover or checkpoint its
+                // SQLite files. Bind the final on-disk predecessor before publication.
+                if hasIndex { try store.execute("DETACH DATABASE legacy") }
+                let captured = try predecessors.map(fileWitness)
+                guard captured.prefix(2) == initial.prefix(2), (captured[2] != nil) == hasIndex else {
+                    throw RequestArchive.failure("Legacy usage files changed while migrating; original files have been preserved")
+                }
+                try store.statement("INSERT INTO migration_predecessor VALUES (1,?)") { query in
+                    try store.bind(store.encoder.encode(captured), to: query, at: 1)
+                    try store.stepDone(query)
                 }
             }
             // Publish the fully committed store in the same directory without replacing a peer's store.

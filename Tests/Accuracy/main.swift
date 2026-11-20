@@ -535,6 +535,57 @@ for version in [1, 2] {
           "A missing migrated store must not reimport stale legacy state")
 }
 
+for change in ["none", "ledger", "checkpoint", "index"] {
+    let url = root.appendingPathComponent("unsealed-\(change).json")
+    let checkpointURL = UsageScanner.metadataURL(for: url)
+    let indexURL = url.deletingPathExtension().appendingPathExtension("events.sqlite")
+    var legacy = Ledger()
+    legacy.checkpointID = UUID()
+    legacy.eventIndexReady = true
+    legacy.cursors["first"] = Cursor(offset: 7)
+    try PrivateCache.write(legacy, to: url)
+    try PrivateCache.write(LedgerMetadataCheckpoint(baseline: legacy.checkpointID!, metadata: legacy), to: checkpointURL)
+    _ = try EventIndex(url: indexURL, required: false)
+    let backup = url.deletingPathExtension().appendingPathExtension("before-sqlite.json")
+    // A blocking file stops the upgrade after the SQLite database is published
+    // and before the marker replaces the predecessor. Leave that state intact.
+    try PrivateCache.write(Data("synthetic blocking file".utf8), to: backup)
+    let interrupted = UsageScanner(home: root, stateURL: url)
+    check(interrupted.loadError != nil && FileManager.default.fileExists(atPath: LedgerStore.url(for: url).path),
+          "Interrupted publication leaves a complete SQLite database beside the predecessor")
+    try FileManager.default.removeItem(at: backup)
+    switch change {
+    case "ledger":
+        legacy.checkpointID = UUID()
+        legacy.cursors["first"]?.offset = 99
+        legacy.entries.append(entry("2026-09-07", id: "older-build-admission"))
+        try PrivateCache.write(legacy, to: url)
+    case "checkpoint":
+        legacy.cursors["first"]?.offset = 99
+        try PrivateCache.write(LedgerMetadataCheckpoint(baseline: legacy.checkpointID!, metadata: legacy), to: checkpointURL)
+    case "index":
+        try EventIndex(url: indexURL, required: true).commit(["synthetic-legacy-recovery-id"])
+    default:
+        break
+    }
+    let resumed = UsageScanner(home: root, stateURL: url)
+    if change == "none" {
+        let marked = try LedgerStore.isMigrationMarker(url)
+        check(resumed.loadError == nil && marked && resumed.ledger.cursors["first"]?.offset == 7,
+              "An unchanged predecessor can resume publication after interruption")
+    } else {
+        check(resumed.loadError?.contains("Legacy usage changed") == true && resumed.ledger.cursors == legacy.cursors,
+              "Resuming after an older build saves holds and displays the latest readable ledger")
+        let old = try UsageScanner.loadLegacyLedger(from: url)
+        let staged = try LedgerStore.read(LedgerStore.url(for: url))
+        check(old.entries == legacy.entries && old.cursors == legacy.cursors &&
+              staged.entries.isEmpty && staged.cursors["first"]?.offset == 7 &&
+              !FileManager.default.fileExists(atPath: backup.path), "Both versions survive a changed " + change)
+        do { try resumed.saveIfNeeded(force: true); preconditionFailure("Competing versions must block quit flush") } catch {}
+    }
+}
+print("PASS: interrupted migration resumes a matching predecessor and refuses changed legacy ledger, checkpoint or index")
+
 do {
     let url = root.appendingPathComponent("legacy-invalid.json")
     var legacy = Ledger()
