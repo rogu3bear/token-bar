@@ -553,6 +553,7 @@ for change in ["none", "ledger", "checkpoint", "index"] {
     let interrupted = UsageScanner(home: root, stateURL: url)
     check(interrupted.loadError != nil && FileManager.default.fileExists(atPath: LedgerStore.url(for: url).path),
           "Interrupted publication leaves a complete SQLite database beside the predecessor")
+    do { _ = try UsageScanner.loadLedger(from: url); preconditionFailure("An unmarked database must not become the profile snapshot") } catch {}
     try FileManager.default.removeItem(at: backup)
     switch change {
     case "ledger":
@@ -585,6 +586,40 @@ for change in ["none", "ledger", "checkpoint", "index"] {
     }
 }
 print("PASS: interrupted migration resumes a matching predecessor and refuses changed legacy ledger, checkpoint or index")
+
+do {
+    let files = FileManager.default
+    let original = root.appendingPathComponent("backup-source")
+    let copy = root.appendingPathComponent("backup-restored")
+    for directory in [original, copy] { try files.createDirectory(at: directory, withIntermediateDirectories: true) }
+    let url = original.appendingPathComponent("ledger.json")
+    var legacy = Ledger()
+    legacy.cursors["legacy"] = Cursor(offset: 7)
+    try PrivateCache.write(legacy, to: url)
+    let id: String
+    let entries: [Entry]
+    do {
+        let writer = UsageScanner(home: original, stateURL: url)
+        check(writer.loadError == nil, "Restore fixture opens its legacy profile")
+        id = checkpointAdmit(writer, "backup")
+        writer.ledger.cursors["legacy"]?.offset = 42
+        try writer.saveIfNeeded(force: true)
+        entries = writer.ledger.entries
+    }
+
+    let restoredURL = copy.appendingPathComponent("ledger.json")
+    for name in ["ledger.sqlite", "ledger.requests.sqlite"] {
+        try files.copyItem(at: original.appendingPathComponent(name), to: copy.appendingPathComponent(name))
+    }
+    do { _ = try UsageScanner.loadLedger(from: restoredURL); preconditionFailure("A copied database alone is not a restore set") } catch {}
+    try files.copyItem(at: url, to: restoredURL)
+    let restored = UsageScanner(home: copy, stateURL: restoredURL)
+    let restoredCount = try restored.requestArchive!.count
+    check(restored.loadError == nil && restored.ledger.entries == entries &&
+          restored.ledger.cursors["legacy"]?.offset == 42 && restored.identityKnown(id) == true && restoredCount == 1,
+          "A stopped profile restores entries, cursor, identities and acknowledged details together")
+}
+print("PASS: quit and restore the SQLite profile and request archive with the migration marker")
 
 do {
     let url = root.appendingPathComponent("legacy-invalid.json")

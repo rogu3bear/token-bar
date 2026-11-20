@@ -37,8 +37,12 @@ extension UsageScanner {
     static func loadLedger(from url: URL) throws -> Ledger {
         if url.pathExtension == "sqlite" { return try LedgerStore.read(url) }
         let databaseURL = LedgerStore.url(for: url)
-        if FileManager.default.fileExists(atPath: databaseURL.path) { return try LedgerStore.read(databaseURL) }
-        return try loadLegacyLedger(from: url)
+        let files = FileManager.default
+        guard files.fileExists(atPath: databaseURL.path) else { return try loadLegacyLedger(from: url) }
+        guard files.fileExists(atPath: url.path), try LedgerStore.isMigrationMarker(url) else {
+            throw RequestArchive.failure("Saved SQLite usage has no migration marker; the profile is not ready to read")
+        }
+        return try LedgerStore.read(databaseURL)
     }
 
     static func loadLegacyLedger(from url: URL) throws -> Ledger {

@@ -405,8 +405,10 @@ replaying every transcript.
   predecessor files describe the migration boundary. Reverting to them would
   discard later SQLite-only history. Back up the SQLite ledger, its
   `ledger.json` migration marker, and the request archive as one restore set.
-  Use SQLite's backup API for live databases, or quit first and retain any
-  remaining journal files with their databases. The migration needs room for the
+  Quit Token Bar before copying the restore set, and retain any remaining
+  journal files with their databases. SQLite's online backup API snapshots a
+  single database. A live ledger backup is useful for Cost recovery, while a
+  complete profile restore needs a matching archive and marker. The migration needs room for the
   new database alongside the predecessor and may leave a private unpublished
   file if the process is killed during migration. When resuming between database
   publication and marker creation, the app verifies the predecessor files. If
