@@ -200,6 +200,7 @@ extension UsageScanner {
             return summary
         }
         ledger = next
+        entryBaseline = nil  // Enrichment rewrites saved entries; the next save is a full baseline.
         rebuildHistoricalIndex()
         markDirty()
         try saveIfNeeded(force: true)

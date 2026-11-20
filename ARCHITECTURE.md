@@ -111,8 +111,12 @@ The surrounding pipeline preserves these responsibilities:
    failures retry the captured checkpoint without re-encoding. Indexed IDs retire
    from memory; JSON retains the last recovery batch until the next genuine save.
    Normal termination flushes outstanding work; storage-load failure preserves
-   saved data. Metadata-only changes write an entry-free UUID-bound sidecar;
-   only a matching full-ledger baseline accepts it. Legacy ledgers acquire a UUID
+   saved data. Saves write a UUID-bound checkpoint beside the full ledger: the
+   metadata, plus any entries appended since that baseline (version 2, with the
+   baseline's entry count). Only the matching full-ledger baseline with that count
+   accepts it. A change to a saved entry, or more than 25,000 appended entries,
+   writes a new full baseline. Older apps refuse a version 2 checkpoint and
+   preserve it rather than drop its entries. Legacy ledgers acquire a UUID
    on full save; older apps may replay older cursors against the durable ID index.
    Archive admitted-row counts update only on successful admissions and invalidate
    after rollback or another connection's committed change.
