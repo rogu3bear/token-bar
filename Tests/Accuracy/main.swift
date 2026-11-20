@@ -343,7 +343,8 @@ do {
             if step == phase { throw RequestArchive.failure("Synthetic phase failure") }
         }
         do { try failing!.saveIfNeeded(force: true); preconditionFailure("Expected phase failure") } catch {}
-        let disk = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: failing!.stateURL))
+        // Durable state is the full baseline plus its checkpoint, exactly as restart loads it.
+        let disk = try UsageScanner.loadLedger(from: failing!.stateURL)
         check(disk.eventIDs?.contains(id) == (phase != .ledger), "Only durable snapshot carries the new ID")
         check(failing!.eventIndex!.contains(id) == (phase == .acknowledge), "Index never leads durable ledger")
         let invisible = try failing!.requestArchive!.count
@@ -416,20 +417,45 @@ do {
     check(!reopened.needsSave, "Restart does not replay an unchanged non-usage transcript")
     let attrs = try FileManager.default.attributesOfItem(atPath: metadataURL.path)
     check((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600, "Metadata remains private")
-    // A genuine admission must replace the full baseline before index/ack.
+    let cursorOnly = try JSONDecoder().decode(LedgerMetadataCheckpoint.self, from: metadata)
+    check(cursorOnly.version == 1 && cursorOnly.appended == nil, "Entry-free checkpoints keep the version older apps read")
+    // A genuine admission travels in the checkpoint with its identity before
+    // index/ack, and leaves every full-history byte unchanged.
     let id = UsageScanner.foreignIdentity(harness: "metadata-test", messageID: "new")
     value.recordID = id
     reopened.persistAdmitted(value, fingerprint: id, date: value.date)
     reopened.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic index failure") } }
     do { try reopened.saveIfNeeded(force: true); preconditionFailure("Expected index failure") } catch {}
+    check(try! Data(contentsOf: url) == baseline, "New admitted usage saves without rewriting full history")
+    let checkpointBytes = try Data(contentsOf: metadataURL)
+    let appended = try JSONDecoder().decode(LedgerMetadataCheckpoint.self, from: checkpointBytes)
+    check(appended.version == 2 && appended.baseCount == baselineEntries.count && appended.appended?.count == 1 &&
+          appended.metadata.eventIDs?.contains(id) == true, "Version 2 checkpoint carries the new entry and its identity together")
+    check(checkpointBytes.count * 100 < baseline.count, "Appended checkpoint stays far smaller than full history")
+    do {  // Scoped so this process's index reads end before the next restart.
+        let recovered = UsageScanner(home: home, stateURL: url)
+        check(recovered.loadError == nil && recovered.ledger.entries.count == baselineEntries.count + 1 &&
+              recovered.ledger.entries.last == reopened.ledger.entries.last, "Restart restores the full baseline plus appended entries")
+        check(recovered.identityKnown(id) == true, "Checkpoint recovers exact dedup identity before exposing detail")
+        check(try! recovered.requestArchive!.count == 1, "Only durable admission is acknowledged after restart")
+    }
+    // A tail past the limit starts a new full baseline; the stale checkpoint
+    // stays harmless across that crash window.
+    let tail = UsageScanner(home: home, stateURL: url)
+    tail.readAccount = false
+    tail.appendedEntryLimit = 1
+    let second = UsageScanner.foreignIdentity(harness: "metadata-test", messageID: "second")
+    value.recordID = second
+    tail.persistAdmitted(value, fingerprint: second, date: value.date)
+    tail.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic index failure") } }
+    do { try tail.saveIfNeeded(force: true); preconditionFailure("Expected index failure") } catch {}
     let next = try Data(contentsOf: url)
-    check(next != baseline, "New admitted totals require a full durable save")
-    check(try! Data(contentsOf: metadataURL) == metadata, "Old metadata checkpoint is preserved across the full-save crash window")
-    let recovered = UsageScanner(home: home, stateURL: url)
-    check(recovered.loadError == nil && recovered.ledger.entries.count == baselineEntries.count + 1,
-          "Restart ignores stale metadata and recovers the newer full ledger")
-    check(recovered.identityKnown(id) == true, "Full save recovers exact dedup identity before exposing detail")
-    check(try! recovered.requestArchive!.count == 1, "Only durable admission is acknowledged after restart")
+    check(next != baseline, "An appended tail past the limit requires a full durable save")
+    check(try! Data(contentsOf: metadataURL) == checkpointBytes, "Old checkpoint is preserved across the full-save crash window")
+    let compacted = UsageScanner(home: home, stateURL: url)
+    check(compacted.loadError == nil && compacted.ledger.entries.count == baselineEntries.count + 2,
+          "Restart ignores the stale checkpoint and recovers the newer full ledger")
+    check(compacted.identityKnown(id) == true && compacted.identityKnown(second) == true, "Full save keeps both identities")
     // A corrupt checkpoint is never silently ignored or overwritten.
     try Data("broken checkpoint".utf8).write(to: metadataURL)
     let broken = UsageScanner(home: home, stateURL: url)
@@ -461,6 +487,73 @@ do {
     }
 }
 print("PASS: metadata checkpoint migration, restart, private permissions, stale/corrupt handling and storage-phase retry")
+
+// Appended checkpoints may carry edits only to entries added after the full
+// baseline; any change to saved history needs a new full save.
+do {
+    let home = root.appendingPathComponent("appended-baseline")
+    try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    let url = home.appendingPathComponent("ledger.json")
+    let checkpointURL = UsageScanner.metadataURL(for: url)
+    func open() -> UsageScanner { let scanner = UsageScanner(home: home, stateURL: url); scanner.readAccount = false; return scanner }
+    func admit(_ scanner: UsageScanner, _ name: String, session: String) {
+        let id = UsageScanner.foreignIdentity(harness: "appended-test", messageID: name)
+        var value = entry("2026-09-07", id: id); value.session = session
+        scanner.persistAdmitted(value, fingerprint: id, date: value.date)
+    }
+    // Each process lives in its own scope, so its index reads end before the next restart.
+    var baseline = Data(), rebased = Data()
+    do {
+        let scanner = open()
+        admit(scanner, "saved-1", session: "saved")
+        try scanner.saveIfNeeded(force: true)
+        baseline = try Data(contentsOf: url)
+        admit(scanner, "appended-1", session: "appended")
+        try scanner.saveIfNeeded(force: true)
+        admit(scanner, "appended-2", session: "appended")
+        try scanner.saveIfNeeded(force: true)
+        check(try! Data(contentsOf: url) == baseline, "Merges into a bucket created after the baseline stay in the checkpoint")
+    }
+    do {
+        let reopened = open()
+        check(reopened.loadError == nil && reopened.ledger.entries.map(\.eventCount) == [1, 2], "Restart restores the merged appended bucket")
+        admit(reopened, "saved-2", session: "saved")
+        try reopened.saveIfNeeded(force: true)
+        rebased = try Data(contentsOf: url)
+        check(rebased != baseline, "Merging into a saved entry forces a full save")
+    }
+    do {
+        let restarted = open()
+        check(restarted.loadError == nil && restarted.ledger.entries.map(\.eventCount) == [2, 2], "Restart keeps both merged buckets")
+        var replaced = restarted.ledger.entries
+        replaced[1].session = "replaced"
+        restarted.ledger.entries = replaced
+        restarted.markDirty()
+        try restarted.saveIfNeeded(force: true)
+        check(try! Data(contentsOf: url) != rebased, "A replaced boundary entry forces a full save")
+    }
+    do {
+        let replayed = open()
+        check(replayed.loadError == nil && replayed.ledger.entries[1].session == "replaced", "The replacement is durable")
+    }
+    // A checkpoint that disagrees with its full ledger fails closed and is preserved.
+    let full = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: url))
+    var metadata = full; metadata.entries = []
+    var mismatched = LedgerMetadataCheckpoint(baseline: full.checkpointID!, metadata: metadata)
+    mismatched.version = 2; mismatched.baseCount = full.entries.count + 5; mismatched.appended = [full.entries[0]]
+    let mismatchedBytes = try JSONEncoder().encode(mismatched)
+    try mismatchedBytes.write(to: checkpointURL)
+    let ledgerBytes = try Data(contentsOf: url)
+    let refused = open()
+    check(refused.loadError != nil, "A base-count mismatch fails closed")
+    do { try refused.saveIfNeeded(force: true); preconditionFailure("Expected preserved load failure") } catch {}
+    check(try! Data(contentsOf: url) == ledgerBytes && (try! Data(contentsOf: checkpointURL)) == mismatchedBytes,
+          "A refused checkpoint and its ledger stay byte-for-byte")
+    mismatched.baseCount = nil
+    try JSONEncoder().encode(mismatched).write(to: checkpointURL)
+    check(open().loadError != nil, "A version 2 checkpoint without its base count fails closed")
+}
+print("PASS: appended checkpoints keep saved history unchanged, rebase on saved-entry edits and fail closed on mismatch")
 
 do {
     let url = root.appendingPathComponent("legacy-checkpoint.json")

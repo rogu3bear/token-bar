@@ -231,10 +231,17 @@ final class UsageScanner {
     var loadError: String?
     var historicalIndex: [String: Int] = [:]
     var rebuilding = false
-    /// Minimum seconds between full ledger saves while new usage keeps it dirty. Each save
-    /// re-encodes the whole ledger, so this bounds write volume; crash recovery re-admits
-    /// at most this window from durable cursors. Quit and explicit flushes save at once.
+    /// Minimum seconds between saves while new usage keeps the ledger dirty. A save writes
+    /// the metadata checkpoint with entries appended since the full baseline, so this bounds
+    /// write volume; crash recovery re-admits at most this window from durable cursors.
+    /// Quit and explicit flushes save at once.
     static let fullSaveInterval: TimeInterval = 600
+    /// Entries in the full ledger file named by `ledger.checkpointID`, while the
+    /// in-memory prefix still equals it; nil forces the next save to be a full save.
+    var entryBaseline: Int?
+    var entryBaselineLast: Entry?
+    /// Appended entries a checkpoint may carry before a full save starts a new baseline.
+    var appendedEntryLimit = 25_000
     var lastSave = Date.distantPast
     var dirtyGeneration: UInt64 = 0
     var savedGeneration: UInt64 = 0
@@ -270,7 +277,12 @@ final class UsageScanner {
         self.claudeHome = claudeHome; self.openCodeHome = openCodeHome
         ledger = Ledger()
         if FileManager.default.fileExists(atPath: stateURL.path) {
-            do { ledger = try Self.loadLedger(from: stateURL) }
+            do {
+                let loaded = try Self.loadLedgerAndBaseline(from: stateURL)
+                ledger = loaded.ledger
+                entryBaseline = loaded.baseCount
+                if let base = loaded.baseCount, base > 0 { entryBaselineLast = ledger.entries[base - 1] }
+            }
             catch { loadError = "Saved usage history could not be read; it has been preserved. " + error.localizedDescription }
         }
         if loadError == nil {
@@ -301,7 +313,7 @@ final class UsageScanner {
         for index in ledger.entries.indices {
             let previous = ledger.entries[index]
             UsageMetadata.recoverPricingDay(&ledger.entries[index])
-            if ledger.entries[index] != previous { markDirty() }
+            if ledger.entries[index] != previous { entryWillChange(at: index); markDirty() }
         }
     }
     static func restoreKey(_ entry: Entry) -> String {
@@ -318,6 +330,7 @@ final class UsageScanner {
     private func admitHistorical(_ entry: Entry) {
         let key = historyKey(entry)
         if let index = historicalIndex[key] {
+            entryWillChange(at: index)
             ledger.entries[index].tokens = ledger.entries[index].tokens + entry.tokens
             ledger.entries[index].sampleCount = ledger.entries[index].eventCount + entry.eventCount
             if let left = ledger.entries[index].modelCalls, let right = entry.modelCalls { ledger.entries[index].modelCalls = left + right }
@@ -348,7 +361,7 @@ final class UsageScanner {
             if entry.date < boundary { admitHistorical(entry) }
             else { ledger.entries.append(entry) }
         }
-        if old != ledger.entries { markDirty() }
+        if old != ledger.entries { entryBaseline = nil; markDirty() }
     }
     func rebuildHistoricalIndex() {
         historicalIndex = [:]

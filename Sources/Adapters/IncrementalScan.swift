@@ -28,12 +28,17 @@ struct UsageCheckpoint {
     var indexed = false
 }
 
-/// Contains cursor/provider metadata only, bound to one full ledger snapshot.
+/// Contains cursor/provider metadata bound to one full ledger snapshot.
 /// A new full save invalidates the prior checkpoint atomically by changing its ID.
+/// Version 2 also carries the entries admitted after the baseline's first
+/// `baseCount` entries, so new usage saves without rewriting full history.
+/// Older apps refuse version 2 and preserve it rather than drop those entries.
 struct LedgerMetadataCheckpoint: Codable {
     var version = 1
     let baseline: UUID
     let metadata: Ledger
+    var baseCount: Int?
+    var appended: [Entry]?
 }
 
 extension UsageScanner {
@@ -41,23 +46,35 @@ extension UsageScanner {
         stateURL.deletingPathExtension().appendingPathExtension("checkpoint.json")
     }
     static func loadLedger(from url: URL) throws -> Ledger {
+        try loadLedgerAndBaseline(from: url).ledger
+    }
+    /// Also returns how many entries the full ledger file holds, so later
+    /// checkpoints keep appending to the same UUID-bound baseline.
+    static func loadLedgerAndBaseline(from url: URL) throws -> (ledger: Ledger, baseCount: Int?) {
         var ledger = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: url))
+        let baseCount = ledger.checkpointID == nil ? nil : ledger.entries.count
         let metadataURL = metadataURL(for: url)
         if FileManager.default.fileExists(atPath: metadataURL.path) {
             let checkpoint = try JSONDecoder().decode(LedgerMetadataCheckpoint.self, from: Data(contentsOf: metadataURL))
-            guard checkpoint.version == 1, checkpoint.metadata.entries.isEmpty,
+            let shape = checkpoint.version == 1 ? checkpoint.appended == nil && checkpoint.baseCount == nil :
+                checkpoint.version == 2 && checkpoint.appended != nil && checkpoint.baseCount != nil
+            guard shape, checkpoint.metadata.entries.isEmpty,
                   checkpoint.metadata.checkpointID == checkpoint.baseline else {
                 throw RequestArchive.failure("Saved usage checkpoint is invalid; it has been preserved")
             }
             if checkpoint.baseline == ledger.checkpointID {
+                if let count = checkpoint.baseCount, count != ledger.entries.count {
+                    throw RequestArchive.failure("Saved usage checkpoint does not match its full ledger; both have been preserved")
+                }
                 var restored = checkpoint.metadata
                 restored.entries = ledger.entries
+                restored.entries.append(contentsOf: checkpoint.appended ?? [])
                 // The full ledger's recovery batch may still need indexing.
                 restored.eventIDs = (restored.eventIDs ?? []).union(ledger.eventIDs ?? [])
                 ledger = restored
             }
         }
-        return ledger
+        return (ledger, baseCount)
     }
     func retainErrors(_ errors: [String], for provider: String, paths: Set<URL>? = nil) {
         let scope = paths.map { Set($0.map { $0.resolvingSymlinksInPath().path }) }
@@ -100,26 +117,45 @@ extension UsageScanner {
         try finishCheckpoint()
         guard dirtyGeneration != savedGeneration,
               force || now.timeIntervalSince(lastSave) >= Self.fullSaveInterval else { return }
-        let metadataOnly = ledger.checkpointID != nil && contentGeneration == savedContentGeneration &&
-            (ledger.eventIDs ?? []).isEmpty
-        let url = metadataOnly ? Self.metadataURL(for: stateURL) : stateURL
+        // New entries and their IDs travel with the metadata in one atomic
+        // checkpoint. Edits to saved entries, or a long appended tail, need a
+        // new full baseline.
+        let appended = ledger.checkpointID == nil ? nil : appendedSinceBaseline()
+        let url = appended != nil ? Self.metadataURL(for: stateURL) : stateURL
         let checkpoint = UsageCheckpoint(generation: dirtyGeneration, contentGeneration: contentGeneration,
                                          ids: ledger.eventIDs ?? [], url: url)
         try checkpointWillRun?(.ledger)
-        if metadataOnly {
+        if let appended {
             var metadata = ledger
             metadata.entries = []
-            try PrivateCache.write(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata), to: url)
+            var sidecar = LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata)
+            if !appended.isEmpty { sidecar.version = 2; sidecar.baseCount = entryBaseline; sidecar.appended = Array(appended) }
+            try PrivateCache.write(sidecar, to: url)
         } else {
             var durable = ledger
             durable.checkpointID = UUID()
             try PrivateCache.write(durable, to: url)
             ledger.checkpointID = durable.checkpointID
+            entryBaseline = ledger.entries.count
+            entryBaselineLast = ledger.entries.last
         }
         pendingCheckpoint = checkpoint
         lastSave = now
         persistenceCount += 1
         try finishCheckpoint()
+    }
+
+    /// Entries after the full ledger's baseline, or nil when saved entries may
+    /// have changed or the tail outgrew `appendedEntryLimit`.
+    func appendedSinceBaseline() -> ArraySlice<Entry>? {
+        guard let base = entryBaseline, base <= ledger.entries.count,
+              ledger.entries.count - base <= appendedEntryLimit,
+              base == 0 || ledger.entries[base - 1] == entryBaselineLast else { return nil }
+        return ledger.entries[base...]
+    }
+    /// Call when an entry may change in place; only saved-baseline entries force a full save.
+    func entryWillChange(at index: Int) {
+        if let base = entryBaseline, index < base { entryBaseline = nil }
     }
 
     private func finishCheckpoint() throws {
