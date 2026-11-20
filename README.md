@@ -123,8 +123,9 @@ reports are prepared in the background from saved usage after relaunch, using a
 durable date/context index. Insights saves derived statistics and per-chat byte
 checkpoints, then processes only appended content in changed chats. Cached
 statistics appear before its lazy refresh. Prompt text is not persisted.
-Usage saves can lag newly displayed records by up to 10 minutes; normal quit
-flushes pending work. See [storage and recovery](ARCHITECTURE.md#log-to-ledger).
+Token Bar commits changed usage and scanner state to a local SQLite database.
+During normal operation, commits may lag displayed usage by up to 10 minutes.
+Quitting flushes pending work. See [migration and recovery](ARCHITECTURE.md#usage-storage-migration-and-recovery).
 
 Token Bar does not upload usage history or include telemetry. Prompt insights
 read local Codex text in memory; prompt text is not copied into the usage ledger.

@@ -120,8 +120,9 @@ let missingIndexURL = temp.appendingPathComponent("missing-index.json")
 let originalState = try JSONEncoder().encode(requiresIndex)
 try originalState.write(to: missingIndexURL)
 let missingIndex = UsageScanner(home: temp, stateURL: missingIndexURL)
-assert(missingIndex.scan().error != nil)
-assert(missingIndex.needsSave, "Initialization compaction makes this a genuine dirty final-flush case")
+let heldLegacy = missingIndex.scan()
+assert(heldLegacy.error != nil && heldLegacy.entries == requiresIndex.entries,
+       "Missing identities still leave the last readable history available")
 do { try missingIndex.saveIfNeeded(force: true); assertionFailure("Missing index must refuse final flush") } catch {}
 let retainedState = try Data(contentsOf: missingIndexURL)
 assert(retainedState == originalState, "Missing identity index must preserve the ledger")
@@ -566,12 +567,13 @@ do {
     let corruptIndex = corruptState.deletingPathExtension().appendingPathExtension("events.sqlite")
     try Data("not a SQLite database".utf8).write(to: corruptIndex)
     let corruptScanner = UsageScanner(home: temp, stateURL: corruptState)
+    corruptScanner.markMetadataDirty()
     assert(corruptScanner.loadError != nil && corruptScanner.needsSave)
     do { try corruptScanner.saveIfNeeded(force: true); assertionFailure("Corrupt index must refuse final flush") } catch {}
     let bytes = try Data(contentsOf: corruptState)
     assert(bytes == originalState, "Corrupt index final flush preserves original ledger bytes")
 }
-print("PASS: missing/corrupt index final flush preserves dirty-initialization ledger bytes")
+print("PASS: missing/corrupt index final flush preserves legacy ledger bytes")
 
 do {
     var calendar = Calendar(identifier: .gregorian)
@@ -777,15 +779,11 @@ for historical in [false, true] {
         try owner!.saveIfNeeded(force: true)
         continuityCheck(owner!.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 200, "\(kind) valid original \(historical)")
         if kind == "legacy" {
+            owner!.ledger.cursors = owner!.ledger.cursors.mapValues(withoutContinuity)
+            owner!.ledger.historyCursors = owner!.ledger.historyCursors?.mapValues(withoutContinuity)
+            owner!.markMetadataDirty()
+            try owner!.saveIfNeeded(force: true)
             owner = nil
-            var json = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
-            for field in ["cursors", "historyCursors"] {
-                if var cursors = json[field] as? [String: [String: Any]] {
-                    for key in cursors.keys { cursors[key]?.removeValue(forKey: "continuity") }
-                    json[field] = cursors
-                }
-            }
-            try JSONSerialization.data(withJSONObject: json).write(to: state)
         }
         var replacement = continuityMeta("original") + a + c
         if kind == "new-session" { replacement = continuityMeta("different") + continuityRecord("new-session-C", 1000, at: date) }
@@ -840,7 +838,7 @@ for historical in [false, true] {
     try append.write(contentsOf: continuityRecord("independent", 300, at: date.addingTimeInterval(2))); try append.close()
     _ = owner.scan(historical: historical, changedPaths: [file]); try owner.saveIfNeeded(force: true)
     continuityCheck(owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "independently disjoint interval resumes after overlap")
-    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner.ledgerStore = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
     let restored = UsageScanner(home: owner.home, stateURL: state); restored.readAccount = false
     continuityCheck(restored.loadError == nil, "restart opens its durable stores")
     _ = restored.scan(historical: historical, changedPaths: [file])
@@ -867,17 +865,33 @@ do {
     continuityCheck(owner.ledger.entries.filter { $0.date < Calendar.current.startOfDay(for: owner.ledger.started) }.reduce(0) { $0 + $1.tokens.input } == 100, "covered historical evidence does not rewrite prior admission timing")
 }
 
+func withoutContinuity(_ cursor: Cursor) -> Cursor {
+    var value = cursor
+    value.continuity = nil
+    return value
+}
+
+func persistLegacyCursors(_ scanner: UsageScanner) throws {
+    scanner.ledger.cursors = scanner.ledger.cursors.mapValues { cursor in
+        var value = withoutContinuity(cursor)
+        value.sourceSession = nil
+        value.lastFingerprint = nil
+        value.admittedBoundary = nil
+        value.lastObservation = nil
+        value.reconciliation = nil
+        value.continuityGap = nil
+        value.aliasWitness = nil
+        return value
+    }
+    scanner.markMetadataDirty()
+    try scanner.saveIfNeeded(force: true)
+}
+
 // Legacy migration without replacement and alias/archive moves retain identities.
 do {
     var (owner, file, state) = try continuityFixture("legacy-unchanged")
-    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
-    var cursors = legacy["cursors"] as! [String: [String: Any]]
-    for key in cursors.keys {
-        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
-    }
-    legacy["cursors"] = cursors
-    try JSONSerialization.data(withJSONObject: legacy).write(to: state)
-    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    try persistLegacyCursors(owner)
+    owner.ledgerStore = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     continuityCheck(owner.loadError == nil, "restart opens its durable stores")
     _ = owner.scan(changedPaths: [file])
@@ -921,13 +935,13 @@ for (phase, inPlace) in [(CodexReadPhase.opened, false), (.line, false), (.valid
     continuityCheck(owner.ledger.sourceErrors?.isEmpty == false, "unrelated success retains failed file diagnostic")
     owner.codexReadWillRun = nil
     _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
-    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner.ledgerStore = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
     let restored = UsageScanner(home: owner.home, stateURL: state); restored.readAccount = false
     continuityCheck(restored.loadError == nil, "restart opens its durable stores")
     _ = restored.scan(changedPaths: [file])
     continuityCheck(restored.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "\(phase) retry/restart admits C exactly once")
 }
-for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
+for phase in [CheckpointPhase.ledger, .commit, .acknowledge] {
     var (owner, file, state) = try continuityFixture("checkpoint-\(phase)")
     let prior = owner.ledger.cursors
     try (continuityMeta("original") + continuityRecord("A", 100, at: now) + continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
@@ -935,9 +949,9 @@ for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
     owner.checkpointWillRun = { if $0 == phase { throw RequestArchive.failure("Synthetic \(phase) failure") } }
     continuityCheck(owner.scan(changedPaths: [file]).error != nil, "\(phase) reports checkpoint failure")
     let durable = try UsageScanner.loadLedger(from: state)
-    continuityCheck(durable.entries.reduce(0) { $0 + $1.tokens.input } == (phase == .ledger ? 200 : 300), "\(phase) durable totals match phase")
-    if phase == .ledger { continuityCheck(durable.cursors == prior, "undurable usage cannot advance durable cursor") }
-    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    continuityCheck(durable.entries.reduce(0) { $0 + $1.tokens.input } == (phase == .acknowledge ? 300 : 200), "\(phase) durable totals match phase")
+    if phase != .acknowledge { continuityCheck(durable.cursors == prior, "undurable usage cannot advance durable cursor") }
+    owner.ledgerStore = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     continuityCheck(owner.loadError == nil, "restart opens its durable stores")
     _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
@@ -953,16 +967,11 @@ for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
 // implicit permission to bill a replayed last_request interval.
 do {
     var (owner, file, state) = try continuityFixture("legacy-overlap")
-    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
-    var cursors = legacy["cursors"] as! [String: [String: Any]]
-    for key in cursors.keys {
-        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
-    }
-    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
+    try persistLegacyCursors(owner)
     try (continuityMeta("original") + continuityRecord("A", 100, at: now) +
         continuityRecord("legacy-old", 150, at: now) + continuityRecord("legacy-overlap", 250, at: now) +
         continuityRecord("C", 300, at: now)).write(to: file, options: .atomic)
-    owner.eventIndex = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
+    owner.ledgerStore = nil; owner.requestArchive = nil // Release the prior storage owner before restart.
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     continuityCheck(owner.loadError == nil, "restart opens its durable stores")
     let result = owner.scan(changedPaths: [file])
@@ -1000,18 +1009,13 @@ do {
 
 do {
     var (owner, file, state) = try continuityFixture("legacy-no-anchor")
-    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
-    var cursors = legacy["cursors"] as! [String: [String: Any]]
-    for key in cursors.keys {
-        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
-    }
-    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
-    owner.eventIndex = nil; owner.requestArchive = nil
+    try persistLegacyCursors(owner)
+    owner.ledgerStore = nil; owner.requestArchive = nil
     try (continuityMeta("unverified") + continuityRecord("unseen-initial", 100, at: now)).write(to: file, options: .atomic)
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     let first = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
     continuityCheck(first.entries.reduce(0) { $0 + $1.tokens.input } == 200 && first.error != nil, "no-anchor legacy prefix is withheld with an explicit gap")
-    owner.eventIndex = nil; owner.requestArchive = nil
+    owner.ledgerStore = nil; owner.requestArchive = nil
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     continuityCheck(owner.loadError == nil, "no-anchor restart restores verified source boundary")
     // Production accepts fractional timestamps too; this fixture's ISO formatter
@@ -1023,7 +1027,7 @@ do {
     let next = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
     continuityCheck(next.entries.reduce(0) { $0 + $1.tokens.input } == 300 && next.error != nil, "verified later append resumes100 while historical gap remains")
     continuityCheck(owner.lastWork.codexBytes == bytes.count, "ordinary append reads only its tail")
-    owner.eventIndex = nil; owner.requestArchive = nil
+    owner.ledgerStore = nil; owner.requestArchive = nil
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     _ = owner.scan(changedPaths: [file])
     continuityCheck(owner.loadError == nil && owner.ledger.entries.reduce(0) { $0 + $1.tokens.input } == 300, "no-anchor recovered append is counted exactly once after restart")
@@ -1103,13 +1107,8 @@ do {
     iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     defer { iso.formatOptions = previousOptions }
     var (owner, file, state) = try continuityFixture("delayed-no-anchor")
-    var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
-    var cursors = legacy["cursors"] as! [String: [String: Any]]
-    for key in cursors.keys {
-        for field in ["continuity", "sourceSession", "lastFingerprint", "admittedBoundary", "lastObservation", "reconciliation", "continuityGap", "aliasWitness"] { cursors[key]?.removeValue(forKey: field) }
-    }
-    legacy["cursors"] = cursors; try JSONSerialization.data(withJSONObject: legacy).write(to: state)
-    owner.eventIndex = nil; owner.requestArchive = nil
+    try persistLegacyCursors(owner)
+    owner.ledgerStore = nil; owner.requestArchive = nil
     try (continuityMeta("delayed") + continuityRecord("unknown-prefix", 100, at: Date().addingTimeInterval(-60))).write(to: file, options: .atomic)
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     let initial = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
@@ -1127,7 +1126,7 @@ do {
     try appendDelayed("backdated-held", 200, afterInitialVerification.addingTimeInterval(-1))
     let held = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
     continuityCheck(held.entries.reduce(0) { $0 + $1.tokens.input } == 200 && held.error != nil, "pre-fence delayed replay remains withheld")
-    owner.eventIndex = nil; owner.requestArchive = nil
+    owner.ledgerStore = nil; owner.requestArchive = nil
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     continuityCheck(owner.loadError == nil, "delayed-stream restart opens durable state")
     try appendDelayed("delayed-new-C", 300, laterSourceDate)
@@ -1136,7 +1135,7 @@ do {
                     "post-fence delayed C must reach300 despite intervening held scan; got \(firstNew.entries.reduce(0) { $0 + $1.tokens.input })")
     try appendDelayed("delayed-new-D", 400, laterSourceDate.addingTimeInterval(0.005))
     _ = owner.scan(changedPaths: [file]); try owner.saveIfNeeded(force: true)
-    owner.eventIndex = nil; owner.requestArchive = nil
+    owner.ledgerStore = nil; owner.requestArchive = nil
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     let restarted = owner.scan(changedPaths: [file])
     continuityCheck(owner.loadError == nil && restarted.entries.reduce(0) { $0 + $1.tokens.input } == 400 && restarted.error != nil,
@@ -1177,7 +1176,7 @@ for historical in [false, true] {
         continuityCheck(unchanged.entries.reduce(0) { $0 + $1.tokens.input } == 300 && (unchanged.error != nil) == expectsGap,
                         "copied prefix unchanged scan neither recounts nor hides a gap")
         try owner.saveIfNeeded(force: true)
-        owner.eventIndex = nil; owner.requestArchive = nil
+        owner.ledgerStore = nil; owner.requestArchive = nil
         let reopened = UsageScanner(home: fixture, stateURL: fixture.appendingPathComponent("ledger.json")); reopened.readAccount = false
         let restarted = reopened.scan(historical: historical, changedPaths: [file])
         continuityCheck(reopened.loadError == nil && restarted.entries.reduce(0) { $0 + $1.tokens.input } == 300 &&
@@ -1232,7 +1231,7 @@ do {
     try owner.saveIfNeeded(force: true)
     let accepted = owner.ledger.entries
     let first = partial.readHealth.diagnostics.first?.firstChecked
-    owner.eventIndex = nil; owner.requestArchive = nil
+    owner.ledgerStore = nil; owner.requestArchive = nil
     owner = UsageScanner(home: owner.home, stateURL: state); owner.readAccount = false
     assert(owner.currentSnapshot().successfulReadAt == partial.successfulReadAt)
     assert(owner.currentSnapshot().readHealth.diagnostics.first?.firstChecked == first)

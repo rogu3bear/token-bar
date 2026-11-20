@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 func check(_ condition: @autoclosure () -> Bool, _ message: String) { precondition(condition(), message) }
 func date(_ day: String) -> Date { ProviderUsage.dayDate(day)! }
@@ -10,6 +11,28 @@ func entry(_ day: String, id: String = "one", effort: String? = "high", tokens: 
     value.requestInputTokens = tokens; value.contextBand = "short"; value.costMetadataVersion = 2
     return value
 }
+func checkpointAdmit(_ scanner: UsageScanner, _ name: String) -> String {
+    let id = UsageScanner.foreignIdentity(harness: "checkpoint-test", messageID: name)
+    var value = entry("2026-09-07", id: id)
+    value.session = "checkpoint"
+    scanner.persistAdmitted(value, fingerprint: id, date: value.date)
+    return id
+}
+
+if CommandLine.arguments.count == 4 && CommandLine.arguments[1] == "--crash-usage-commit" {
+    let state = URL(fileURLWithPath: CommandLine.arguments[2])
+    let scanner = UsageScanner(home: state.deletingLastPathComponent(), stateURL: state)
+    guard scanner.loadError == nil else { _exit(7) }
+    _ = checkpointAdmit(scanner, "crash")
+    scanner.ledger.cursors["crash"] = Cursor(offset: 23)
+    let stop: CheckpointPhase = CommandLine.arguments[3] == "before" ? .commit : .acknowledge
+    scanner.checkpointWillRun = {
+        if $0 == stop { kill(getpid(), SIGKILL) }
+    }
+    try scanner.saveIfNeeded(force: true)
+    _exit(8)
+}
+
 let root = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-accuracy-tests-" + UUID().uuidString)
 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: root) }
@@ -178,7 +201,7 @@ let ledgerURL = home.appendingPathComponent("ledger.json")
  do {
     let scanner = UsageScanner(home: home, stateURL: ledgerURL); scanner.rebuilding = true; scanner.readAccount = false
     let snapshot = scanner.scan(historical: true)
-    check(snapshot.error == nil && snapshot.entries.reduce(0) { $0 + $1.tokens.total } == 220, "Scanner still deduplicates identical fork counters")
+    check(snapshot.error == nil && snapshot.entries.reduce(0) { $0 + $1.tokens.total } == 220, "Scanner still deduplicates identical fork counters: " + (snapshot.error ?? "unexpected total"))
     var details: [Entry] = []; try scanner.requestArchive!.forEach { details.append($0) }
     check(details.count == 2 && details[0].date != details[1].date, "Archive retains separate timestamped records before daily aggregation")
     check(details[0].requestedService == "priority" && details[0].observedService == "default", "Requested and observed tier have independent provenance")
@@ -293,21 +316,14 @@ do {
         scanner.readAccount = false
         return scanner
     }
-    func admit(_ scanner: UsageScanner, _ name: String) -> String {
-        let id = UsageScanner.foreignIdentity(harness: "checkpoint-test", messageID: name)
-        var value = entry("2026-09-07", id: id)
-        value.session = "checkpoint"
-        scanner.persistAdmitted(value, fingerprint: id, date: value.date)
-        return id
-    }
     let batch = makeScanner("batches")
     for round in 0..<5 {
-        for item in 0..<2000 { _ = admit(batch, "batch-\(round)-\(item)") }
+        for item in 0..<2000 { _ = checkpointAdmit(batch, "batch-\(round)-\(item)") }
         try batch.saveIfNeeded(force: true)
-        let disk = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: batch.stateURL))
-        check(batch.ledger.eventIDs?.isEmpty == true && disk.eventIDs?.count == 2000,
-              "Memory retires IDs and disk retains only the latest batch, not lifetime IDs")
-        check(!batch.needsSave && batch.persistenceCount == round + 1, "One encoding per genuine batch")
+        let disk = try UsageScanner.loadLedger(from: batch.stateURL)
+        check(batch.ledger.eventIDs?.isEmpty == true && disk.eventIDs?.isEmpty == true,
+              "Committed event IDs live in the indexed table instead of accumulating in metadata")
+        check(!batch.needsSave && batch.persistenceCount == round + 1, "One transaction per genuine batch")
     }
     let retainedCount = try batch.requestArchive!.count
     check(retainedCount == 10000 && batch.ledger.entries.reduce(0) { $0 + $1.eventCount } == 10000, "All 10000 requests survive retirement")
@@ -318,167 +334,229 @@ do {
         }
     }
     for _ in 0..<5 { try batch.saveIfNeeded(force: true) }
-    check(batch.persistenceCount == 5, "Idle and final flush do not rewrite clean JSON")
+    check(batch.persistenceCount == 5, "Idle and final flush do not write a clean database")
     // Unforced saves wait out the full-save floor, so steady admissions cost one rewrite per interval.
     let floor = makeScanner("save-floor")
+    floor.markMetadataDirty()
     try floor.saveIfNeeded(force: true)
     let floorWrites = floor.persistenceCount
     let saved = floor.lastSave
     for step in 1...5 {
-        _ = admit(floor, "save-floor-\(step)")
+        _ = checkpointAdmit(floor, "save-floor-\(step)")
         try floor.saveIfNeeded(now: saved.addingTimeInterval(Double(step) * 100))
     }
     check(floor.persistenceCount == floorWrites && floor.needsSave, "Admissions inside the save floor stay pending without a rewrite")
-    try floor.saveIfNeeded(now: saved.addingTimeInterval(UsageScanner.fullSaveInterval))
+    try floor.saveIfNeeded(now: saved.addingTimeInterval(UsageScanner.saveInterval))
     check(floor.persistenceCount == floorWrites + 1 && !floor.needsSave, "One save at the floor settles every pending admission")
     let reopened = makeScanner("batches")
-    check(!reopened.needsSave, "Restart ID retirement alone does not require a JSON rewrite")
+    check(!reopened.needsSave, "Restart ID retirement alone does not require a new commit")
     check(reopened.ledger.entries.reduce(0) { $0 + $1.eventCount } == 10000, "Restart preserves all counters")
-    for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
+    for phase in [CheckpointPhase.ledger, .commit, .acknowledge] {
         let name = "failure-\(phase)"
         var failing: UsageScanner? = makeScanner(name)
         try failing!.saveIfNeeded(force: true)
-        let id = admit(failing!, name)
+        let id = checkpointAdmit(failing!, name)
+        failing!.ledger.cursors["synthetic"] = Cursor(offset: 42)
         failing!.checkpointWillRun = { step in
             if step == phase { throw RequestArchive.failure("Synthetic phase failure") }
         }
         do { try failing!.saveIfNeeded(force: true); preconditionFailure("Expected phase failure") } catch {}
-        let disk = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: failing!.stateURL))
-        check(disk.eventIDs?.contains(id) == (phase != .ledger), "Only durable snapshot carries the new ID")
-        check(failing!.eventIndex!.contains(id) == (phase == .acknowledge), "Index never leads durable ledger")
+        let disk = try UsageScanner.loadLedger(from: failing!.stateURL)
+        let committed = phase == .acknowledge
+        check(!disk.entries.isEmpty == committed && (disk.cursors["synthetic"]?.offset == 42) == committed,
+              "Totals and cursors share the commit")
+        check(failing!.ledgerStore!.contains(id) == committed, "Event identity shares the ledger commit")
         let invisible = try failing!.requestArchive!.count
         check(invisible == 0 && failing!.needsSave, "Failed phase is retriable and details stay pending")
         failing = nil
         let restart = makeScanner(name)
         let visible = try restart.requestArchive!.count
-        check(visible == (phase == .ledger ? 0 : 1), "Restart acknowledges only durable totals")
-        if phase == .ledger { _ = admit(restart, name); try restart.saveIfNeeded(force: true) }
+        check(visible == (committed ? 1 : 0), "Restart acknowledges only durable totals")
+        if phase != .acknowledge { _ = checkpointAdmit(restart, name); try restart.saveIfNeeded(force: true) }
         check(restart.identityKnown(id) == true, "Restart/retry knows exact original ID")
     }
     let retry = makeScanner("retry")
     try retry.saveIfNeeded(force: true)
-    let durableID = admit(retry, "durable")
+    let durableID = checkpointAdmit(retry, "durable")
     retry.checkpointWillRun = { if $0 == .acknowledge { throw RequestArchive.failure("Synthetic ack failure") } }
     do { try retry.saveIfNeeded(force: true); preconditionFailure("Expected ack failure") } catch {}
     let writes = retry.persistenceCount
-    let unsavedID = admit(retry, "not-yet-durable")
+    let unsavedID = checkpointAdmit(retry, "not-yet-durable")
     retry.checkpointWillRun = nil
     try retry.saveIfNeeded(now: retry.lastSave)
     let visible = try retry.requestArchive!.count
-    check(visible == 1 && retry.eventIndex!.contains(durableID) == true && retry.eventIndex!.contains(unsavedID) == false,
+    check(visible == 1 && retry.ledgerStore!.contains(durableID) == true && retry.ledgerStore!.contains(unsavedID) == false,
           "Retry only acknowledges captured durable IDs, not newer in-memory admissions")
     check(retry.persistenceCount == writes && retry.ledger.eventIDs == [unsavedID], "Ack retry needs no encoding and retires only captured IDs")
     try retry.saveIfNeeded(force: true)
     let finalCount = try retry.requestArchive!.count
     check(finalCount == 2 && !retry.needsSave, "Final flush settles new usage and checkpoint work")
-    let indexRetry = makeScanner("index-retry")
-    _ = admit(indexRetry, "index-retry")
-    indexRetry.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic index failure") } }
-    do { try indexRetry.saveIfNeeded(force: true); preconditionFailure("Expected index failure") } catch {}
-    indexRetry.checkpointWillRun = nil
-    try indexRetry.saveIfNeeded(force: true)
-    check(indexRetry.persistenceCount == 1 && !indexRetry.needsSave, "Index retry without input reuses durable snapshot")
+    let transactionRetry = makeScanner("commit-retry")
+    _ = checkpointAdmit(transactionRetry, "commit-retry")
+    transactionRetry.checkpointWillRun = { if $0 == .commit { throw RequestArchive.failure("Synthetic pre-commit failure") } }
+    do { try transactionRetry.saveIfNeeded(force: true); preconditionFailure("Expected pre-commit failure") } catch {}
+    transactionRetry.checkpointWillRun = nil
+    try transactionRetry.saveIfNeeded(force: true)
+    check(transactionRetry.persistenceCount == 1 && !transactionRetry.needsSave, "A rolled-back transaction can retry without duplicating usage")
 }
 print("PASS: 10000 IDs in five bounded recovery batches, storage-phase failure/restart, exact retry visibility and no idle rewrites")
 
-// Growing non-usage transcripts must checkpoint their byte position without
-// serializing historical entries again. Exercise the real scanner, not a timer.
-do {
-    let home = root.appendingPathComponent("metadata-checkpoint")
+for when in ["before", "after"] {
+    let url = root.appendingPathComponent("crash-\(when).json")
+    let child = Process()
+    child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+    child.arguments = ["--crash-usage-commit", url.path, when]
+    try child.run()
+    child.waitUntilExit()
+    check(child.terminationReason == .uncaughtSignal && child.terminationStatus == SIGKILL,
+          "Crash fixture dies at the real transaction boundary")
+    let scanner = UsageScanner(home: root, stateURL: url)
+    let committed = when == "after"
+    let id = UsageScanner.foreignIdentity(harness: "checkpoint-test", messageID: "crash")
+    let details = try scanner.requestArchive!.count
+    check(scanner.loadError == nil && !scanner.ledger.entries.isEmpty == committed &&
+          (scanner.ledger.cursors["crash"]?.offset == 23) == committed &&
+          scanner.identityKnown(id) == committed && details == (committed ? 1 : 0),
+          "Process kill restores totals, cursor and ID together and acknowledges only committed detail")
+}
+print("PASS: SIGKILL before COMMIT and after COMMIT before archive acknowledgement")
+
+// Measure actual SQLite WAL frame bytes for a metadata-only source read and
+// one admission. Start each fixture from the same kind of legacy snapshot.
+func walBytes(_ url: URL) throws -> Int {
+    let wal = URL(fileURLWithPath: LedgerStore.url(for: url).path + "-wal")
+    guard FileManager.default.fileExists(atPath: wal.path) else { return 0 }
+    return try wal.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+}
+
+for size in [10_000, 100_000] {
+    let home = root.appendingPathComponent("volume-\(size)")
     let sessions = home.appendingPathComponent("sessions")
     try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
     let url = home.appendingPathComponent("ledger.json")
     let log = sessions.appendingPathComponent("synthetic.jsonl")
-    let scanner = UsageScanner(home: home, stateURL: url)
-    scanner.readAccount = false
     var value = entry("2026-09-13")
-    value.date = Date(); value.pricingDay = nil; UsageMetadata.recoverPricingDay(&value)
-    scanner.ledger.entries = (0..<10_000).map { index in
-        var item = value; item.session = "history-\(index)"; item.recordID = "synthetic-\(index)"; return item
+    value.date = Date()
+    value.pricingDay = nil
+    UsageMetadata.recoverPricingDay(&value)
+    var legacy = Ledger()
+    legacy.entries = (0..<size).map { index in
+        var item = value
+        item.session = "history-\(index)"
+        item.recordID = "synthetic-\(index)"
+        return item
     }
-    scanner.markDirty()
-    try scanner.saveIfNeeded(force: true)
-    let baseline = try Data(contentsOf: url)
-    let baselineEntries = scanner.ledger.entries
+    for index in 0..<(size / 2) {
+        let key = "sessions/retained-\(index).jsonl"
+        legacy.cursors[key] = Cursor(offset: UInt64(index))
+    }
+    legacy.historyCursors = legacy.cursors
+    let legacyBytes = try JSONEncoder().encode(legacy)
+    try PrivateCache.write(legacyBytes, to: url)
+    var metadata = legacy
+    metadata.entries = []
+    let legacyMetadataBytes = try JSONEncoder().encode(metadata).count
+    let scanner = UsageScanner(home: home, stateURL: url, retainRequests: false)
+    scanner.readAccount = false
+    check(scanner.loadError == nil, scanner.loadError ?? "Migration succeeded")
+    let marker = try Data(contentsOf: url)
+    let baseline = try walBytes(url)
     let line = Data("{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}\n".utf8)
     try line.write(to: log)
     _ = scanner.scan(changedPaths: [log])
     try scanner.saveIfNeeded(force: true)
-    let metadataURL = UsageScanner.metadataURL(for: url)
-    let metadata = try Data(contentsOf: metadataURL)
-    check(try! Data(contentsOf: url) == baseline, "Cursor-only scan leaves every full-history byte unchanged")
-    check(metadata.count * 100 < baseline.count, "Cursor checkpoint excludes the history-sized payload")
-    let reopened = UsageScanner(home: home, stateURL: url)
-    reopened.readAccount = false
-    check(reopened.loadError == nil && reopened.ledger.entries == baselineEntries, "Restart restores exact original counters and metadata")
-    check(reopened.ledger.cursors["sessions/synthetic.jsonl"]?.offset == UInt64(line.count), "Restart uses the durable cursor")
-    _ = reopened.scan(changedPaths: [log])
-    check(!reopened.needsSave, "Restart does not replay an unchanged non-usage transcript")
-    let attrs = try FileManager.default.attributesOfItem(atPath: metadataURL.path)
-    check((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600, "Metadata remains private")
-    // A genuine admission must replace the full baseline before index/ack.
-    let id = UsageScanner.foreignIdentity(harness: "metadata-test", messageID: "new")
-    value.recordID = id
-    reopened.persistAdmitted(value, fingerprint: id, date: value.date)
-    reopened.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic index failure") } }
-    do { try reopened.saveIfNeeded(force: true); preconditionFailure("Expected index failure") } catch {}
-    let next = try Data(contentsOf: url)
-    check(next != baseline, "New admitted totals require a full durable save")
-    check(try! Data(contentsOf: metadataURL) == metadata, "Old metadata checkpoint is preserved across the full-save crash window")
-    let recovered = UsageScanner(home: home, stateURL: url)
-    check(recovered.loadError == nil && recovered.ledger.entries.count == baselineEntries.count + 1,
-          "Restart ignores stale metadata and recovers the newer full ledger")
-    check(recovered.identityKnown(id) == true, "Full save recovers exact dedup identity before exposing detail")
-    check(try! recovered.requestArchive!.count == 1, "Only durable admission is acknowledged after restart")
-    // A corrupt checkpoint is never silently ignored or overwritten.
-    try Data("broken checkpoint".utf8).write(to: metadataURL)
-    let broken = UsageScanner(home: home, stateURL: url)
-    check(broken.loadError != nil, "Invalid metadata fails closed")
-    do { try broken.saveIfNeeded(force: true); preconditionFailure("Expected preserved load failure") } catch {}
-    check(try! Data(contentsOf: url) == next, "Load failure preserves full history")
-    check(try! Data(contentsOf: metadataURL) == Data("broken checkpoint".utf8), "Load failure preserves corrupt checkpoint evidence")
-    print("PASS: real cursor-only scan writes \(metadata.count) metadata bytes instead of \(baseline.count) ledger bytes")
-}
-
-do {
-    for phase in [CheckpointPhase.ledger, .index, .acknowledge] {
-        let url = root.appendingPathComponent("metadata-failure-\(phase).json")
-        let scanner = UsageScanner(home: root, stateURL: url)
-        try scanner.saveIfNeeded(force: true)
-        let baseline = try Data(contentsOf: url)
-        scanner.ledger.cursors["synthetic"] = Cursor(offset: 42)
-        scanner.markMetadataDirty()
-        scanner.checkpointWillRun = { if $0 == phase { throw RequestArchive.failure("Synthetic metadata failure") } }
-        do { try scanner.saveIfNeeded(force: true); preconditionFailure("Expected metadata failure") } catch {}
-        let restart = UsageScanner(home: root, stateURL: url)
-        check(restart.ledger.cursors["synthetic"]?.offset == (phase == .ledger ? nil : 42), "Only durable metadata survives a process restart")
-        scanner.checkpointWillRun = nil
-        let writes = scanner.persistenceCount
-        try scanner.saveIfNeeded(force: true)
-        check(scanner.persistenceCount == writes + (phase == .ledger ? 1 : 0), "Index/ack retry never rewrites metadata")
-        check(try! Data(contentsOf: url) == baseline, "Metadata failure/retry never rewrites full history")
-        check(!scanner.needsSave, "Metadata retry settles the captured generation")
-    }
-}
-print("PASS: metadata checkpoint migration, restart, private permissions, stale/corrupt handling and storage-phase retry")
-
-do {
-    let url = root.appendingPathComponent("legacy-checkpoint.json")
-    var legacy = Ledger()
-    legacy.cursors["legacy"] = Cursor(offset: 7)
-    try JSONEncoder().encode(legacy).write(to: url)
-    var stale = Ledger(); stale.checkpointID = UUID(); stale.cursors["legacy"] = Cursor(offset: 99)
-    try JSONEncoder().encode(LedgerMetadataCheckpoint(baseline: stale.checkpointID!, metadata: stale))
-        .write(to: UsageScanner.metadataURL(for: url))
-    let scanner = UsageScanner(home: root, stateURL: url)
-    check(scanner.loadError == nil && scanner.ledger.cursors["legacy"]?.offset == 7,
-          "A legacy writer that drops the UUID cannot reactivate an old metadata checkpoint")
+    let cursorWAL = try walBytes(url)
+    let metadataBytes = cursorWAL - baseline
+    let id = checkpointAdmit(scanner, "volume")
     try scanner.saveIfNeeded(force: true)
-    let restored = try UsageScanner.loadLedger(from: url)
-    check(restored.checkpointID != nil && restored.cursors["legacy"]?.offset == 7,
-          "Legacy migration creates a full baseline before metadata-only writes")
+    let admissionBytes = try walBytes(url) - cursorWAL
+    let idleBefore = try walBytes(url)
+    try scanner.saveIfNeeded(force: true)
+    let idleBytes = try walBytes(url) - idleBefore
+    let disk = try UsageScanner.loadLedger(from: url)
+    check(disk.entries.count == size + 1 && disk.cursors["sessions/synthetic.jsonl"]?.offset == UInt64(line.count) &&
+          scanner.ledgerStore?.contains(id) == true, "Rows, cursor and ID survive reload")
+    check(metadataBytes > 0 && metadataBytes < 64 * 1024 && admissionBytes > 0 &&
+          admissionBytes < 64 * 1024 && idleBytes == 0, "Single changes touch a small bounded set of WAL pages")
+    check(try! Data(contentsOf: url) == marker, "Subsequent commits leave the legacy migration marker unchanged")
+    let attrs = try FileManager.default.attributesOfItem(atPath: LedgerStore.url(for: url).path)
+    check((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600, "Usage database remains private")
+    print("PASS: write volume \(size) entries, \(size) cursor rows: previous JSON \(legacyBytes.count) full / \(legacyMetadataBytes) cursor-only payload bytes; SQLite WAL \(admissionBytes) admission / \(metadataBytes) cursor-only / \(idleBytes) idle bytes")
 }
-print("PASS: legacy ledger migration and stale sidecar after older-writer rollback")
+
+for version in [1, 2] {
+    let url = root.appendingPathComponent("migrate-\(version).json")
+    let id = "pending-\(version)"
+    var legacy = Ledger()
+    legacy.checkpointID = UUID()
+    legacy.started = date("2026-09-01")
+    legacy.entries = [entry("2026-09-07", id: "indexed")]
+    if version == 1 {
+        legacy.entries.append(entry("2026-09-07", id: id))
+        legacy.eventIDs = [id]
+    }
+    legacy.eventIndexReady = true
+    let baselineBytes = try JSONEncoder().encode(legacy)
+    try PrivateCache.write(baselineBytes, to: url)
+    var metadata = legacy
+    metadata.entries = []
+    metadata.cursors["legacy"] = Cursor(offset: 42)
+    metadata.eventIDs = version == 2 ? [id] : []
+    let checkpoint = version == 1
+        ? LedgerMetadataCheckpoint(baseline: legacy.checkpointID!, metadata: metadata)
+        : LedgerMetadataCheckpoint(version: 2, baseline: legacy.checkpointID!, metadata: metadata,
+                                   baseCount: 1, appended: [entry("2026-09-07", id: id)])
+    let checkpointURL = UsageScanner.metadataURL(for: url)
+    let checkpointBytes = try JSONEncoder().encode(checkpoint)
+    try PrivateCache.write(checkpointBytes, to: checkpointURL)
+    let indexURL = url.deletingPathExtension().appendingPathExtension("events.sqlite")
+    do {
+        let oldIndex = try EventIndex(url: indexURL, required: false)
+        try oldIndex.commit(["indexed"])
+    }
+    let indexBytes = try Data(contentsOf: indexURL)
+    let archive = try RequestArchive(url: url.deletingPathExtension().appendingPathExtension("requests.sqlite"))
+    try archive.record(entry("2026-09-07", id: id))
+    var scanner: UsageScanner? = UsageScanner(home: root, stateURL: url)
+    check(scanner!.loadError == nil && scanner!.ledger.entries.count == 2 &&
+          scanner!.ledger.cursors["legacy"]?.offset == 42, "Migrate exact versioned baseline and metadata")
+    let details = try archive.count
+    check(scanner!.identityKnown(id) == true && scanner!.identityKnown("indexed") == true && details == 1,
+          "Migrate indexed and pending identities before acknowledging request details")
+    let preserved = url.deletingPathExtension().appendingPathExtension("before-sqlite.json")
+    check(try! Data(contentsOf: preserved) == baselineBytes && (try! Data(contentsOf: checkpointURL)) == checkpointBytes &&
+          (try! Data(contentsOf: indexURL)) == indexBytes, "Migration preserves predecessor files")
+    check((try? JSONDecoder().decode(Ledger.self, from: Data(contentsOf: url))) == nil, "Old readers refuse the migration marker")
+    scanner = nil
+    let db = LedgerStore.url(for: url)
+    try FileManager.default.moveItem(at: db, to: db.appendingPathExtension("held"))
+    let missing = UsageScanner(home: root, stateURL: url)
+    check(missing.loadError?.contains("database is missing") == true && !FileManager.default.fileExists(atPath: db.path),
+          "A missing migrated store must not reimport stale legacy state")
+}
+
+do {
+    let url = root.appendingPathComponent("legacy-invalid.json")
+    var legacy = Ledger()
+    legacy.checkpointID = UUID()
+    legacy.cursors["legacy"] = Cursor(offset: 7)
+    let baseline = try JSONEncoder().encode(legacy)
+    try PrivateCache.write(baseline, to: url)
+    let checkpoint = UsageScanner.metadataURL(for: url)
+    try PrivateCache.write(Data("broken checkpoint".utf8), to: checkpoint)
+    let broken = UsageScanner(home: root, stateURL: url)
+    check(broken.loadError != nil && !FileManager.default.fileExists(atPath: LedgerStore.url(for: url).path),
+          "Malformed legacy data blocks migration")
+    check(try! Data(contentsOf: url) == baseline && (try! Data(contentsOf: checkpoint)) == Data("broken checkpoint".utf8),
+          "Failed migration preserves its original files")
+    var stale = Ledger()
+    stale.checkpointID = UUID()
+    stale.cursors["legacy"] = Cursor(offset: 99)
+    try PrivateCache.write(LedgerMetadataCheckpoint(baseline: stale.checkpointID!, metadata: stale), to: checkpoint)
+    let scanner = UsageScanner(home: root, stateURL: url)
+    check(scanner.loadError == nil && scanner.ledger.cursors["legacy"]?.offset == 7, "Stale checkpoint cannot replace the current ledger")
+}
+print("PASS: v1 and v2 legacy migration, pending archive acknowledgement, stale/corrupt checkpoint and missing-store protection")
 
 do {
     let recoveryHome = root.appendingPathComponent("checkpoint-recovery")
@@ -492,7 +570,7 @@ do {
     do { try scanner.saveIfNeeded(force: true); preconditionFailure("Expected ack failure") } catch {}
     let writes = scanner.persistenceCount
     do { _ = try scanner.recoverCostDetails(); preconditionFailure("Recovery must settle pending checkpoint first") } catch {}
-    check(scanner.persistenceCount == writes, "Recovery failure retries pending phase without rewriting JSON")
+    check(scanner.persistenceCount == writes, "Recovery failure retries acknowledgement without another transaction")
     scanner.checkpointWillRun = nil
     _ = try scanner.recoverCostDetails()
     let count = try scanner.requestArchive!.count
@@ -504,7 +582,7 @@ do {
     scanner.ledger.costMetadataVersion = 1
     scanner.markDirty()
     try scanner.saveIfNeeded(force: true)
-    scanner.checkpointWillRun = { if $0 == .index { throw RequestArchive.failure("Synthetic recovery index failure") } }
+    scanner.checkpointWillRun = { if $0 == .acknowledge { throw RequestArchive.failure("Synthetic recovery acknowledgement failure") } }
     do { _ = try scanner.recoverCostDetails(); preconditionFailure("Expected recovered-ledger checkpoint failure") } catch {}
     let recoveryWrites = scanner.persistenceCount
     scanner.checkpointWillRun = nil

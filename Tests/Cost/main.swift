@@ -5,13 +5,11 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--abandon-cost
     do {
         let workspace = try CostRecoveryWorkspace(stateURL: URL(fileURLWithPath: CommandLine.arguments[2]))
         let state = try workspace.prepare()
-        let ids = try EventIndex(url: state.deletingPathExtension().appendingPathExtension("events.sqlite"), required: false)
-        try ids.commit(["synthetic-interrupted-event"])
-        let archive = try RequestArchive(url: state.deletingPathExtension().appendingPathExtension("requests.sqlite"))
+        let scanner = UsageScanner(home: state.deletingLastPathComponent(), stateURL: state)
         var row = Entry(date: Date(), session: "synthetic", model: "synthetic", tokens: Tokens(["input_tokens": 1, "output_tokens": 1]), account: nil)
         row.recordID = "synthetic-interrupted-event"
-        try archive.record(row, admitted: true)
-        try Data("interrupted-derived-checkpoint".utf8).write(to: UsageScanner.metadataURL(for: state))
+        scanner.persistAdmitted(row, fingerprint: row.recordID!, date: row.date)
+        try scanner.saveIfNeeded(force: true)
         withExtendedLifetime(workspace) { _exit(0) }
     } catch { _exit(9) }
 }
@@ -188,7 +186,10 @@ let records = [data("session_meta", ["model_provider": "openai"], date: yesterda
                data("turn_context", ["model": "gpt-6-astra", "effort": "high", "turn_id": "r2"], date: yesterday), event(b, last, date: yesterday)]
 try records.reduce(Data()) { $0 + $1 + Data([10]) }.write(to: sessions.appendingPathComponent("rollout-" + id + ".jsonl"))
 let ledgerURL = home.appendingPathComponent("state.json")
-var saved: Ledger = { let seed = UsageScanner(home: home, stateURL: ledgerURL); _ = seed.scan(historical: true); _ = seed.scan(); return seed.ledger }()
+let recovery = UsageScanner(home: home, stateURL: ledgerURL)
+_ = recovery.scan(historical: true)
+_ = recovery.scan()
+var saved = recovery.ledger
 func oldCursor(_ cursor: Cursor) -> Cursor { var c = cursor; c.provider = nil; c.effort = nil; c.previous?.cacheWrite = nil; return c }
 saved.cursors = saved.cursors.mapValues(oldCursor)
 saved.historyCursors = saved.historyCursors?.mapValues(oldCursor)
@@ -196,16 +197,17 @@ var retained = Entry(date: Calendar.current.startOfDay(for: yesterday), session:
 retained.bucket = "day"; retained.sampleCount = 2
 var unavailable = retained; unavailable.session = "missing-source"
 saved.entries = [retained, unavailable]
-try JSONEncoder().encode(saved).write(to: ledgerURL)
-let recovery = UsageScanner(home: home, stateURL: ledgerURL)
+recovery.ledger = saved
+recovery.markDirty()
 let originalOffsets = recovery.ledger.cursors.mapValues(\.offset)
 try recovery.saveIfNeeded(force: true)
-let beforePlanCheckpoint = try Data(contentsOf: ledgerURL)
+let beforePlanCheckpoint = try UsageScanner.loadLedger(from: ledgerURL)
 recovery.recordPlan("Synthetic checkpoint plan", date: Date(), account: nil, evidence: "test", model: nil)
 try recovery.saveIfNeeded(force: true)
-let afterPlanCheckpoint = try Data(contentsOf: ledgerURL)
-check(beforePlanCheckpoint == afterPlanCheckpoint && FileManager.default.fileExists(atPath: UsageScanner.metadataURL(for: ledgerURL).path),
-      "Rollback fixture stores its plan only in a metadata sidecar")
+let afterPlanCheckpoint = try UsageScanner.loadLedger(from: ledgerURL)
+check(beforePlanCheckpoint.entries == afterPlanCheckpoint.entries &&
+      afterPlanCheckpoint.plans?.values.contains { $0.plan == "Synthetic checkpoint plan" } == true,
+      "Rollback fixture persists its plan independently of the usage rows")
 let before = recovery.ledger.entries.reduce(0) { $0 + $1.tokens.total }
 _ = try recovery.recoverCostDetails()
 check(recovery.ledger.entries.reduce(0) { $0 + $1.tokens.total } == before, "Recovery never drops or adds historical totals")
@@ -221,68 +223,65 @@ check(again.ledger.entries.count == 3, "Effort bins survive restart and compacti
 check(again.ledger.entries.filter { $0.session == id }.reduce(0) { $0 + ($1.tokens.cacheWrite ?? 0) } == 30, "Cache writes survive historical reduction")
 try again.saveIfNeeded(force: true)
 let rollbackBeforeRepeat = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
-let ledgerBeforeRepeat = try Data(contentsOf: ledgerURL)
+let ledgerBeforeRepeat = try UsageScanner.loadLedger(from: ledgerURL)
 let repeatWrites = again.persistenceCount
 _ = try again.recoverCostDetails()
 check(again.ledger.entries.reduce(0) { $0 + $1.tokens.total } == before, "Repeated recovery is idempotent")
 let rollbackAfterRepeat = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
-let ledgerAfterRepeat = try Data(contentsOf: ledgerURL)
+let ledgerAfterRepeat = try UsageScanner.loadLedger(from: ledgerURL)
 check(rollbackAfterRepeat == rollbackBeforeRepeat,
       "Unchanged recovery cannot accumulate another full-history rollback copy")
-check(ledgerAfterRepeat == ledgerBeforeRepeat && again.persistenceCount == repeatWrites,
+check(ledgerAfterRepeat.entries == ledgerBeforeRepeat.entries && again.persistenceCount == repeatWrites,
       "Unchanged recovery does not replace the durable ledger")
 again.ledger.costRecoverySummary = "Earlier recovery status"
 again.markMetadataDirty()
 try again.saveIfNeeded(force: true)
 let statusRevision = again.ledger.reportRevision
 _ = try again.recoverCostDetails()
-let statusOnlyLedger = try Data(contentsOf: ledgerURL)
 let statusOnlyBackups = Set(try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-before-cost-") })
 let statusOnlyRestored = try UsageScanner.loadLedger(from: ledgerURL)
-check(statusOnlyLedger == ledgerBeforeRepeat && statusOnlyBackups == rollbackBeforeRepeat && again.ledger.reportRevision == statusRevision,
-      "A recovery-status-only change uses the metadata checkpoint, without another history copy or report revision")
+check(statusOnlyRestored.entries == ledgerBeforeRepeat.entries && statusOnlyBackups == rollbackBeforeRepeat && again.ledger.reportRevision == statusRevision,
+      "A recovery-status-only change updates metadata, without another history copy or report revision")
 check(statusOnlyRestored.costRecoverySummary == again.ledger.costRecoverySummary && statusOnlyRestored.costRecoverySummary != "Earlier recovery status",
-      "The recovery status remains durable through its UUID-bound metadata checkpoint")
+      "The recovery status remains durable through the committed ledger")
 var mismatch = retained; mismatch.tokens.input += 1
 check(CostRecovery.reconcile(original: [mismatch], reconstructed: recovery.ledger.entries).groups == 0, "Changed source totals cannot replace history")
 let preservedFiles = try FileManager.default.contentsOfDirectory(atPath: home.path)
 check(preservedFiles.contains { $0.hasPrefix("ledger-before-cost-") }, "Preserve private rollback ledger")
 let rollbackLedgers = try preservedFiles.filter { $0.hasPrefix("ledger-before-cost-") }.map {
-    try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: home.appendingPathComponent($0)))
+    try UsageScanner.loadLedger(from: home.appendingPathComponent($0))
 }
 check(rollbackLedgers.allSatisfy { $0.plans?.values.contains { $0.plan == "Synthetic checkpoint plan" } == true },
       "Self-contained rollback includes metadata stored outside the full history baseline")
 check(again.scan(historical: true).entries.reduce(0) { $0 + $1.tokens.total } == before, "Recovery preserves cursors and committed event identities")
 // Exercise the same scanner history/live/rebuild sequence as the native model.
-// The history read time may replace its one metadata sidecar; admitted stores
-// and rollback artifacts must remain byte-identical without new source usage.
+// Read clocks may add WAL frames. The admitted rows and separately stored
+// archive and rollback artifacts should stay the same without new source usage.
 _ = again.scan()
 try again.saveIfNeeded(force: true)
 func durableFiles() throws -> [String: Data] {
     var result: [String: Data] = [:]
     for name in try FileManager.default.contentsOfDirectory(atPath: home.path)
-        where name.hasPrefix("state.") || name.hasPrefix("ledger-before-cost-") {
+        where (name.hasPrefix("state.") || name.hasPrefix("ledger-before-cost-")) &&
+              !name.hasSuffix("-wal") && !name.hasSuffix("-shm") && name != LedgerStore.url(for: ledgerURL).lastPathComponent {
         result[name] = try Data(contentsOf: home.appendingPathComponent(name))
     }
     return result
 }
 let warmFiles = try durableFiles()
 let warmRows = try again.requestArchive!.count
-let checkpointName = UsageScanner.metadataURL(for: ledgerURL).lastPathComponent
-var metadataSizes = [warmFiles[checkpointName]?.count ?? 0]
 for iteration in 0..<20 {
     check(again.scan(historical: true).error == nil && again.scan().error == nil, "Normal unchanged refresh remains readable")
     if iteration % 4 == 0 { _ = try again.recoverCostDetails() }
     try again.saveIfNeeded(force: true)
     let files = try durableFiles()
     check(Set(files.keys) == Set(warmFiles.keys), "Repeated normal workflow creates no additional persistent artifacts")
-    for (name, bytes) in warmFiles where name != checkpointName {
+    for (name, bytes) in warmFiles {
         check(files[name] == bytes, "Unchanged history, archive, index and rollback bytes stay stable: " + name)
     }
-    metadataSizes.append(files[checkpointName]?.count ?? 0)
+    let disk = try UsageScanner.loadLedger(from: ledgerURL)
+    check(disk.entries == ledgerAfterRepeat.entries, "Read-clock updates preserve admitted entries")
 }
-check((metadataSizes.max() ?? 0) - (metadataSizes.min() ?? 0) < 256,
-      "The replaced metadata sidecar stays bounded while its read timestamp changes")
 check(try! again.requestArchive!.count == warmRows, "Unchanged refreshes do not append archive rows")
 let newUsage = [data("turn_context", ["model": "gpt-6-astra", "effort": "high", "turn_id": "r3"], date: yesterday),
                 event(counts(350, output: 35, write: 35), counts(50, output: 5, write: 5), date: yesterday)]
@@ -301,9 +300,7 @@ check(replayedArchive == appendedArchive && again.ledger.entries.reduce(0) { $0 
 // A retained ledger can need archive backfill without any summary enrichment.
 // Copy only synthetic ledger/index evidence into a fresh archive namespace.
 let archiveOnlyURL = home.appendingPathComponent("archive-only.json")
-try PrivateCache.write(UsageScanner.loadLedger(from: ledgerURL), to: archiveOnlyURL)
-try FileManager.default.copyItem(at: ledgerURL.deletingPathExtension().appendingPathExtension("events.sqlite"),
-                                to: archiveOnlyURL.deletingPathExtension().appendingPathExtension("events.sqlite"))
+try again.ledgerStore!.backup(to: LedgerStore.url(for: archiveOnlyURL))
 let archiveOnly = UsageScanner(home: home, stateURL: archiveOnlyURL)
 let archiveOnlyEntries = archiveOnly.ledger.entries
 let archiveOnlyRevision = archiveOnly.ledger.reportRevision
@@ -317,7 +314,7 @@ let archiveOnlyRecoveredRevision = archiveOnly.ledger.reportRevision
 _ = try archiveOnly.recoverCostDetails()
 check(archiveOnly.ledger.reportRevision == archiveOnlyRecoveredRevision,
       "Repeating archive-only backfill becomes a no-op once its details are retained")
-print("PASS: 20 native scanner refreshes and five rebuilds keep admitted stores/rollback artifacts byte-stable; metadata sidecar spans \(metadataSizes.min() ?? 0)...\(metadataSizes.max() ?? 0) bytes; one real append adds exactly one row")
+print("PASS: 20 native scanner refreshes and five rebuilds preserve usage and rollback artifacts; one real append adds exactly one row")
 print("PASS: end-to-end raw-log backfill, exact totals, missing-source retention, restart, cache-write bins, idempotence and rollback")
 
 var freshCursor = Cursor(); freshCursor.offset = 100; freshCursor.model = "gpt-6-astra"; freshCursor.turnID = "t"; freshCursor.previous = usage(); freshCursor.provider = "openai"; freshCursor.effort = "high"
@@ -811,11 +808,10 @@ do {
     let competing = try abandonedAttempt()
     check(competing == 9, "A live workspace owner refuses another producer before reset")
     let fresh = try workspace.prepare()
-    let index = try EventIndex(url: fresh.deletingPathExtension().appendingPathExtension("events.sqlite"), required: true)
+    let (store, freshLedger) = try LedgerStore.open(for: fresh)
     let archive = try RequestArchive(url: fresh.deletingPathExtension().appendingPathExtension("requests.sqlite"))
     let count = try archive.count
-    let freshLedger = try UsageScanner.loadLedger(from: fresh)
-    check(index.contains("synthetic-interrupted-event") == false && count == 0 && freshLedger.entries.isEmpty,
+    check(store.contains("synthetic-interrupted-event") == false && count == 0 && freshLedger.entries.isEmpty,
           "Restart resets only derived identities, detail rows and ledger before reconstruction")
     workspace.finish()
     check(!FileManager.default.fileExists(atPath: workspace.root.path), "Normal completion removes its own temporary workspace")

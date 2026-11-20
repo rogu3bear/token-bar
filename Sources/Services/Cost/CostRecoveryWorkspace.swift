@@ -98,18 +98,25 @@ final class CostRecoveryWorkspace {
             guard mkdir(directory.path, 0o700) == 0 else { throw RequestArchive.failure("Cost recovery derived directory could not be created") }
         }
         let ledger = directory.appendingPathComponent("ledger.json")
-        for name in ["ledger.json", "ledger.checkpoint.json", "ledger.events.sqlite", "ledger.requests.sqlite"] {
+        let names = ["ledger.json", "ledger.before-sqlite.json", "ledger.checkpoint.json",
+                     "ledger.sqlite", "ledger.events.sqlite", "ledger.requests.sqlite"]
+        for name in names {
             try checked(directory.appendingPathComponent(name))
             if name.hasSuffix(".sqlite") {
                 for suffix in ["-journal", "-wal", "-shm"] { try checked(directory.appendingPathComponent(name + suffix)) }
             }
         }
-        try EventIndex(url: ledger.deletingPathExtension().appendingPathExtension("events.sqlite"), required: false, refuseAliases: true).resetReconstruction()
-        try RequestArchive(url: ledger.deletingPathExtension().appendingPathExtension("requests.sqlite"), refuseAliases: true).resetReconstruction()
-        var baseline = Ledger(); baseline.checkpointID = UUID()
-        try PrivateCache.write(baseline, to: ledger)
-        try PrivateCache.write(LedgerMetadataCheckpoint(baseline: baseline.checkpointID!, metadata: baseline),
-                               to: UsageScanner.metadataURL(for: ledger))
+        // Only this exclusively owned reconstruction slot may be deleted.
+        // Validate all paths first, including journals of interrupted producers.
+        for name in names {
+            let suffixes = name.hasSuffix(".sqlite") ? ["", "-journal", "-wal", "-shm"] : [""]
+            for suffix in suffixes {
+                let url = directory.appendingPathComponent(name + suffix)
+                if try checked(url) { try FileManager.default.removeItem(at: url) }
+            }
+        }
+        _ = try LedgerStore.open(for: ledger)
+        _ = try RequestArchive(url: ledger.deletingPathExtension().appendingPathExtension("requests.sqlite"), refuseAliases: true)
         return ledger
     }
     /// Preserve the existing successful/throwing-return cleanup, while holding custody.

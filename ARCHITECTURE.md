@@ -21,7 +21,7 @@ not application state or UI code.
 | `AppDelegate`, `UsageModel` (`App.swift`) | AppDelegate owns native surfaces, commands and clocks; UsageModel connects process stores and services | host lifetime and orchestration |
 | `UsageReadHealth`, `UsageDiagnostic` | Structured source failure and coverage evidence; completed read clock, scope and recovery | Derived snapshot evidence; first-recorded diagnostic dates in ledger metadata |
 | `ReportScheduler`, `ReportState` | Utility-queue report work, latest-request publication and retained report choices | Derived reports and query state |
-| `UsageScanner` (`Usage.swift`, `UsageAdmission.swift`) with `EventIndex`, `RequestArchive`, `UsageMetadata` | qualify source intervals, admit once, retain and compact | `ledger.json`, `ledger.events.sqlite`, `ledger.requests.sqlite` |
+| `UsageScanner` (`Usage.swift`, `UsageAdmission.swift`) with `LedgerStore`, `RequestArchive`, `UsageMetadata` | qualify source intervals, admit once, retain and compact | `ledger.sqlite`, `ledger.requests.sqlite` |
 | `GrokUsage` | file-based Grok session usage through the same admission path; live activity from `active_sessions.json` and summary recency | Grok cursors in the ledger |
 | `LogStream` | FSEvents watcher on Codex, Claude, Grok and OpenCode homes | nothing |
 | `ActivityFeed`, `Activity`, `ClaudeActivityReader`, `Tachometer` | tool-scoped tasks, counter deltas, independent dials | in-memory |
@@ -41,9 +41,9 @@ not application state or UI code.
 
 | Concern | Canonical owner | Derived views | Proof |
 |---|---|---|---|
-| Admitted usage | `~/Library/Application Support/CodexTokenBar/ledger.json` | reports, charts, CSV | `Tests/main.swift`, `Tests/Accuracy` |
+| Admitted usage | `~/Library/Application Support/CodexTokenBar/ledger.sqlite` | reports, charts, CSV | `Tests/main.swift`, `Tests/Accuracy` |
 | Admitted counter coverage | Optional `ledger.usageCoverage`, keyed by logical source and established epoch | New / Covered / Unresolved decisions; coverage diagnostics | `Tests/main.swift`, `Tests/Harnesses`, `Tests/Grok` |
-| Event identity | `ledger.events.sqlite` plus in-flight ledger IDs | duplicate counts | `Tests/main.swift` |
+| Event identity | `event_ids` in `ledger.sqlite` plus in-flight ledger IDs | duplicate counts | `Tests/main.swift` |
 | Request detail | `ledger.requests.sqlite` | request CSV, evidence panel | `Tests/Accuracy` |
 | Cost reconstruction scratch | `CostRecoveryWorkspace`: one exclusively owned `cost-recovery-workspace` per ledger, reset on a new recovery and removed on normal return | Metadata reconciliation only; never admitted usage | `Tests/Cost`, `docs/COST.md` |
 | Quota and accounts | app-server responses, incrementally persisted in `live-accounts.sqlite` | runway, account cards | `Tests/main.swift`, `Tests/MenuBar` |
@@ -106,14 +106,12 @@ The surrounding pipeline preserves these responsibilities:
    live/history date partitions select observations; they do not establish novelty.
 3. **Admission validates and persists.** Fatal integrity failures are counted and
    excluded; permitted subordinate-counter reductions preserve core totals.
-   Write request detail pending, add the ledger entry/day bucket and coverage,
-   save atomically, index captured IDs, then acknowledge archive rows. Index/ack
-   failures retry the captured checkpoint without re-encoding. Indexed IDs retire
-   from memory; JSON retains the last recovery batch until the next genuine save.
-   Normal termination flushes outstanding work; storage-load failure preserves
-   saved data. Metadata-only changes write an entry-free UUID-bound sidecar;
-   only a matching full-ledger baseline accepts it. Legacy ledgers acquire a UUID
-   on full save; older apps may replay older cursors against the durable ID index.
+   Write request detail pending, then commit the affected entry or day bucket,
+   cursor and provider metadata rows, and event IDs together in `ledger.sqlite`.
+   Only committed IDs can acknowledge archive rows. A failed ledger transaction
+   leaves its whole batch pending. If archive acknowledgement fails after commit,
+   retry it without another ledger write, including on restart. Normal termination
+   drains the scanner queue and forces a commit inside the ordinary 10-minute interval.
    Archive admitted-row counts update only on successful admissions and invalidate
    after rollback or another connection's committed change.
 4. **Reports derive from admitted usage.** Publish saved results before scanning,
@@ -385,13 +383,41 @@ uses GrokQuotaMonitor for identity-bound Grok quota and never falls through to C
 
 ## Persistence and lazy work
 
-The durable stores are the ledger, matching metadata checkpoint, event index,
-request archive, sign-in timeline and Codex account database. The derived report
+The durable stores include the SQLite ledger (with its event index), request
+archive, sign-in timeline and Codex account database. The derived report
 index and per-chat prompt checkpoints are durable too. Report results and live
 output-rate baselines are process memory. Launch restores
 saved usage and starts source discovery. Changed files resume from validated
 cursors; unchanged files reuse checkpoints. Full discovery does not imply
 replaying every transcript.
+
+### Usage storage migration and recovery
+
+- On first open, Token Bar imports the legacy JSON, its matching version 1
+  metadata or version 2 appended-entry checkpoint, and the event index. It
+  also imports pending identities carried by the JSON. It publishes a complete
+  private database before replacing `ledger.json` with a migration marker.
+  The original JSON is retained as `ledger.before-sqlite.json` alongside the
+  old checkpoint and index. A corrupt checkpoint, missing required index, or
+  unusable migrated database stops saves. A marker with a missing database
+  never triggers a stale reimport.
+- Older builds and JSON-only diagnostics cannot read migrated history. The
+  predecessor files describe the migration boundary. Reverting to them would
+  discard later SQLite-only history. To back up a live store, use SQLite's
+  backup API or quit first and preserve the database and any remaining journal
+  files together with the request archive. The migration needs room for the
+  new database alongside the predecessor and may leave a private unpublished
+  file if the process is killed during migration. If the upgrade is interrupted,
+  resume it with the SQLite-capable build before opening the profile again.
+- Ordinary commits encode and write changed rows. The current scanner still
+  loads history into memory and compares it with the last committed snapshot.
+  Large imports, entry reordering during compaction or cost recovery, and large
+  per-provider diagnostic values can touch many pages in one transaction. Cost
+  recovery takes a full SQLite rollback snapshot before changing saved history.
+- SQLite uses WAL with full synchronization. A process crash before commit can
+  leave pending archive rows and uncommitted usage to replay from readable logs.
+  A crash after commit can leave only acknowledgement pending. This does not
+  recover deleted or truncated source history or repair database corruption.
 
 Report changes rebuild on a utility queue before navigation needs them. Returning
 to History or Cost does not invalidate an unchanged result. Scanner-owned content

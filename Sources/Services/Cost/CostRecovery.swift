@@ -168,13 +168,11 @@ extension UsageScanner {
         let missing = next.entries.filter { ($0.costMetadataVersion ?? 0) < 2 }.reduce(0) { $0 + $1.eventCount }
         var summary = (partialRecovery ? "Claude/Grok recovery only; other source failures leave those groups unchanged. " : "") + (excludedSessions.isEmpty ? "" : "Preserved \(excludedSessions.count) conflicting source sessions without enrichment. ") + "Reconciled details for \(recovered.groups) day/task/model groups. \(missing) older records remain unchanged; missing details stay Unknown."
         next.costRecoverySummary = summary
-        // Materialize the durable baseline plus matching metadata into one
-        // self-contained rollback ledger; copying only the base loses cursors.
+        // The rollback snapshot includes the committed identity table as well as usage.
         func preserveRollback() throws {
-            if FileManager.default.fileExists(atPath: stateURL.path) {
-                let backup = stateURL.deletingLastPathComponent().appendingPathComponent("ledger-before-cost-" + UUID().uuidString + ".json")
-                try PrivateCache.write(Self.loadLedger(from: stateURL), to: backup)
-            }
+            guard let ledgerStore else { throw RequestArchive.failure("The usage database is unavailable") }
+            let backup = stateURL.deletingLastPathComponent().appendingPathComponent("ledger-before-cost-" + UUID().uuidString + ".sqlite")
+            try ledgerStore.backup(to: backup)
         }
         let contentChanged = next.entries != ledger.entries || next.cursors != ledger.cursors ||
             next.historyCursors != ledger.historyCursors || next.claudeCounters != ledger.claudeCounters ||

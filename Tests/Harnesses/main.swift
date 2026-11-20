@@ -200,7 +200,8 @@ check(migrating!.ledger.entries.reduce(0) { $0 + $1.tokens.output } == 10, "Init
 // Reproduce an older installation: immutable base row survives but no counter checkpoint exists.
 migrating!.ledger.claudeCounters = nil
 migrating!.ledger.usageCoverage = nil
-try JSONEncoder().encode(migrating!.ledger).write(to: ledgerURL)
+migrating!.markMetadataDirty()
+try migrating!.saveIfNeeded(force: true)
 migrating = nil
 migrating = UsageScanner(home: migration, stateURL: ledgerURL, claudeHome: migrationHome)
 migrating!.readAccount = false
@@ -311,7 +312,8 @@ try writeClaude([growing[0]])
 _ = held!.scan(historical: true)
 held!.ledger.claudeCounters = nil
 held!.ledger.usageCoverage = nil
-try JSONEncoder().encode(held!.ledger).write(to: heldState)
+held!.markMetadataDirty()
+try held!.saveIfNeeded(force: true)
 held = nil
 held = UsageScanner(home: heldRoot, stateURL: heldState, retainRequests: false, claudeHome: migrationHome)
 held!.readAccount = false
@@ -491,16 +493,12 @@ let ending = try FileHandle(forWritingTo: incrementalFile)
 try ending.seekToEnd(); try ending.write(contentsOf: Data([10])); try ending.close()
 _ = incremental!.scan(historical: true, changedPaths: [incrementalFile])
 check(incremental!.ledger.entries.reduce(0) { $0 + $1.tokens.output } == beforePartial + 7, "Partial line survives a persisted tail checkpoint")
-let idleBytes = try Data(contentsOf: incrementalState)
-let idleStamp = try ClaudeFileCheck.read(incrementalState)
+let idleWrites = incremental!.persistenceCount
 incremental!.lastSave = .distantPast
 let idleGeneration = incremental!.dirtyGeneration
 _ = incremental!.scan(changedPaths: [])
 check(incremental!.dirtyGeneration == idleGeneration && !incremental!.needsSave, "An idle scan does not dirty the ledger")
-let idleAfter = try Data(contentsOf: incrementalState)
-check(idleAfter == idleBytes, "An idle scan does not encode a changed ledger")
-let idleStampAfter = try ClaudeFileCheck.read(incrementalState)
-check(idleStampAfter == idleStamp, "An idle scan does not atomically replace the ledger")
+check(incremental!.persistenceCount == idleWrites, "An idle scan does not commit a changed ledger")
 print("PASS: proportional Claude tail reads, persisted cursors, partial-line retry, provider dispatch and zero idle ledger writes")
 
 let incrementalDB = incrementalOpen.appendingPathComponent("opencode.db")

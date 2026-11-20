@@ -145,7 +145,7 @@ struct Cursor: Codable, Equatable {
     var aliasWitness: String?
     var usageEpoch: String?
 }
-struct Quota: Codable {
+struct Quota: Codable, Equatable {
     var name: String
     var used: Double
     var minutes: Int
@@ -153,8 +153,7 @@ struct Quota: Codable {
     var observed: Date
 }
 struct Ledger: Codable {
-    /// Identifies the exact full-history baseline for a metadata checkpoint.
-    /// Older ledgers decode without this field and migrate on their next save.
+    /// Legacy UUID that binds a JSON ledger to its metadata checkpoint.
     var checkpointID: UUID?
     /// Durable identity of admitted content; metadata-only checkpoints retain it.
     var reportRevision: UUID?
@@ -231,23 +230,19 @@ final class UsageScanner {
     var loadError: String?
     var historicalIndex: [String: Int] = [:]
     var rebuilding = false
-    /// Minimum seconds between full ledger saves while new usage keeps it dirty. Each save
-    /// re-encodes the whole ledger, so this bounds write volume; crash recovery re-admits
-    /// at most this window from durable cursors. Quit and explicit flushes save at once.
-    static let fullSaveInterval: TimeInterval = 600
+    /// Minimum seconds between ordinary commits. Quit and explicit flushes commit at once.
+    static let saveInterval: TimeInterval = 600
     var lastSave = Date.distantPast
     var dirtyGeneration: UInt64 = 0
     var savedGeneration: UInt64 = 0
-    var contentGeneration: UInt64 = 0
-    var savedContentGeneration: UInt64 = 0
     var persistenceCount = 0
-    var pendingCheckpoint: UsageCheckpoint?
+    var archiveAckPending = false
     /// Optional fault injection at durable storage boundaries; unset in production.
     var checkpointWillRun: ((CheckpointPhase) throws -> Void)?
     /// File-race/read-failure seam; production leaves this unset.
     var codexReadWillRun: ((CodexReadPhase, URL) throws -> Void)?
     var lastWork = ScanWork()
-    var eventIndex: EventIndex?
+    var ledgerStore: LedgerStore?
     var requestArchive: RequestArchive?
     var onAdmitted: ((Entry) -> Void)?
     var onSnapshot: ((Snapshot) -> Void)?
@@ -269,32 +264,23 @@ final class UsageScanner {
         self.home = home; self.stateURL = stateURL; self.grokHome = grokHome
         self.claudeHome = claudeHome; self.openCodeHome = openCodeHome
         ledger = Ledger()
-        if FileManager.default.fileExists(atPath: stateURL.path) {
-            do { ledger = try Self.loadLedger(from: stateURL) }
-            catch { loadError = "Saved usage history could not be read; it has been preserved. " + error.localizedDescription }
+        do {
+            (ledgerStore, ledger) = try LedgerStore.open(for: stateURL)
+            if retainRequests {
+                requestArchive = try RequestArchive(url: requestArchiveURL)
+                archiveAckPending = true
+                try finishArchiveAcknowledgement()
+            }
+            ledger.lastPoll = nil
+            compactHistoricalEntries()
+            recoverMissingPricingDays()
+        } catch {
+            // A readable legacy snapshot can still be displayed if its
+            // identity index or the migration is unavailable. The load error
+            // blocks all admission and saves.
+            if ledgerStore == nil, let readable = try? Self.loadLedger(from: stateURL) { ledger = readable }
+            loadError = "Saved usage history could not be opened; it has been preserved. " + error.localizedDescription
         }
-        if loadError == nil {
-            do {
-                try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-                eventIndex = try EventIndex(url: stateURL.deletingPathExtension().appendingPathExtension("events.sqlite"), required: ledger.eventIndexReady == true)
-                try eventIndex?.commit(ledger.eventIDs ?? [])
-                if retainRequests {
-                    requestArchive = try RequestArchive(url: requestArchiveURL)
-                    try requestArchive?.acknowledge { id in
-                        guard let found = eventIndex?.contains(id) else { throw RequestArchive.failure("Event identity could not be verified") }
-                        return found
-                    }
-                }
-                if ledger.eventIndexReady != true { markDirty() }
-                ledger.eventIDs = []
-                ledger.eventIndexReady = true
-            } catch { loadError = error.localizedDescription }
-        }
-        ledger.lastPoll = nil
-        if loadError == nil && ledger.reportRevision == nil { markDirty() }
-        compactHistoricalEntries()
-        recoverMissingPricingDays()
-        if !FileManager.default.fileExists(atPath: stateURL.path) { markDirty() }
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     }
     func recoverMissingPricingDays() {
@@ -478,7 +464,7 @@ final class UsageScanner {
     }
     func identityKnown(_ fingerprint: String) -> Bool? {
         if ledger.eventIDs == nil { ledger.eventIDs = [] }
-        guard let indexed = eventIndex?.contains(fingerprint) else {
+        guard let indexed = ledgerStore?.contains(fingerprint) else {
             loadError = "Historical identity lookup failed; usage history is preserved"
             return nil
         }

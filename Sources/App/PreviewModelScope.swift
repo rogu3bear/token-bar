@@ -6,13 +6,13 @@ enum PreviewModelScope {
     @MainActor static func run(root: URL, defaults: UserDefaults, releaseTimeout: TimeInterval = 15,
                               prepare: () throws -> Void = {}, body: (UsageModel) throws -> Void) throws {
         weak var releasedModel: UsageModel?
-        weak var releasedIndex: EventIndex?
+        weak var releasedStore: LedgerStore?
         weak var releasedArchive: RequestArchive?
         let result: Result<Void, Error> = autoreleasepool {
             do { try prepare() } catch { return .failure(error) }
             let model = UsageModel(previewRoot: root, defaults: defaults, referenceDate: PreviewFixture.date)
             releasedModel = model
-            releasedIndex = model.scanner.eventIndex
+            releasedStore = model.scanner.ledgerStore
             releasedArchive = model.scanner.requestArchive
             let result = Result { try body(model) }
             do {
@@ -26,7 +26,7 @@ enum PreviewModelScope {
         // If a fixture leaks an owner, fail visibly and preserve its files for
         // diagnosis instead of unlinking a database that is still open.
         try PreviewFixture.settle("preview resource release", timeout: releaseTimeout) {
-            releasedModel == nil && releasedIndex == nil && releasedArchive == nil
+            releasedModel == nil && releasedStore == nil && releasedArchive == nil
         }
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
         try result.get()
@@ -53,7 +53,7 @@ enum PreviewModelScope {
         PreviewFixture.prepare()
         _ = NSApplication.shared
         enum Expected: Error { case failure }
-        for mode in ["return", "throw", "setup-throw", "pending-report", "retained-window", "retained-owner"] {
+        for mode in ["return", "throw", "setup-throw", "pending-report", "quit-flush", "retained-window", "retained-owner"] {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("TokenBar-lifecycle-" + UUID().uuidString)
             let suite = "local.tokenbar.lifecycle." + UUID().uuidString
             let defaults = UserDefaults(suiteName: suite)!
@@ -70,7 +70,7 @@ enum PreviewModelScope {
                         throw Expected.failure
                     }
                 }) { model in
-                    precondition(model.scanner.eventIndex != nil && model.scanner.requestArchive != nil)
+                    precondition(model.scanner.ledgerStore != nil && model.scanner.requestArchive != nil)
                     if mode == "retained-window" {
                         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 100),
                                               styleMask: [.borderless], backing: .buffered, defer: false)
@@ -81,6 +81,19 @@ enum PreviewModelScope {
                     }
                     if mode == "throw" { throw Expected.failure }
                     if mode == "pending-report" { model.rebuild() }
+                    if mode == "quit-flush" {
+                        // No ingestion runs in this preview. Set up pending
+                        // work, then use the same flush as applicationWillTerminate.
+                        let scanner = model.scanner
+                        scanner.lastSave = Date()
+                        scanner.ledger.cursors["synthetic-quit"] = Cursor(offset: 42)
+                        scanner.markMetadataDirty()
+                        try scanner.saveIfNeeded()
+                        precondition(scanner.needsSave)
+                        model.flushUsage()
+                        let disk = try UsageScanner.loadLedger(from: scanner.stateURL)
+                        precondition(!scanner.needsSave && disk.cursors["synthetic-quit"]?.offset == 42)
+                    }
                     if mode == "retained-owner" { held = model; heldArchive = model.scanner.requestArchive }
                 }
             } catch Expected.failure { caught = true }

@@ -71,7 +71,7 @@ enum RecoveryPreviewData {
             throw CocoaError(.fileWriteInvalidFileName)
         }
         let receipt: [String: Any] = ["root": root.path, "source": root.appendingPathComponent("sessions/recovery.jsonl").path,
-            "ledger": model.scanner.stateURL.path, "processedTokens": model.report.totals.total,
+            "ledger": LedgerStore.url(for: model.scanner.stateURL).path, "processedTokens": model.report.totals.total,
             "expectedUnpricedTokens": unpriced, "coverageWarnings": model.snapshot.readHealth.continuityCount,
             "currentReadFailed": model.snapshot.readHealth.failed, "notificationAdapters": QuotaGuardNotifications.constructionCount,
             "startingEvidence": "Scanner-created persisted ledger and source diagnostics loaded by UsageModel; no display snapshot assignment"]

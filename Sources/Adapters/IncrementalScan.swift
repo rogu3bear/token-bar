@@ -3,7 +3,7 @@ import Darwin
 
 /// Durable byte position; the boundary digest detects replacement/truncation
 /// without rereading an unchanged transcript prefix.
-struct ClaudeCursor: Codable {
+struct ClaudeCursor: Codable, Equatable {
     var offset: UInt64
     var stamp: ClaudeFileCheck
     var boundary: String
@@ -18,22 +18,16 @@ struct ScanWork {
     var openCodeRows = 0
 }
 
-enum CheckpointPhase: Equatable { case ledger, index, acknowledge }
+enum CheckpointPhase: Equatable { case ledger, commit, acknowledge }
 
-struct UsageCheckpoint {
-    let generation: UInt64
-    let contentGeneration: UInt64
-    let ids: Set<String>
-    let url: URL
-    var indexed = false
-}
-
-/// Contains cursor/provider metadata only, bound to one full ledger snapshot.
-/// A new full save invalidates the prior checkpoint atomically by changing its ID.
+/// Legacy cursor/provider metadata bound to one JSON baseline. Version 2
+/// also carries the entries appended after that baseline.
 struct LedgerMetadataCheckpoint: Codable {
     var version = 1
     let baseline: UUID
     let metadata: Ledger
+    var baseCount: Int?
+    var appended: [Entry]?
 }
 
 extension UsageScanner {
@@ -41,17 +35,32 @@ extension UsageScanner {
         stateURL.deletingPathExtension().appendingPathExtension("checkpoint.json")
     }
     static func loadLedger(from url: URL) throws -> Ledger {
+        if url.pathExtension == "sqlite" { return try LedgerStore.read(url) }
+        let databaseURL = LedgerStore.url(for: url)
+        if FileManager.default.fileExists(atPath: databaseURL.path) { return try LedgerStore.read(databaseURL) }
+        return try loadLegacyLedger(from: url)
+    }
+
+    static func loadLegacyLedger(from url: URL) throws -> Ledger {
+        if try LedgerStore.isMigrationMarker(url) {
+            throw RequestArchive.failure("The migrated usage database is missing; restore it from backup")
+        }
         var ledger = try JSONDecoder().decode(Ledger.self, from: Data(contentsOf: url))
         let metadataURL = metadataURL(for: url)
         if FileManager.default.fileExists(atPath: metadataURL.path) {
             let checkpoint = try JSONDecoder().decode(LedgerMetadataCheckpoint.self, from: Data(contentsOf: metadataURL))
-            guard checkpoint.version == 1, checkpoint.metadata.entries.isEmpty,
+            let validShape = (checkpoint.version == 1 && checkpoint.baseCount == nil && checkpoint.appended == nil) ||
+                (checkpoint.version == 2 && checkpoint.baseCount != nil && checkpoint.appended != nil)
+            guard validShape, checkpoint.metadata.entries.isEmpty,
                   checkpoint.metadata.checkpointID == checkpoint.baseline else {
                 throw RequestArchive.failure("Saved usage checkpoint is invalid; it has been preserved")
             }
             if checkpoint.baseline == ledger.checkpointID {
+                guard checkpoint.baseCount == nil || checkpoint.baseCount == ledger.entries.count else {
+                    throw RequestArchive.failure("The saved usage checkpoint does not match the ledger's entry count")
+                }
                 var restored = checkpoint.metadata
-                restored.entries = ledger.entries
+                restored.entries = ledger.entries + (checkpoint.appended ?? [])
                 // The full ledger's recovery batch may still need indexing.
                 restored.eventIDs = (restored.eventIDs ?? []).union(ledger.eventIDs ?? [])
                 ledger = restored
@@ -90,59 +99,37 @@ extension UsageScanner {
 
     /// Serial scanner queue only. Cursor/metadata mutations count as durable work;
     /// a polling timestamp alone does not.
-    func markDirty() { dirtyGeneration &+= 1; contentGeneration &+= 1; ledger.reportRevision = UUID() }
+    func markDirty() { dirtyGeneration &+= 1; ledger.reportRevision = UUID() }
     func markMetadataDirty() { dirtyGeneration &+= 1 }
-    var needsSave: Bool { pendingCheckpoint != nil || dirtyGeneration != savedGeneration }
+    var needsSave: Bool { archiveAckPending || dirtyGeneration != savedGeneration }
+
     func saveIfNeeded(now: Date = Date(), force: Bool = false) throws {
         if let loadError { throw RequestArchive.failure(loadError) }
-        // Finish the already durable snapshot before capturing newer admissions.
-        // Retrying SQLite phases never re-encodes an identical JSON snapshot.
-        try finishCheckpoint()
+        try finishArchiveAcknowledgement()
         guard dirtyGeneration != savedGeneration,
-              force || now.timeIntervalSince(lastSave) >= Self.fullSaveInterval else { return }
-        let metadataOnly = ledger.checkpointID != nil && contentGeneration == savedContentGeneration &&
-            (ledger.eventIDs ?? []).isEmpty
-        let url = metadataOnly ? Self.metadataURL(for: stateURL) : stateURL
-        let checkpoint = UsageCheckpoint(generation: dirtyGeneration, contentGeneration: contentGeneration,
-                                         ids: ledger.eventIDs ?? [], url: url)
+              force || now.timeIntervalSince(lastSave) >= Self.saveInterval else { return }
+        guard let ledgerStore else { throw RequestArchive.failure("The usage database is unavailable") }
         try checkpointWillRun?(.ledger)
-        if metadataOnly {
-            var metadata = ledger
-            metadata.entries = []
-            try PrivateCache.write(LedgerMetadataCheckpoint(baseline: ledger.checkpointID!, metadata: metadata), to: url)
-        } else {
-            var durable = ledger
-            durable.checkpointID = UUID()
-            try PrivateCache.write(durable, to: url)
-            ledger.checkpointID = durable.checkpointID
-        }
-        pendingCheckpoint = checkpoint
+        try ledgerStore.commit(ledger) { try checkpointWillRun?(.commit) }
+
+        ledger.eventIDs = []
+        savedGeneration = dirtyGeneration
         lastSave = now
         persistenceCount += 1
-        try finishCheckpoint()
+        archiveAckPending = requestArchive != nil
+        try finishArchiveAcknowledgement()
     }
 
-    private func finishCheckpoint() throws {
-        guard let checkpoint = pendingCheckpoint else { return }
-        guard let eventIndex else { throw RequestArchive.failure("Event identity index is unavailable") }
-        if !checkpoint.indexed {
-            try checkpointWillRun?(.index)
-            try eventIndex.commit(checkpoint.ids)
-            pendingCheckpoint?.indexed = true
-        }
+    func finishArchiveAcknowledgement() throws {
+        guard archiveAckPending else { return }
         try checkpointWillRun?(.acknowledge)
         try requestArchive?.acknowledge { id in
-            // Only the index contains identities backed by durable totals.
-            // ledger.eventIDs may also contain newer, unsaved admissions.
-            guard let found = eventIndex.contains(id) else { throw RequestArchive.failure("Event identity could not be verified") }
-            return found
+            // Only the database contains committed IDs. Newer in-memory
+            // admissions must stay pending, even during acknowledgement retry.
+            guard let known = ledgerStore?.contains(id) else { throw RequestArchive.failure("Event identity could not be verified") }
+            return known
         }
-        ledger.eventIDs?.subtract(checkpoint.ids)
-        savedGeneration = checkpoint.generation
-        savedContentGeneration = checkpoint.contentGeneration
-        pendingCheckpoint = nil
-        // No cleanup-only write: the next genuine save replaces the residual
-        // on-disk ID batch. It is recovery evidence, not lifetime accumulation.
+        archiveAckPending = false
     }
 
     static func boundary(_ handle: FileHandle, offset: UInt64) throws -> String {

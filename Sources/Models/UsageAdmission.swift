@@ -158,7 +158,7 @@ extension UsageScanner {
         let reconciling = cursor.reconciliation != nil
         let recoveredBoundary = cursor.reconciliation.map { recovery in
             let matches = recovery.fingerprint.map { $0 == fingerprint && recovery.session == cursor.sourceSession } ??
-                ((ledger.eventIDs?.contains(fingerprint) == true || eventIndex?.contains(fingerprint) == true))
+                ((ledger.eventIDs?.contains(fingerprint) == true || ledgerStore?.contains(fingerprint) == true))
             return matches && (recovery.session == nil || recovery.session == cursor.sourceSession) && recovery.previous == total &&
                 (recovery.covered.map { total.input >= $0.total.input && total.output >= $0.total.output && date >= $0.date } ?? true)
         } ?? false
