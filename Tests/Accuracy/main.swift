@@ -535,6 +535,38 @@ for version in [1, 2] {
           "A missing migrated store must not reimport stale legacy state")
 }
 
+let malformedV2Cases: [(String, Int?, String)] = [
+    ("mismatched-count", 2, "entry count"),
+    ("missing-count", nil, "checkpoint is invalid"),
+]
+for (name, baseCount, expectedError) in malformedV2Cases {
+    let url = root.appendingPathComponent("legacy-v2-\(name).json")
+    let checkpointURL = UsageScanner.metadataURL(for: url)
+    var legacy = Ledger()
+    let baseline = UUID()
+    legacy.checkpointID = baseline
+    legacy.entries = [entry("2026-09-07", id: "baseline")]
+    var metadata = legacy
+    metadata.entries = []
+    let checkpoint = LedgerMetadataCheckpoint(version: 2, baseline: baseline, metadata: metadata,
+                                              baseCount: baseCount, appended: [entry("2026-09-07", id: "appended")])
+    let original = try JSONEncoder().encode(legacy)
+    let sidecar = try JSONEncoder().encode(checkpoint)
+    try PrivateCache.write(original, to: url)
+    try PrivateCache.write(sidecar, to: checkpointURL)
+
+    let scanner = UsageScanner(home: root, stateURL: url)
+    check(scanner.loadError?.contains(expectedError) == true, "Reject malformed v2 checkpoint: " + name)
+    do {
+        try scanner.saveIfNeeded(force: true)
+        preconditionFailure("A malformed v2 checkpoint must block quit flush")
+    } catch {}
+    check(try! Data(contentsOf: url) == original && (try! Data(contentsOf: checkpointURL)) == sidecar &&
+          !FileManager.default.fileExists(atPath: LedgerStore.url(for: url).path),
+          "Refused migration preserves both legacy files and publishes no database")
+}
+print("PASS: malformed v2 migration refuses a missing or mismatched base count and preserves the original files")
+
 for change in ["none", "ledger", "checkpoint", "index"] {
     let url = root.appendingPathComponent("unsealed-\(change).json")
     let checkpointURL = UsageScanner.metadataURL(for: url)
